@@ -18,12 +18,20 @@
         <nav class="sidebar__nav">
             <a href="{% url 'dashboard' %}"
                class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}">
-                Главная
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10.5 9-7.5 9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+                    Главная
+                </span>
             </a>
+
+            <div class="nav-label">Работа</div>
             <div class="nav-group">
                 <a href="{% url 'projects:list' %}"
                    class="nav-item {% if request.resolver_match.namespace == 'projects' %}is-active{% endif %}">
-                    Проекты
+                    <span class="nav-item__label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                        Проекты
+                    </span>
                 </a>
                 <div class="nav-sub">
                     <a href="{% url 'projects:list' %}">Все проекты</a>
@@ -32,26 +40,50 @@
                     <a href="{% url 'projects:list' %}?view=completed">Завершённые</a>
                 </div>
             </div>
-            <a href="{% url 'clients:list' %}"
-               class="nav-item {% if request.resolver_match.namespace == 'clients' %}is-active{% endif %}">
-                Клиенты
-            </a>
             <a href="{% url 'tasks:list' %}"
                class="nav-item {% if request.resolver_match.namespace == 'tasks' %}is-active{% endif %}">
-                Задачи
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Задачи
+                </span>
             </a>
+            <a href="{% url 'clients:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'clients' %}is-active{% endif %}">
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Клиенты
+                </span>
+            </a>
+            <a href="{% url 'documents:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'documents' %}is-active{% endif %}">
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                    Документы
+                </span>
+            </a>
+
+            <div class="nav-label">Люди</div>
             <a href="{% url 'teams:overview' %}"
                class="nav-item {% if request.resolver_match.namespace == 'teams' %}is-active{% endif %}">
-                Команды
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Команды
+                </span>
             </a>
             <a href="{% url 'interns:list' %}"
                class="nav-item {% if request.resolver_match.namespace == 'interns' %}is-active{% endif %}">
-                Стажёры
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
+                    Стажёры
+                </span>
             </a>
             <div class="nav-group">
                 <a href="{% url 'resources:forecast' %}"
                    class="nav-item {% if request.resolver_match.namespace == 'resources' %}is-active{% endif %}">
-                    Ресурсы
+                    <span class="nav-item__label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 12 10 5 10-5"/><path d="m2 17 10 5 10-5"/></svg>
+                        Ресурсы
+                    </span>
                 </a>
                 <div class="nav-sub">
                     <a href="{% url 'teams:overview' %}">Загрузка</a>
@@ -59,23 +91,36 @@
                     <a href="{% url 'resources:forecast' %}">Прогноз потребности</a>
                 </div>
             </div>
-            <a href="{% url 'documents:list' %}"
-               class="nav-item {% if request.resolver_match.namespace == 'documents' %}is-active{% endif %}">
-                Документы
-            </a>
+
+            <div class="nav-label">Контроль</div>
             <a href="{% url 'meetings:list' %}"
                class="nav-item {% if request.resolver_match.namespace == 'meetings' %}is-active{% endif %}">
-                Собрания
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>
+                    Собрания
+                </span>
             </a>
-            <span class="nav-item is-disabled">Календарь <em>скоро</em></span>
+            <span class="nav-item is-disabled">
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
+                    Календарь
+                </span>
+                <em>скоро</em>
+            </span>
             <a href="{% url 'risks:list' %}"
                class="nav-item {% if request.resolver_match.namespace == 'risks' %}is-active{% endif %}">
-                Риски
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                    Риски
+                </span>
             </a>
             <div class="nav-group">
                 <a href="{% url 'reports:weekly_list' %}"
                    class="nav-item {% if request.resolver_match.namespace == 'reports' %}is-active{% endif %}">
-                    Отчёты
+                    <span class="nav-item__label">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                        Отчёты
+                    </span>
                 </a>
                 <div class="nav-sub">
                     <a href="{% url 'reports:weekly_list' %}">Недельный</a>
@@ -84,9 +129,12 @@
             </div>
             <a href="{% url 'notifications:list' %}"
                class="nav-item {% if request.resolver_match.namespace == 'notifications' %}is-active{% endif %}">
-                Уведомления
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                    Уведомления
+                </span>
                 {% if unread_notifications %}
-                    <em style="background: var(--red); color:#fff">{{ unread_notifications }}</em>
+                    <em class="nav-count">{{ unread_notifications }}</em>
                 {% endif %}
             </a>
         </nav>
