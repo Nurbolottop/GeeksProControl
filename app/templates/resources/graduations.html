@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Выпуски — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Будущие выпуски</h1>
+        <div class="sub">Учебные группы по датам окончания (ТЗ §13)</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'resources:forecast' %}" class="btn btn--secondary">Прогноз потребности</a>
+    </div>
+</div>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Группа</th>
+                <th>Направление</th>
+                <th>Филиал</th>
+                <th>Окончание</th>
+                <th>Обучающихся</th>
+                <th>Прогноз в стажировку</th>
+                <th>Фактически пришло</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% regroup groups by end_date|date:'F Y' as months %}
+            {% for month in months %}
+                <tr><td colspan="7" style="background:#f8fafc; font-weight:700; text-transform:capitalize">{{ month.grouper }}</td></tr>
+                {% for group in month.list %}
+                    <tr>
+                        <td><strong>{{ group.number }}</strong></td>
+                        <td>{{ group.specialization }}</td>
+                        <td>{{ group.branch|default:'—' }}</td>
+                        <td>{{ group.end_date|date:'d.m.Y' }}</td>
+                        <td>{{ group.students_count }}</td>
+                        <td>{{ group.expected_interns }}</td>
+                        <td>{{ group.actual_interns|default:'—' }}</td>
+                    </tr>
+                {% endfor %}
+            {% empty %}
+                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">
+                    Будущих выпусков нет. Группы добавляются через админку.
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

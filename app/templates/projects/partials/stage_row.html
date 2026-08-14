@@ -1,0 +1,28 @@
+<tr id="stage-{{ stage.pk }}">
+    <td><strong>{{ stage.get_key_display }}</strong></td>
+    <td>
+        {% if stage.status == 'done' %}<span class="badge badge--green">✓ Завершено</span>
+        {% elif stage.status == 'in_progress' %}<span class="badge badge--blue">В работе</span>
+        {% elif stage.status == 'review' %}<span class="badge badge--yellow">На проверке</span>
+        {% elif stage.status == 'blocked' %}<span class="badge badge--red">⚠ Заблокировано</span>
+        {% else %}<span class="badge badge--gray">Не начато</span>{% endif %}
+    </td>
+    <td>{{ stage.start_date|date:'d.m.Y'|default:'—' }}</td>
+    <td>{{ stage.deadline|date:'d.m.Y'|default:'—' }}</td>
+    <td>{{ stage.end_date|date:'d.m.Y'|default:'—' }}</td>
+    <td>
+        <div class="progress">
+            <div class="progress__bar"><div class="progress__fill" style="width: {{ stage.progress }}%"></div></div>
+            <span class="progress__label">{{ stage.progress }}%</span>
+        </div>
+    </td>
+    <td style="font-size:12px; color: var(--text-muted)">{{ stage.comment|default:'' }}</td>
+    <td>
+        <button class="btn btn--secondary btn--sm"
+                hx-get="{% url 'projects:stage_update' stage.pk %}"
+                hx-target="#stage-{{ stage.pk }}"
+                hx-swap="outerHTML">
+            Изменить
+        </button>
+    </td>
+</tr>

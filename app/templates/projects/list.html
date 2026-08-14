@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block title %}Проекты — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>
+            {% if view == 'delivery' %}Проекты на сдаче
+            {% elif view == 'completed' %}Завершённые проекты
+            {% else %}Проекты{% endif %}
+        </h1>
+        <div class="sub">Всего: {{ page.paginator.count }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'projects:kanban' %}" class="btn btn--secondary">Pipeline</a>
+        <a href="{% url 'projects:create' %}" class="btn">+ Новый проект</a>
+    </div>
+</div>
+
+<form method="get" class="filters">
+    {% if view != 'all' %}<input type="hidden" name="view" value="{{ view }}">{% endif %}
+    <input type="text" name="q" placeholder="Поиск: название, ID, клиент"
+           value="{{ params.q|default:'' }}">
+    <select name="status">
+        <option value="">Статус: все</option>
+        {% for value, label in statuses %}
+            <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="stage">
+        <option value="">Этап: все</option>
+        {% for value, label in stages %}
+            <option value="{{ value }}" {% if params.stage == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="type">
+        <option value="">Тип: все</option>
+        {% for type in project_types %}
+            <option value="{{ type.pk }}" {% if params.type == type.pk|stringformat:'s' %}selected{% endif %}>{{ type.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="city">
+        <option value="">Город: все</option>
+        {% for city in cities %}
+            <option value="{{ city }}" {% if params.city == city %}selected{% endif %}>{{ city }}</option>
+        {% endfor %}
+    </select>
+    <select name="deadline">
+        <option value="">Сроки: все</option>
+        <option value="overdue" {% if params.deadline == 'overdue' %}selected{% endif %}>Просроченные</option>
+        <option value="behind" {% if params.deadline == 'behind' %}selected{% endif %}>Отставание</option>
+        <option value="at_risk" {% if params.deadline == 'at_risk' %}selected{% endif %}>Риск задержки</option>
+    </select>
+    <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+    <a href="{% url 'projects:list' %}" class="btn btn--secondary btn--sm">Сбросить</a>
+</form>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Проект</th>
+                <th>Клиент</th>
+                <th>Тип</th>
+                <th>Этап</th>
+                <th>Срок</th>
+                <th>Deadline</th>
+                <th>Прогресс</th>
+                <th>PM / TL</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for project in page.object_list %}
+                <tr>
+                    <td>{{ project.code }}</td>
+                    <td>
+                        <a href="{{ project.get_absolute_url }}"><strong>{{ project.name }}</strong></a>
+                        {% if project.is_favorite %}★{% endif %}
+                        <div class="sub" style="font-size: 12px; color: var(--text-muted)">
+                            {{ project.get_status_display }}{% if project.city %} · {{ project.city }}{% endif %}
+                        </div>
+                    </td>
+                    <td>{% if project.client %}<a href="{% url 'clients:detail' project.client.pk %}">{{ project.client }}</a>{% else %}—{% endif %}</td>
+                    <td>{{ project.project_type|default:'—' }}</td>
+                    <td><span class="badge badge--blue">{{ project.get_current_stage_display }}</span></td>
+                    <td>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</td>
+                    <td>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</td>
+                    <td>
+                        <div class="progress">
+                            <div class="progress__bar"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>
+                            <span class="progress__label">{{ project.progress }}%</span>
+                        </div>
+                    </td>
+                    <td style="font-size: 12px">
+                        {{ project.project_manager.display_name|default:'—' }}<br>
+                        {{ project.team_lead.display_name|default:'—' }}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="9" class="empty" style="text-align:center; padding: 24px;">Проектов не найдено.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page.has_previous %}
+            <a href="?{% for k, v in params.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page.previous_page_number }}">‹</a>
+        {% endif %}
+        <span class="current">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}
+            <a href="?{% for k, v in params.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page.next_page_number }}">›</a>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

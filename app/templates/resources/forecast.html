@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block title %}Прогноз потребности — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Прогноз потребности</h1>
+        <div class="sub">Доступные стажёры + выпуски против потребностей планируемых проектов</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'resources:graduations' %}" class="btn btn--secondary">Выпуски</a>
+        <a href="{% url 'resources:planned_create' %}" class="btn">+ Планируемый проект</a>
+    </div>
+</div>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Направление</th>
+                <th>Доступно</th>
+                <th>Выпуск (3 мес.)</th>
+                <th>Нужно</th>
+                <th>Баланс</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td><strong>{{ row.specialization }}</strong></td>
+                    <td>{{ row.available }}</td>
+                    <td>{{ row.graduating }}</td>
+                    <td>{{ row.needed }}</td>
+                    <td>
+                        {% if row.deficit %}
+                            <span class="badge badge--red">▼ {{ row.balance }} — дефицит</span>
+                        {% elif row.balance == 0 %}
+                            <span class="badge badge--yellow">0 — впритык</span>
+                        {% else %}
+                            <span class="badge badge--green">+{{ row.balance }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">
+                    Нет направлений. Добавьте направления в админке или через seed_demo.
+                </td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel" style="padding: 0;">
+    <h2 style="padding: 16px 20px 0">Планируемые проекты ({{ planned|length }})</h2>
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Название</th>
+                <th>Статус</th>
+                <th>Вероятность</th>
+                <th>Старт</th>
+                <th>Длительность</th>
+                <th>Состав</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for project in planned %}
+                <tr>
+                    <td><strong>{{ project.name }}</strong></td>
+                    <td>
+                        {% if project.status == 'confirmed' or project.status == 'team_forming' %}
+                            <span class="badge badge--green">{{ project.get_status_display }}</span>
+                        {% elif project.status == 'potential' %}
+                            <span class="badge badge--gray">{{ project.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge badge--yellow">{{ project.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ project.probability }}%</td>
+                    <td>{{ project.expected_start|date:'d.m.Y'|default:'—' }}</td>
+                    <td>{% if project.duration_months %}{{ project.duration_months }} мес.{% else %}—{% endif %}</td>
+                    <td style="font-size:12px">
+                        {% for need in project.needs.all %}{{ need.specialization }} × {{ need.count }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}
+                    </td>
+                    <td><a href="{% url 'resources:planned_update' project.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Планируемых проектов нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,73 @@
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+
+from apps.common.models import TimeStampedModel
+from apps.projects.models import Project
+
+
+class TeamRole(models.TextChoices):
+    """Структура команды проекта (ТЗ §11)."""
+
+    PROJECT_MANAGER = 'pm', 'Project Manager'
+    TEAM_LEAD = 'team_lead', 'Team Lead'
+    BACKEND = 'backend', 'Backend'
+    FRONTEND = 'frontend', 'Frontend'
+    MOBILE = 'mobile', 'Mobile'
+    UXUI = 'uxui', 'UX/UI'
+    QA = 'qa', 'QA'
+    OTHER = 'other', 'Other'
+
+
+class TeamMember(TimeStampedModel):
+    """Участник команды проекта: сотрудник (user) или стажёр (intern)."""
+
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Активен'
+        LEFT = 'left', 'Вышел'
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name='team_members',
+        verbose_name='Проект',
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='team_memberships', verbose_name='Сотрудник',
+        null=True, blank=True,
+    )
+    intern = models.ForeignKey(
+        'interns.Intern', on_delete=models.CASCADE,
+        related_name='team_memberships', verbose_name='Стажёр',
+        null=True, blank=True,
+    )
+    role = models.CharField('Роль', max_length=20, choices=TeamRole.choices)
+    joined_at = models.DateField('Дата подключения', null=True, blank=True)
+    left_at = models.DateField('Дата выхода', null=True, blank=True)
+    workload = models.PositiveSmallIntegerField('Загрузка, %', default=50)
+    status = models.CharField(
+        'Статус', max_length=10,
+        choices=Status.choices, default=Status.ACTIVE, db_index=True,
+    )
+    comment = models.TextField('Комментарий', blank=True)
+
+    class Meta:
+        verbose_name = 'Участник команды'
+        verbose_name_plural = 'Участники команд'
+        ordering = ['role']
+
+    def __str__(self) -> str:
+        return f'{self.person_name} — {self.get_role_display()} ({self.project.code})'
+
+    def clean(self):
+        if not self.user and not self.intern:
+            raise ValidationError('Укажите сотрудника или стажёра.')
+        if self.user and self.intern:
+            raise ValidationError('Укажите либо сотрудника, либо стажёра — не обоих.')
+
+    @property
+    def person_name(self) -> str:
+        if self.user:
+            return self.user.display_name
+        if self.intern:
+            return self.intern.full_name
+        return '—'

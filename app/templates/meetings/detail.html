@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ meeting.topic }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ meeting.topic }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--blue">{{ meeting.get_meeting_type_display }}</span>
+            <span class="badge badge--gray">{{ meeting.date|date:'d.m.Y' }}{% if meeting.time %} {{ meeting.time|time:'H:i' }}{% endif %}</span>
+            {% if meeting.project %}
+                <a href="{{ meeting.project.get_absolute_url }}" class="badge badge--gray">{{ meeting.project.name }}</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'meetings:update' meeting.pk %}" class="btn btn--secondary">Редактировать</a>
+    </div>
+</div>
+
+<div class="panel">
+    <dl class="def-grid">
+        <div class="def"><dt>Участники</dt><dd>
+            {% for participant in meeting.participants.all %}{{ participant.display_name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}
+        </dd></div>
+        <div class="def"><dt>Внешние участники</dt><dd>{{ meeting.external_participants|default:'—' }}</dd></div>
+        <div class="def"><dt>Следующее собрание</dt><dd>{{ meeting.next_meeting_date|date:'d.m.Y'|default:'—' }}</dd></div>
+    </dl>
+</div>
+
+{% if meeting.agenda %}
+    <div class="panel"><h2>Повестка</h2><p style="margin:0; white-space: pre-line">{{ meeting.agenda }}</p></div>
+{% endif %}
+{% if meeting.discussion %}
+    <div class="panel"><h2>Обсуждение</h2><p style="margin:0; white-space: pre-line">{{ meeting.discussion }}</p></div>
+{% endif %}
+
+<div class="panel">
+    <h2>Решения ({{ decisions|length }})</h2>
+    {% for decision in decisions %}
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border); display:flex; gap:12px; align-items:flex-start; justify-content: space-between; flex-wrap:wrap;">
+            <div>
+                {{ decision.text|linebreaksbr }}
+                <div style="font-size:12px; color:var(--text-muted); margin-top:4px">
+                    {% if decision.responsible %}Ответственный: {{ decision.responsible.display_name }} · {% endif %}
+                    {% if decision.deadline %}Deadline: {{ decision.deadline|date:'d.m.Y' }} · {% endif %}
+                    {% if decision.status == 'done' %}<span class="badge badge--green">Выполнено</span>
+                    {% elif decision.status == 'cancelled' %}<span class="badge badge--gray">Отменено</span>
+                    {% else %}<span class="badge badge--yellow">Открыто</span>{% endif %}
+                </div>
+            </div>
+            <div>
+                {% if decision.task %}
+                    <a href="{{ decision.task.get_absolute_url }}" class="btn btn--secondary btn--sm">Задача создана →</a>
+                {% else %}
+                    <form method="post" action="{% url 'meetings:decision_task' decision.pk %}" style="margin:0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn--secondary btn--sm">Создать задачу</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <div class="empty">Решений пока нет.</div>
+    {% endfor %}
+
+    <h2 style="margin-top:18px">Добавить решение</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-grid">
+            {% include 'partials/form_fields.html' with form=decision_form %}
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn--secondary">Добавить</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Стажёры — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Стажёры</h1>
+        <div class="sub">Всего: {{ page.paginator.count }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'interns:create' %}" class="btn">+ Новый стажёр</a>
+    </div>
+</div>
+
+<form method="get" class="filters">
+    <input type="text" name="q" placeholder="Поиск: ФИО, телефон, email" value="{{ params.q|default:'' }}">
+    <select name="specialization">
+        <option value="">Направление: все</option>
+        {% for spec in specializations %}
+            <option value="{{ spec.pk }}" {% if params.specialization == spec.pk|stringformat:'s' %}selected{% endif %}>{{ spec.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="status">
+        <option value="">Статус: все</option>
+        {% for value, label in statuses %}
+            <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="group">
+        <option value="">Группа: все</option>
+        {% for group in groups %}
+            <option value="{{ group.pk }}" {% if params.group == group.pk|stringformat:'s' %}selected{% endif %}>{{ group }}</option>
+        {% endfor %}
+    </select>
+    <select name="availability">
+        <option value="">Занятость: все</option>
+        <option value="free" {% if params.availability == 'free' %}selected{% endif %}>Свободен</option>
+        <option value="busy" {% if params.availability == 'busy' %}selected{% endif %}>Занят</option>
+    </select>
+    <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+    <a href="{% url 'interns:list' %}" class="btn btn--secondary btn--sm">Сбросить</a>
+</form>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>ФИО</th>
+                <th>Направление</th>
+                <th>Статус</th>
+                <th>Группа</th>
+                <th>Team Lead</th>
+                <th>Занятость</th>
+                <th>Рейтинг</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for intern in page.object_list %}
+                <tr>
+                    <td>
+                        <a href="{{ intern.get_absolute_url }}"><strong>{{ intern.full_name }}</strong></a>
+                        <div style="font-size:12px; color: var(--text-muted)">{{ intern.city|default:'' }}</div>
+                    </td>
+                    <td>{{ intern.specialization|default:'—' }}</td>
+                    <td>
+                        {% if intern.status == 'active' or intern.status == 'internship' %}
+                            <span class="badge badge--green">{{ intern.get_status_display }}</span>
+                        {% elif intern.status == 'employable' or intern.status == 'ready' %}
+                            <span class="badge badge--blue">{{ intern.get_status_display }}</span>
+                        {% elif intern.status == 'dropped' or intern.status == 'paused' %}
+                            <span class="badge badge--gray">{{ intern.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge badge--yellow">{{ intern.get_status_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ intern.training_group|default:'—' }}</td>
+                    <td>{{ intern.team_lead.display_name|default:'—' }}</td>
+                    <td>
+                        {% if intern.is_busy %}<span class="badge badge--orange">На проекте</span>
+                        {% else %}<span class="badge badge--gray">Свободен</span>{% endif %}
+                    </td>
+                    <td>{% if intern.rating %}★ {{ intern.rating }}{% else %}—{% endif %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Стажёров не найдено.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">‹</a>{% endif %}
+        <span class="current">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}">›</a>{% endif %}
+    </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Документы — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Документы</h1>
+        <div class="sub">Всего: {{ page.paginator.count }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'documents:create' %}" class="btn">+ Новый документ</a>
+    </div>
+</div>
+
+<form method="get" class="filters">
+    <select name="project">
+        <option value="">Проект: все</option>
+        {% for project in projects %}
+            <option value="{{ project.pk }}" {% if params.project == project.pk|stringformat:'s' %}selected{% endif %}>{{ project.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="type">
+        <option value="">Тип: все</option>
+        {% for doc_type in doc_types %}
+            <option value="{{ doc_type.pk }}" {% if params.type == doc_type.pk|stringformat:'s' %}selected{% endif %}>{{ doc_type.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="status">
+        <option value="">Статус: все</option>
+        {% for value, label in statuses %}
+            <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+    <a href="{% url 'documents:list' %}" class="btn btn--secondary btn--sm">Сбросить</a>
+</form>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Проект</th>
+                <th>Тип</th>
+                <th>Номер</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Подписан</th>
+                <th>Файл</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for document in page.object_list %}
+                <tr>
+                    <td><a href="{{ document.project.get_absolute_url }}?tab=documents">{{ document.project.name }}</a></td>
+                    <td><strong>{{ document.doc_type }}</strong></td>
+                    <td>{{ document.number|default:'—' }}</td>
+                    <td>{{ document.document_date|date:'d.m.Y'|default:'—' }}</td>
+                    <td>
+                        {% if document.status == 'signed' %}<span class="badge badge--green">Подписан</span>
+                        {% elif document.status == 'awaiting' %}<span class="badge badge--yellow">Ожидает подписи</span>
+                        {% elif document.status == 'expired' %}<span class="badge badge--red">Истёк</span>
+                        {% elif document.status == 'cancelled' %}<span class="badge badge--gray">Отменён</span>
+                        {% else %}<span class="badge badge--gray">Черновик</span>{% endif %}
+                    </td>
+                    <td>{% if document.is_signed %}✓{% else %}—{% endif %}</td>
+                    <td>{% if document.file %}<a href="{{ document.file.url }}" target="_blank" rel="noopener">Открыть</a>{% else %}—{% endif %}</td>
+                    <td><a href="{% url 'documents:update' document.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="8" class="empty" style="text-align:center; padding: 24px;">Документов нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">‹</a>{% endif %}
+        <span class="current">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}">›</a>{% endif %}
+    </div>
+{% endif %}
+{% endblock %}

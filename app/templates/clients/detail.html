@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ client.organization }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ client.organization }}</h1>
+        <div class="sub">{{ client.city|default:'' }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'clients:update' client.pk %}" class="btn btn--secondary">Редактировать</a>
+        <a href="{% url 'projects:create' %}" class="btn">+ Проект</a>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Контакты и реквизиты</h2>
+    <dl class="def-grid">
+        <div class="def"><dt>ФИО представителя</dt><dd>{{ client.contact_name|default:'—' }}</dd></div>
+        <div class="def"><dt>Телефон</dt><dd>{{ client.phone|default:'—' }}</dd></div>
+        <div class="def"><dt>Email</dt><dd>{{ client.email|default:'—' }}</dd></div>
+        <div class="def"><dt>Адрес</dt><dd>{{ client.address|default:'—' }}</dd></div>
+        <div class="def"><dt>Город</dt><dd>{{ client.city|default:'—' }}</dd></div>
+    </dl>
+    {% if client.requisites %}
+        <h2 style="margin-top: 16px">Реквизиты</h2>
+        <p style="margin:0; white-space: pre-line">{{ client.requisites }}</p>
+    {% endif %}
+    {% if client.comment %}
+        <h2 style="margin-top: 16px">Комментарий</h2>
+        <p style="margin:0">{{ client.comment|linebreaksbr }}</p>
+    {% endif %}
+</div>
+
+<div class="panel" style="padding: 0;">
+    <h2 style="padding: 16px 20px 0">Проекты клиента ({{ projects|length }})</h2>
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Проект</th>
+                <th>Тип</th>
+                <th>Статус</th>
+                <th>Этап</th>
+                <th>Deadline</th>
+                <th>Прогресс</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for project in projects %}
+                <tr>
+                    <td>{{ project.code }}</td>
+                    <td><a href="{{ project.get_absolute_url }}"><strong>{{ project.name }}</strong></a></td>
+                    <td>{{ project.project_type|default:'—' }}</td>
+                    <td>{{ project.get_status_display }}</td>
+                    <td><span class="badge badge--blue">{{ project.get_current_stage_display }}</span></td>
+                    <td>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</td>
+                    <td>
+                        <div class="progress">
+                            <div class="progress__bar"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>
+                            <span class="progress__label">{{ project.progress }}%</span>
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Проектов пока нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

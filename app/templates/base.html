@@ -1,0 +1,114 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GeeksPro Control{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <script src="{% static 'js/htmx.min.js' %}" defer></script>
+    <script src="{% static 'js/alpine.min.js' %}" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar__brand">
+            <a href="{% url 'dashboard' %}">Geeks<span>Pro</span> Control</a>
+        </div>
+        <nav class="sidebar__nav">
+            <a href="{% url 'dashboard' %}"
+               class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}is-active{% endif %}">
+                Главная
+            </a>
+            <div class="nav-group">
+                <a href="{% url 'projects:list' %}"
+                   class="nav-item {% if request.resolver_match.namespace == 'projects' %}is-active{% endif %}">
+                    Проекты
+                </a>
+                <div class="nav-sub">
+                    <a href="{% url 'projects:list' %}">Все проекты</a>
+                    <a href="{% url 'projects:kanban' %}">Pipeline</a>
+                    <a href="{% url 'projects:list' %}?view=delivery">На сдаче</a>
+                    <a href="{% url 'projects:list' %}?view=completed">Завершённые</a>
+                </div>
+            </div>
+            <a href="{% url 'clients:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'clients' %}is-active{% endif %}">
+                Клиенты
+            </a>
+            <a href="{% url 'tasks:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'tasks' %}is-active{% endif %}">
+                Задачи
+            </a>
+            <a href="{% url 'teams:overview' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'teams' %}is-active{% endif %}">
+                Команды
+            </a>
+            <a href="{% url 'interns:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'interns' %}is-active{% endif %}">
+                Стажёры
+            </a>
+            <div class="nav-group">
+                <a href="{% url 'resources:forecast' %}"
+                   class="nav-item {% if request.resolver_match.namespace == 'resources' %}is-active{% endif %}">
+                    Ресурсы
+                </a>
+                <div class="nav-sub">
+                    <a href="{% url 'teams:overview' %}">Загрузка</a>
+                    <a href="{% url 'resources:graduations' %}">Выпуски</a>
+                    <a href="{% url 'resources:forecast' %}">Прогноз потребности</a>
+                </div>
+            </div>
+            <a href="{% url 'documents:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'documents' %}is-active{% endif %}">
+                Документы
+            </a>
+            <a href="{% url 'meetings:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'meetings' %}is-active{% endif %}">
+                Собрания
+            </a>
+            <span class="nav-item is-disabled">Календарь <em>скоро</em></span>
+            <a href="{% url 'risks:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'risks' %}is-active{% endif %}">
+                Риски
+            </a>
+            <div class="nav-group">
+                <a href="{% url 'reports:weekly_list' %}"
+                   class="nav-item {% if request.resolver_match.namespace == 'reports' %}is-active{% endif %}">
+                    Отчёты
+                </a>
+                <div class="nav-sub">
+                    <a href="{% url 'reports:weekly_list' %}">Недельный</a>
+                    <a href="{% url 'reports:kpi' %}">KPI</a>
+                </div>
+            </div>
+            <a href="{% url 'notifications:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'notifications' %}is-active{% endif %}">
+                Уведомления
+                {% if unread_notifications %}
+                    <em style="background: var(--red); color:#fff">{{ unread_notifications }}</em>
+                {% endif %}
+            </a>
+        </nav>
+        <div class="sidebar__footer">
+            <span class="sidebar__user">{{ request.user.display_name }}</span>
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--ghost btn--sm">Выйти</button>
+            </form>
+        </div>
+    </aside>
+    <main class="main">
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="message message--{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

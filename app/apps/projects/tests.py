@@ -1,0 +1,161 @@
+import datetime
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from apps.clients.models import Client
+from apps.projects.forms import ProjectForm
+from apps.projects.models import (
+    DeadlineStatus,
+    Project,
+    ProjectStageKey,
+    ProjectStatus,
+)
+from apps.projects.services import calculate_deadline_status, create_project
+
+User = get_user_model()
+
+TODAY = datetime.date(2026, 8, 14)
+
+
+def make_project(**kwargs) -> Project:
+    defaults = {'name': 'Test', 'status': ProjectStatus.ACTIVE, 'progress': 50}
+    defaults.update(kwargs)
+    return Project(**defaults)
+
+
+class DeadlineStatusTests(TestCase):
+    """Статус срока (ТЗ §8, §22)."""
+
+    def test_completed_project(self):
+        project = make_project(status=ProjectStatus.COMPLETED)
+        self.assertEqual(
+            calculate_deadline_status(project, TODAY), DeadlineStatus.COMPLETED,
+        )
+
+    def test_no_deadline_is_on_track(self):
+        project = make_project(planned_end_date=None)
+        self.assertEqual(
+            calculate_deadline_status(project, TODAY), DeadlineStatus.ON_TRACK,
+        )
+
+    def test_overdue(self):
+        project = make_project(
+            planned_end_date=TODAY - datetime.timedelta(days=1),
+        )
+        self.assertEqual(
+            calculate_deadline_status(project, TODAY), DeadlineStatus.OVERDUE,
+        )
+
+    def test_behind_when_deadline_close_and_low_progress(self):
+        project = make_project(
+            planned_end_date=TODAY + datetime.timedelta(days=2), progress=50,
+        )
+        self.assertEqual(
+            calculate_deadline_status(project, TODAY), DeadlineStatus.BEHIND,
+        )
+
+    def test_at_risk_when_week_left_and_low_progress(self):
+        project = make_project(
+            planned_end_date=TODAY + datetime.timedelta(days=6), progress=50,
+        )
+        self.assertEqual(
+            calculate_deadline_status(project, TODAY), DeadlineStatus.AT_RISK,
+        )
+
+    def test_on_track_with_good_progress(self):
+        project = make_project(
+            planned_end_date=TODAY + datetime.timedelta(days=2), progress=95,
+        )
+        self.assertEqual(
+            calculate_deadline_status(project, TODAY), DeadlineStatus.ON_TRACK,
+        )
+
+    def test_on_track_far_deadline(self):
+        project = make_project(
+            planned_end_date=TODAY + datetime.timedelta(days=60), progress=5,
+        )
+        self.assertEqual(
+            calculate_deadline_status(project, TODAY), DeadlineStatus.ON_TRACK,
+        )
+
+
+class CreateProjectTests(TestCase):
+    def test_creates_all_lifecycle_stages_and_history(self):
+        project = make_project()
+        create_project(project)
+        self.assertEqual(
+            project.stages.count(), len(ProjectStageKey.values),
+        )
+        self.assertEqual(project.history.count(), 1)
+        self.assertTrue(project.code.startswith('GP-'))
+
+
+class ProjectFormTests(TestCase):
+    """Перенос deadline требует причину (ТЗ §21)."""
+
+    def _form_data(self, project, **overrides):
+        data = {
+            'name': project.name,
+            'status': project.status,
+            'current_stage': project.current_stage,
+            'priority': project.priority,
+            'progress': project.progress,
+            'planned_end_date': project.planned_end_date,
+            'change_reason': '',
+        }
+        data.update(overrides)
+        return data
+
+    def test_deadline_change_requires_reason(self):
+        project = make_project(planned_end_date=TODAY)
+        create_project(project)
+        form = ProjectForm(
+            self._form_data(
+                project,
+                planned_end_date=TODAY + datetime.timedelta(days=10),
+            ),
+            instance=project,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('change_reason', form.errors)
+
+    def test_deadline_change_with_reason_is_valid(self):
+        project = make_project(planned_end_date=TODAY)
+        create_project(project)
+        form = ProjectForm(
+            self._form_data(
+                project,
+                planned_end_date=TODAY + datetime.timedelta(days=10),
+                change_reason='Клиент задержал материалы',
+            ),
+            instance=project,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+
+class AuthTests(TestCase):
+    """Все внутренние страницы закрыты (ТЗ §2)."""
+
+    def test_anonymous_redirected_to_login(self):
+        for url in ['/', '/projects/', '/clients/']:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 302)
+            self.assertTrue(response.url.startswith('/login/'))
+
+    def test_dashboard_opens_for_authenticated_user(self):
+        User.objects.create_user(username='head', password='test12345')
+        self.client.login(username='head', password='test12345')
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Требует внимания')
+
+
+class ClientProjectsTests(TestCase):
+    def test_client_can_have_multiple_projects(self):
+        client_obj = Client.objects.create(organization='Org')
+        for index in range(2):
+            project = make_project(name=f'P{index}', client=client_obj)
+            create_project(project)
+        self.assertEqual(client_obj.projects.count(), 2)

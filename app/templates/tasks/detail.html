@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ task.title }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ task.title }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--blue">{{ task.get_status_display }}</span>
+            {% if task.priority == 'critical' %}<span class="badge badge--red">Critical</span>
+            {% elif task.priority == 'high' %}<span class="badge badge--orange">High</span>
+            {% elif task.priority == 'medium' %}<span class="badge badge--blue">Medium</span>
+            {% else %}<span class="badge badge--gray">Low</span>{% endif %}
+            {% if task.deadline %}<span class="badge badge--gray">Deadline: {{ task.deadline|date:'d.m.Y' }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        {% if task.is_open %}
+            <form method="post" action="{% url 'tasks:set_status' task.pk %}" style="margin:0">
+                {% csrf_token %}
+                <input type="hidden" name="status" value="done">
+                <button type="submit" class="btn">✓ Выполнена</button>
+            </form>
+        {% endif %}
+        <a href="{% url 'tasks:update' task.pk %}" class="btn btn--secondary">Редактировать</a>
+    </div>
+</div>
+
+<div class="panel">
+    <dl class="def-grid">
+        <div class="def"><dt>Проект</dt><dd>{% if task.project %}<a href="{{ task.project.get_absolute_url }}">{{ task.project.name }}</a>{% else %}—{% endif %}</dd></div>
+        <div class="def"><dt>Этап</dt><dd>{% if task.stage %}{{ task.stage.get_key_display }}{% else %}—{% endif %}</dd></div>
+        <div class="def"><dt>Исполнитель</dt><dd>{{ task.assignee.display_name|default:'—' }}</dd></div>
+        <div class="def"><dt>Автор</dt><dd>{{ task.author.display_name|default:'—' }}</dd></div>
+        <div class="def"><dt>Создана</dt><dd>{{ task.created_at|date:'d.m.Y H:i' }}</dd></div>
+        <div class="def"><dt>Завершена</dt><dd>{{ task.completed_at|date:'d.m.Y'|default:'—' }}</dd></div>
+    </dl>
+    {% if task.description %}
+        <h2 style="margin-top:16px">Описание</h2>
+        <p style="margin:0">{{ task.description|linebreaksbr }}</p>
+    {% endif %}
+</div>
+
+<div class="panel">
+    <h2>Вложения ({{ attachments|length }})</h2>
+    {% for attachment in attachments %}
+        <div style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+            <a href="{{ attachment.file.url }}" target="_blank" rel="noopener">{{ attachment.name }}</a>
+            <span class="sub" style="color:var(--text-muted); font-size:12px">
+                — {{ attachment.created_at|date:'d.m.Y H:i' }}
+            </span>
+        </div>
+    {% empty %}
+        <div class="empty">Вложений нет.</div>
+    {% endfor %}
+    <form method="post" enctype="multipart/form-data" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+        {% csrf_token %}
+        <input type="hidden" name="attachment" value="1">
+        {{ attachment_form.file }}
+        {% if attachment_form.file.errors %}
+            <span class="form-errors">{{ attachment_form.file.errors.0 }}</span>
+        {% endif %}
+        <button type="submit" class="btn btn--secondary btn--sm">Загрузить</button>
+    </form>
+</div>
+
+<div class="panel">
+    <h2>Комментарии ({{ comments|length }})</h2>
+    <ul class="feed">
+        {% for comment in comments %}
+            <li>
+                {{ comment.text|linebreaksbr }}
+                <div class="when">{{ comment.created_at|date:'d.m.Y H:i' }}{% if comment.author %} · {{ comment.author.display_name }}{% endif %}</div>
+            </li>
+        {% empty %}
+            <li class="empty">Комментариев нет.</li>
+        {% endfor %}
+    </ul>
+    <form method="post" style="margin-top:12px">
+        {% csrf_token %}
+        <input type="hidden" name="comment" value="1">
+        <div class="form-field">{{ comment_form.text }}</div>
+        <button type="submit" class="btn btn--secondary btn--sm" style="margin-top:8px">Отправить</button>
+    </form>
+</div>
+{% endblock %}

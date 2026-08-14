@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Главная — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Главная</h1>
+        <div class="sub">Состояние GeeksPro на текущий момент</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'projects:create' %}" class="btn">+ Проект</a>
+        <a href="{% url 'tasks:create' %}" class="btn btn--secondary">+ Задача</a>
+        <a href="{% url 'interns:create' %}" class="btn btn--secondary">+ Стажёр</a>
+        <a href="{% url 'clients:create' %}" class="btn btn--secondary">+ Клиент</a>
+    </div>
+</div>
+
+<div class="kpi-grid">
+    {% for card in kpi_cards %}
+        <a href="{{ card.url }}" class="kpi-card kpi-card--{{ card.tone }}">
+            <div class="kpi-card__value">{{ card.value }}</div>
+            <div class="kpi-card__label">{{ card.label }}</div>
+        </a>
+    {% endfor %}
+</div>
+
+<div class="panel">
+    <h2>Требует внимания
+        {% if attention_items %}<span class="badge badge--red">{{ attention_items|length }}</span>{% endif %}
+    </h2>
+    {% if attention_items %}
+        <ul class="attention-list">
+            {% for item in attention_items %}
+                <li>
+                    <span class="dot dot--{{ item.level }}"></span>
+                    <a href="{{ item.url }}">{{ item.text }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="empty">Все проекты под контролем — проблем не обнаружено.</div>
+    {% endif %}
+</div>
+
+<div class="panel">
+    <h2>Сегодня и ближайшая неделя</h2>
+    {% if today_items %}
+        <ul class="attention-list">
+            {% for item in today_items %}
+                <li>
+                    <span class="dot" style="background: var(--blue)"></span>
+                    <a href="{{ item.url }}">{{ item.text }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="empty">Событий на ближайшую неделю нет.</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+<tr id="task-{{ task.pk }}">
+    <td>
+        <a href="{{ task.get_absolute_url }}"><strong>{{ task.title }}</strong></a>
+        {% if task.project %}
+            <div style="font-size:12px; color: var(--text-muted)">
+                <a href="{{ task.project.get_absolute_url }}">{{ task.project.name }}</a>
+            </div>
+        {% endif %}
+    </td>
+    <td>
+        {% if task.priority == 'critical' %}<span class="badge badge--red">Critical</span>
+        {% elif task.priority == 'high' %}<span class="badge badge--orange">High</span>
+        {% elif task.priority == 'medium' %}<span class="badge badge--blue">Medium</span>
+        {% else %}<span class="badge badge--gray">Low</span>{% endif %}
+    </td>
+    <td>{{ task.assignee.display_name|default:'—' }}</td>
+    <td>{{ task.deadline|date:'d.m.Y'|default:'—' }}</td>
+    <td>
+        <form hx-post="{% url 'tasks:set_status' task.pk %}"
+              hx-target="#task-{{ task.pk }}" hx-swap="outerHTML"
+              style="margin:0">
+            <select name="status" onchange="this.form.requestSubmit()"
+                    style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;">
+                {% for value, label in statuses %}
+                    <option value="{{ value }}" {% if task.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </form>
+    </td>
+</tr>

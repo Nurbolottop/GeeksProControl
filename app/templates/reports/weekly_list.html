@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Недельные отчёты — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Недельные отчёты</h1>
+        <div class="sub">Формируются за предыдущую неделю (ТЗ §24.1)</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'reports:kpi' %}" class="btn btn--secondary">KPI</a>
+        <form method="post" action="{% url 'reports:weekly_generate' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn">Сформировать отчёт</button>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    {% for report in reports %}
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 10px 0; border-bottom: 1px solid var(--border);">
+            <a href="{% url 'reports:weekly_detail' report.pk %}"><strong>{{ report }}</strong></a>
+            <span style="font-size:12px; color:var(--text-muted)">сформирован {{ report.updated_at|date:'d.m.Y H:i' }}</span>
+        </div>
+    {% empty %}
+        <div class="empty">Отчётов пока нет — нажмите «Сформировать отчёт».</div>
+    {% endfor %}
+</div>
+{% endblock %}

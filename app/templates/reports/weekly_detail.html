@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ report }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ report }}</h1>
+        {% if previous %}
+            <div class="sub">Сравнение с неделей от {{ previous.week_start|date:'d.m.Y' }}</div>
+        {% endif %}
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'reports:weekly_list' %}" class="btn btn--secondary">Все отчёты</a>
+    </div>
+</div>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Показатель</th>
+                <th>Значение</th>
+                <th>Δ к прошлой неделе</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td>{{ row.label }}</td>
+                    <td><strong>{{ row.value|default_if_none:'—' }}</strong></td>
+                    <td>
+                        {% if row.delta is None %}—
+                        {% elif row.delta > 0 %}<span class="badge badge--blue">+{{ row.delta }}</span>
+                        {% elif row.delta < 0 %}<span class="badge badge--gray">{{ row.delta }}</span>
+                        {% else %}0{% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Комментарий руководителя</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-field">
+            <textarea name="comment" rows="3">{{ report.comment }}</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn--secondary">Сохранить комментарий</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

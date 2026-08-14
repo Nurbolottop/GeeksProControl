@@ -1,0 +1,77 @@
+"""ResourcePlanningService (ТЗ §14): баланс людей по направлениям."""
+import datetime
+
+from django.utils import timezone
+
+from apps.interns.models import Intern, WORKING_STATUSES, InternStatus
+from apps.resources.models import PlannedProject, PlannedProjectNeed
+from apps.teams.models import TeamMember
+from apps.training.models import Specialization, TrainingGroup
+
+# Горизонт прогноза выпусков, месяцев
+FORECAST_MONTHS = 3
+
+
+def resource_balance(today: datetime.date | None = None) -> list[dict]:
+    """Таблица баланса: Направление | Доступно | Выпуск | Нужно | Баланс.
+
+    - Доступно: стажёры в рабочих статусах без активного проекта
+      + «готов к распределению».
+    - Выпуск: прогноз перехода в стажировку из групп, заканчивающихся
+      в ближайшие FORECAST_MONTHS месяцев.
+    - Нужно: потребность планируемых проектов в активных статусах.
+    """
+    today = today or timezone.localdate()
+    horizon = today + datetime.timedelta(days=30 * FORECAST_MONTHS)
+
+    busy_ids = set(
+        TeamMember.objects.filter(
+            status=TeamMember.Status.ACTIVE, intern__isnull=False,
+        ).values_list('intern_id', flat=True),
+    )
+
+    rows = []
+    for spec in Specialization.objects.all():
+        available = (
+            Intern.objects.active()
+            .filter(
+                specialization=spec,
+                status__in=[*WORKING_STATUSES, InternStatus.READY],
+            )
+            .exclude(pk__in=busy_ids)
+            .count()
+        )
+        graduating = sum(
+            group.expected_interns
+            for group in TrainingGroup.objects.filter(
+                specialization=spec,
+                end_date__gte=today, end_date__lte=horizon,
+            )
+        )
+        needed = sum(
+            need.count
+            for need in PlannedProjectNeed.objects.filter(
+                specialization=spec,
+                planned_project__status__in=PlannedProject.ACTIVE_STATUSES,
+            )
+        )
+        balance = available + graduating - needed
+        rows.append({
+            'specialization': spec,
+            'available': available,
+            'graduating': graduating,
+            'needed': needed,
+            'balance': balance,
+            'deficit': balance < 0,
+        })
+    return rows
+
+
+def upcoming_graduations(today: datetime.date | None = None) -> list[TrainingGroup]:
+    """Будущие выпуски по месяцам (ТЗ §13)."""
+    today = today or timezone.localdate()
+    return list(
+        TrainingGroup.objects.filter(end_date__gte=today)
+        .select_related('specialization')
+        .order_by('end_date'),
+    )

@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ intern.full_name }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ intern.full_name }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
+            <span class="badge badge--green">{{ intern.get_status_display }}</span>
+            {% if intern.rating %}<span class="badge badge--yellow">★ {{ intern.rating }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'interns:evaluate' intern.pk %}" class="btn">+ Оценка</a>
+        <a href="{% url 'interns:update' intern.pk %}" class="btn btn--secondary">Редактировать</a>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Карточка</h2>
+    <dl class="def-grid">
+        <div class="def"><dt>Телефон</dt><dd>{{ intern.phone|default:'—' }}</dd></div>
+        <div class="def"><dt>Email</dt><dd>{{ intern.email|default:'—' }}</dd></div>
+        <div class="def"><dt>Город</dt><dd>{{ intern.city|default:'—' }}</dd></div>
+        <div class="def"><dt>Филиал</dt><dd>{{ intern.branch|default:'—' }}</dd></div>
+        <div class="def"><dt>Учебная группа</dt><dd>{{ intern.training_group|default:'—' }}</dd></div>
+        <div class="def"><dt>Окончание обучения</dt><dd>{{ intern.education_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
+        <div class="def"><dt>Начало стажировки</dt><dd>{{ intern.internship_start_date|date:'d.m.Y'|default:'—' }}</dd></div>
+        <div class="def"><dt>Текущий Team Lead</dt><dd>{{ intern.team_lead.display_name|default:'—' }}</dd></div>
+        <div class="def"><dt>Количество проектов</dt><dd>{{ projects_count }}</dd></div>
+    </dl>
+    {% if intern.comment %}
+        <h2 style="margin-top:16px">Комментарий</h2>
+        <p style="margin:0">{{ intern.comment|linebreaksbr }}</p>
+    {% endif %}
+</div>
+
+<div class="panel">
+    <h2>Текущие проекты ({{ active_memberships|length }})</h2>
+    {% for member in active_memberships %}
+        <div style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+            <a href="{{ member.project.get_absolute_url }}">{{ member.project.name }}</a>
+            — {{ member.get_role_display }}, загрузка {{ member.workload }}%
+        </div>
+    {% empty %}
+        <div class="empty">Сейчас не назначен(а) на проекты.</div>
+    {% endfor %}
+    {% if past_memberships %}
+        <h2 style="margin-top:16px">Завершённые проекты ({{ past_memberships|length }})</h2>
+        {% for member in past_memberships %}
+            <div style="padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--text-muted)">
+                <a href="{{ member.project.get_absolute_url }}">{{ member.project.name }}</a>
+                — {{ member.get_role_display }}
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<div class="panel">
+    <h2>Оценки ({{ evaluations|length }})</h2>
+    {% for evaluation in evaluations %}
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <strong>★ {{ evaluation.average }}</strong>
+                {% if evaluation.project %}<span class="badge badge--blue">{{ evaluation.project.name }}</span>{% endif %}
+                <span class="when" style="color:var(--text-muted); font-size:12px">
+                    {{ evaluation.created_at|date:'d.m.Y' }}{% if evaluation.evaluator %} · {{ evaluation.evaluator.display_name }}{% endif %}
+                </span>
+            </div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px">
+                Hard skills: {{ evaluation.hard_skills }} · Качество: {{ evaluation.quality }} ·
+                Скорость: {{ evaluation.speed }} · Ответственность: {{ evaluation.responsibility }} ·
+                Коммуникация: {{ evaluation.communication }} · Teamwork: {{ evaluation.teamwork }} ·
+                Самостоятельность: {{ evaluation.independence }}
+            </div>
+            {% if evaluation.comment %}<div style="margin-top:4px">{{ evaluation.comment }}</div>{% endif %}
+        </div>
+    {% empty %}
+        <div class="empty">Оценок пока нет.</div>
+    {% endfor %}
+</div>
+{% endblock %}

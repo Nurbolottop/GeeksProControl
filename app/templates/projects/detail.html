@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ project.name }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ project.code }} · {{ project.name }} {% if project.is_favorite %}★{% endif %}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--blue">{{ project.get_current_stage_display }}</span>
+            {% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}
+            <span class="badge badge--gray">{{ project.get_status_display }}</span>
+            <span class="badge badge--gray">Приоритет: {{ project.get_priority_display }}</span>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'projects:update' project.pk %}" class="btn btn--secondary">Редактировать</a>
+    </div>
+</div>
+
+<div class="tabs">
+    <a href="?tab=overview" class="{% if tab == 'overview' %}is-active{% endif %}">Обзор</a>
+    <a href="?tab=stages" class="{% if tab == 'stages' %}is-active{% endif %}">Этапы</a>
+    <a href="?tab=tasks" class="{% if tab == 'tasks' %}is-active{% endif %}">Задачи</a>
+    <a href="?tab=team" class="{% if tab == 'team' %}is-active{% endif %}">Команда</a>
+    <a href="?tab=documents" class="{% if tab == 'documents' %}is-active{% endif %}">Документы</a>
+    <a href="?tab=delivery" class="{% if tab == 'delivery' %}is-active{% endif %}">Сдача</a>
+    <a href="?tab=history" class="{% if tab == 'history' %}is-active{% endif %}">История</a>
+</div>
+
+{% if tab == 'stages' %}
+    <div class="panel">
+        <h2>Этапы проекта</h2>
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Этап</th>
+                    <th>Статус</th>
+                    <th>Начало</th>
+                    <th>Deadline</th>
+                    <th>Завершение</th>
+                    <th>Прогресс</th>
+                    <th>Комментарий</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for stage in stages %}
+                    {% include 'projects/partials/stage_row.html' %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% elif tab == 'tasks' %}
+    <div class="panel" style="padding: 0;">
+        <div style="display:flex; justify-content: space-between; align-items:center; padding: 16px 20px 0;">
+            <h2 style="margin:0">Задачи проекта ({{ tasks|length }})</h2>
+            <a href="{% url 'tasks:create' %}?project={{ project.pk }}" class="btn btn--sm">+ Задача</a>
+        </div>
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Задача</th>
+                    <th>Приоритет</th>
+                    <th>Исполнитель</th>
+                    <th>Deadline</th>
+                    <th>Статус</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for task in tasks %}
+                    {% include 'tasks/partials/task_row.html' with statuses=task_statuses %}
+                {% empty %}
+                    <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Задач нет.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% elif tab == 'team' %}
+    <div class="panel" style="padding: 0;">
+        <div style="display:flex; justify-content: space-between; align-items:center; padding: 16px 20px 0;">
+            <h2 style="margin:0">Команда ({{ team_members|length }})</h2>
+            <a href="{% url 'teams:member_add' project.pk %}" class="btn btn--sm">+ Участник</a>
+        </div>
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Человек</th>
+                    <th>Роль</th>
+                    <th>Загрузка</th>
+                    <th>Подключение</th>
+                    <th>Выход</th>
+                    <th>Статус</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for member in team_members %}
+                    <tr>
+                        <td>
+                            {% if member.intern %}
+                                <a href="{{ member.intern.get_absolute_url }}"><strong>{{ member.person_name }}</strong></a>
+                                <span class="badge badge--blue">Стажёр</span>
+                            {% else %}
+                                <strong>{{ member.person_name }}</strong>
+                            {% endif %}
+                        </td>
+                        <td>{{ member.get_role_display }}</td>
+                        <td>{{ member.workload }}%</td>
+                        <td>{{ member.joined_at|date:'d.m.Y'|default:'—' }}</td>
+                        <td>{{ member.left_at|date:'d.m.Y'|default:'—' }}</td>
+                        <td>
+                            {% if member.status == 'active' %}<span class="badge badge--green">Активен</span>
+                            {% else %}<span class="badge badge--gray">Вышел</span>{% endif %}
+                        </td>
+                        <td><a href="{% url 'teams:member_edit' member.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Команда не сформирована.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% elif tab == 'documents' %}
+    <div class="panel">
+        <div style="display:flex; justify-content: space-between; align-items:center;">
+            <h2 style="margin:0">
+                Документы: {{ doc_progress.done }}/{{ doc_progress.total }} обязательных
+            </h2>
+            <a href="{% url 'documents:create' %}?project={{ project.pk }}" class="btn btn--sm">+ Документ</a>
+        </div>
+        {% if doc_progress.missing %}
+            <div class="message message--warning" style="margin-top:12px">
+                Отсутствуют: {% for doc_type in doc_progress.missing %}{{ doc_type.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    <div class="panel" style="padding: 0;">
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Тип</th>
+                    <th>Номер</th>
+                    <th>Дата</th>
+                    <th>Статус</th>
+                    <th>Подписан</th>
+                    <th>Файл</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for document in documents %}
+                    <tr>
+                        <td><strong>{{ document.doc_type }}</strong></td>
+                        <td>{{ document.number|default:'—' }}</td>
+                        <td>{{ document.document_date|date:'d.m.Y'|default:'—' }}</td>
+                        <td>
+                            {% if document.status == 'signed' %}<span class="badge badge--green">Подписан</span>
+                            {% elif document.status == 'awaiting' %}<span class="badge badge--yellow">Ожидает подписи</span>
+                            {% elif document.status == 'expired' %}<span class="badge badge--red">Истёк</span>
+                            {% elif document.status == 'cancelled' %}<span class="badge badge--gray">Отменён</span>
+                            {% else %}<span class="badge badge--gray">Черновик</span>{% endif %}
+                        </td>
+                        <td>{% if document.is_signed %}✓ {{ document.signed_date|date:'d.m.Y' }}{% else %}—{% endif %}</td>
+                        <td>{% if document.file %}<a href="{{ document.file.url }}" target="_blank" rel="noopener">Открыть</a>{% else %}—{% endif %}</td>
+                        <td><a href="{% url 'documents:update' document.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Документов нет.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% elif tab == 'delivery' %}
+    <div class="panel">
+        <h2>Delivery Checklist</h2>
+        {% regroup delivery_checks by group as check_groups %}
+        {% for group in check_groups %}
+            <h2 style="margin-top:14px; font-size: 13px; color: var(--text-muted)">{{ group.grouper }}</h2>
+            <ul class="attention-list">
+                {% for check in group.list %}
+                    <li>
+                        {% if check.ok %}
+                            <span class="badge badge--green">✓</span> {{ check.label }}
+                        {% else %}
+                            <span class="badge badge--red">✗</span> {{ check.label }}
+                            <span style="color:var(--text-muted); font-size:12px">— {{ check.hint }}</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+    </div>
+    {% if project.status != 'completed' %}
+        <div class="panel">
+            <h2>Завершение проекта</h2>
+            {% if delivery_ready %}
+                <div class="message message--success">Все условия выполнены — проект готов к завершению.</div>
+            {% else %}
+                <div class="message message--warning">Есть невыполненные условия. Завершение будет заблокировано.</div>
+            {% endif %}
+            <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+                <form method="post" action="{% url 'projects:complete' project.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn">Завершить проект</button>
+                </form>
+                <form method="post" action="{% url 'projects:complete' project.pk %}"
+                      style="display:flex; gap:8px; align-items:flex-start;">
+                    {% csrf_token %}
+                    <input type="hidden" name="force" value="1">
+                    <div class="form-field" style="min-width: 280px">
+                        <label>Причина принудительного завершения (обязательно)</label>
+                        <input type="text" name="reason" placeholder="Например: клиент принял работу без акта">
+                    </div>
+                    <button type="submit" class="btn btn--secondary"
+                            onclick="return confirm('Завершить проект принудительно, минуя проверки?')">
+                        Принудительно
+                    </button>
+                </form>
+            </div>
+        </div>
+    {% else %}
+        <div class="panel">
+            <div class="message message--success" style="margin:0">
+                Проект завершён {{ project.actual_end_date|date:'d.m.Y' }}.
+                {% if project.delay_days is not None %}
+                    {% if project.delay_days > 0 %}Задержка: {{ project.delay_days }} дн.
+                    {% else %}Сдан в срок.{% endif %}
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+{% elif tab == 'history' %}
+    <div class="panel">
+        <h2>История изменений</h2>
+        {% if history %}
+            <ul class="feed">
+                {% for record in history %}
+                    <li>
+                        <strong>{{ record.field }}</strong>:
+                        {% if record.old_value %}{{ record.old_value }} → {% endif %}{{ record.new_value|default:'—' }}
+                        {% if record.reason %}<div class="reason">Причина: {{ record.reason }}</div>{% endif %}
+                        <div class="when">{{ record.created_at|date:'d.m.Y H:i' }}{% if record.user %} · {{ record.user.display_name }}{% endif %}</div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="empty">Изменений пока нет.</div>
+        {% endif %}
+    </div>
+{% else %}
+    <div class="panel">
+        <h2>Прогресс</h2>
+        <div class="progress" style="max-width: 420px">
+            <div class="progress__bar" style="height: 10px"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>
+            <span class="progress__label">{{ project.progress }}%</span>
+        </div>
+    </div>
+    <div class="panel">
+        <h2>Основная информация</h2>
+        <dl class="def-grid">
+            <div class="def"><dt>Заказчик</dt><dd>{% if project.client %}<a href="{% url 'clients:detail' project.client.pk %}">{{ project.client }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Контактное лицо</dt><dd>{{ project.client.contact_name|default:'—' }}</dd></div>
+            <div class="def"><dt>Телефон</dt><dd>{{ project.client.phone|default:'—' }}</dd></div>
+            <div class="def"><dt>Город / филиал</dt><dd>{{ project.city|default:'—' }}</dd></div>
+            <div class="def"><dt>Тип проекта</dt><dd>{{ project.project_type|default:'—' }}</dd></div>
+            <div class="def"><dt>Project Manager</dt><dd>{{ project.project_manager.display_name|default:'—' }}</dd></div>
+            <div class="def"><dt>Team Lead</dt><dd>{{ project.team_lead.display_name|default:'—' }}</dd></div>
+            <div class="def"><dt>Дата договора</dt><dd>{{ project.contract_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div class="def"><dt>Дата начала</dt><dd>{{ project.start_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div class="def"><dt>Плановое завершение</dt><dd>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div class="def"><dt>Фактическое завершение</dt><dd>{{ project.actual_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div class="def"><dt>Продолжительность</dt><dd>{% if project.duration_days %}{{ project.duration_days }} дн.{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Последняя активность</dt><dd>{{ project.last_activity_at|date:'d.m.Y H:i'|default:'—' }}</dd></div>
+        </dl>
+    </div>
+    {% if project.description %}
+        <div class="panel"><h2>Описание</h2><p style="margin:0">{{ project.description|linebreaksbr }}</p></div>
+    {% endif %}
+    {% if project.head_comment %}
+        <div class="panel"><h2>Комментарий руководителя</h2><p style="margin:0">{{ project.head_comment|linebreaksbr }}</p></div>
+    {% endif %}
+    {% if project.github_url or project.figma_url or project.staging_url or project.production_url or project.domain %}
+        <div class="panel">
+            <h2>Ссылки</h2>
+            <dl class="def-grid">
+                {% if project.github_url %}<div class="def"><dt>GitHub</dt><dd><a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url }}</a></dd></div>{% endif %}
+                {% if project.figma_url %}<div class="def"><dt>Figma</dt><dd><a href="{{ project.figma_url }}" target="_blank" rel="noopener">{{ project.figma_url }}</a></dd></div>{% endif %}
+                {% if project.staging_url %}<div class="def"><dt>Staging</dt><dd><a href="{{ project.staging_url }}" target="_blank" rel="noopener">{{ project.staging_url }}</a></dd></div>{% endif %}
+                {% if project.production_url %}<div class="def"><dt>Production</dt><dd><a href="{{ project.production_url }}" target="_blank" rel="noopener">{{ project.production_url }}</a></dd></div>{% endif %}
+                {% if project.domain %}<div class="def"><dt>Домен</dt><dd>{{ project.domain }}</dd></div>{% endif %}
+            </dl>
+        </div>
+    {% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Собрания — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Собрания</h1>
+        <div class="sub">Всего: {{ page.paginator.count }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'meetings:create' %}?agenda=auto" class="btn btn--secondary"
+           title="Создать собрание с автоматической повесткой из проблемных пунктов">
+            + С авто-повесткой
+        </a>
+        <a href="{% url 'meetings:create' %}" class="btn">+ Новое собрание</a>
+    </div>
+</div>
+
+<form method="get" class="filters">
+    <select name="type">
+        <option value="">Тип: все</option>
+        {% for value, label in types %}
+            <option value="{{ value }}" {% if params.type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="project">
+        <option value="">Проект: все</option>
+        {% for project in projects %}
+            <option value="{{ project.pk }}" {% if params.project == project.pk|stringformat:'s' %}selected{% endif %}>{{ project.name }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+</form>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Тема</th>
+                <th>Дата</th>
+                <th>Тип</th>
+                <th>Проект</th>
+                <th>Решений</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for meeting in page.object_list %}
+                <tr>
+                    <td><a href="{{ meeting.get_absolute_url }}"><strong>{{ meeting.topic }}</strong></a></td>
+                    <td>{{ meeting.date|date:'d.m.Y' }}{% if meeting.time %} {{ meeting.time|time:'H:i' }}{% endif %}</td>
+                    <td><span class="badge badge--blue">{{ meeting.get_meeting_type_display }}</span></td>
+                    <td>{% if meeting.project %}<a href="{{ meeting.project.get_absolute_url }}">{{ meeting.project.name }}</a>{% else %}—{% endif %}</td>
+                    <td>{{ meeting.decisions.count }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Собраний нет.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">‹</a>{% endif %}
+        <span class="current">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}">›</a>{% endif %}
+    </div>
+{% endif %}
+{% endblock %}

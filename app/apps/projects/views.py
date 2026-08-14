@@ -1,0 +1,198 @@
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+
+from apps.projects.forms import ProjectForm, StageUpdateForm
+from apps.projects.models import (
+    Project,
+    ProjectStage,
+    ProjectStageKey,
+    ProjectStatus,
+    ProjectType,
+)
+from apps.projects import selectors, services
+
+
+@login_required
+def project_list(request):
+    qs = selectors.filter_projects(selectors.projects_qs(), request.GET)
+    view = request.GET.get('view', 'all')
+    if view == 'delivery':
+        qs = qs.filter(
+            current_stage=ProjectStageKey.DELIVERY, status=ProjectStatus.ACTIVE,
+        )
+    elif view == 'completed':
+        qs = qs.filter(status=ProjectStatus.COMPLETED)
+
+    per_page = request.GET.get('per_page', '25')
+    if per_page not in ('25', '50', '100'):
+        per_page = '25'
+    paginator = Paginator(qs, int(per_page))
+    page = paginator.get_page(request.GET.get('page'))
+    selectors.annotate_deadline_statuses(page.object_list)
+
+    context = {
+        'page': page,
+        'view': view,
+        'project_types': ProjectType.objects.all(),
+        'cities': Project.objects.active()
+                  .exclude(city='').values_list('city', flat=True)
+                  .distinct().order_by('city'),
+        'statuses': ProjectStatus.choices,
+        'stages': ProjectStageKey.choices,
+        'params': request.GET,
+    }
+    return render(request, 'projects/list.html', context)
+
+
+@login_required
+def project_kanban(request):
+    """Pipeline: проекты по этапам (ТЗ §6.4). Drag-and-drop через HTMX."""
+    projects = selectors.annotate_deadline_statuses(
+        selectors.active_projects().order_by('planned_end_date'),
+    )
+    columns = []
+    for key, label in ProjectStageKey.choices:
+        if key == ProjectStageKey.COMPLETED:
+            continue
+        columns.append({
+            'key': key,
+            'label': label,
+            'projects': [p for p in projects if p.current_stage == key],
+        })
+    return render(request, 'projects/kanban.html', {'columns': columns})
+
+
+@login_required
+def project_move_stage(request, pk):
+    """Endpoint для drag-and-drop в Kanban: двигает проект между этапами."""
+    if request.method != 'POST':
+        return redirect('projects:kanban')
+    project = get_object_or_404(Project.objects.active(), pk=pk)
+    stage_key = request.POST.get('stage')
+    if stage_key in ProjectStageKey.values:
+        services.move_project_to_stage(project, stage_key, user=request.user)
+    return HttpResponse(status=204)
+
+
+@login_required
+def project_detail(request, pk):
+    project = get_object_or_404(
+        Project.objects.select_related(
+            'client', 'project_type', 'project_manager', 'team_lead',
+        ),
+        pk=pk,
+    )
+    project.deadline_status = services.calculate_deadline_status(project)
+    tab = request.GET.get('tab', 'overview')
+    context = {
+        'project': project,
+        'tab': tab,
+        'stages': project.stages.select_related('responsible'),
+        'history': project.history.select_related('user')[:50],
+        'today': timezone.localdate(),
+    }
+    if tab == 'tasks':
+        from apps.tasks.models import TaskStatus
+        context['tasks'] = (
+            project.tasks.active().select_related('assignee', 'project')
+        )
+        context['task_statuses'] = TaskStatus.choices
+    elif tab == 'team':
+        context['team_members'] = (
+            project.team_members.select_related('user', 'intern')
+        )
+    elif tab == 'documents':
+        from apps.documents import services as doc_services
+        context['documents'] = (
+            project.documents.active().select_related('doc_type')
+        )
+        context['doc_progress'] = doc_services.document_progress(project)
+    elif tab == 'delivery':
+        from apps.projects import delivery
+        context['delivery_checks'] = delivery.delivery_checks(project)
+        context['delivery_ready'] = not delivery.failed_checks(project)
+    return render(request, 'projects/detail.html', context)
+
+
+@login_required
+def project_create(request):
+    form = ProjectForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        project = form.save(commit=False)
+        services.create_project(project, user=request.user)
+        messages.success(request, f'Проект «{project.name}» создан.')
+        return redirect(project.get_absolute_url())
+    return render(
+        request, 'projects/form.html',
+        {'form': form, 'title': 'Новый проект'},
+    )
+
+
+@login_required
+def project_update(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    old_values = {
+        field: getattr(project, field) for field in services.TRACKED_FIELDS
+    }
+    form = ProjectForm(request.POST or None, instance=project)
+    if request.method == 'POST' and form.is_valid():
+        updated = form.save(commit=False)
+        services.update_project(
+            updated, old_values, user=request.user,
+            reason=form.cleaned_data.get('change_reason', ''),
+        )
+        messages.success(request, 'Проект обновлён.')
+        return redirect(updated.get_absolute_url())
+    return render(
+        request, 'projects/form.html',
+        {'form': form, 'title': f'Редактирование: {project.name}', 'project': project},
+    )
+
+
+@login_required
+def project_complete(request, pk):
+    """Кнопка «Завершить проект» (ТЗ §18): проверяет условия сдачи."""
+    from apps.projects import delivery
+    project = get_object_or_404(Project, pk=pk)
+    if request.method != 'POST':
+        return redirect(f'{project.get_absolute_url()}?tab=delivery')
+    force = request.POST.get('force') == '1'
+    reason = request.POST.get('reason', '').strip()
+    if force and not reason:
+        messages.error(
+            request, 'Принудительное завершение требует указания причины.',
+        )
+        return redirect(f'{project.get_absolute_url()}?tab=delivery')
+    success, failed = delivery.complete_project(
+        project, user=request.user, force=force, reason=reason,
+    )
+    if success:
+        messages.success(request, f'Проект «{project.name}» завершён.')
+    else:
+        details = '; '.join(check['label'] for check in failed)
+        messages.error(request, f'Нельзя завершить проект. Не выполнено: {details}.')
+    return redirect(f'{project.get_absolute_url()}?tab=delivery')
+
+
+@login_required
+def stage_update(request, pk):
+    """HTMX endpoint: инлайн-обновление этапа в карточке проекта."""
+    stage = get_object_or_404(
+        ProjectStage.objects.select_related('project'), pk=pk,
+    )
+    form = StageUpdateForm(request.POST or None, instance=stage)
+    if request.method == 'POST' and form.is_valid():
+        updated = form.save()
+        services.update_stage(updated, user=request.user)
+        return render(
+            request, 'projects/partials/stage_row.html',
+            {'stage': updated, 'project': updated.project},
+        )
+    return render(
+        request, 'projects/partials/stage_form.html',
+        {'form': form, 'stage': stage},
+    )

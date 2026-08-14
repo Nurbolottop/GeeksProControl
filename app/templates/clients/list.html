@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Клиенты — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Клиенты</h1>
+        <div class="sub">Всего: {{ page.paginator.count }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'clients:create' %}" class="btn">+ Новый клиент</a>
+    </div>
+</div>
+
+<form method="get" class="filters">
+    <input type="text" name="q" placeholder="Поиск: организация, ФИО, телефон"
+           value="{{ params.q|default:'' }}">
+    <select name="city">
+        <option value="">Город: все</option>
+        {% for city in cities %}
+            <option value="{{ city }}" {% if params.city == city %}selected{% endif %}>{{ city }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+</form>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Организация</th>
+                <th>Представитель</th>
+                <th>Телефон</th>
+                <th>Email</th>
+                <th>Город</th>
+                <th>Проектов</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for client in page.object_list %}
+                <tr>
+                    <td><a href="{% url 'clients:detail' client.pk %}"><strong>{{ client.organization }}</strong></a></td>
+                    <td>{{ client.contact_name|default:'—' }}</td>
+                    <td>{{ client.phone|default:'—' }}</td>
+                    <td>{{ client.email|default:'—' }}</td>
+                    <td>{{ client.city|default:'—' }}</td>
+                    <td>{{ client.project_count }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Клиентов не найдено.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">‹</a>{% endif %}
+        <span class="current">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}">›</a>{% endif %}
+    </div>
+{% endif %}
+{% endblock %}
