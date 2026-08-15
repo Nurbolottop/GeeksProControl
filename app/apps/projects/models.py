@@ -232,6 +232,35 @@ class ProjectStatusHistory(TimeStampedModel):
         return f'{self.project.code}: {self.field}'
 
 
+class ProjectAccess(TimeStampedModel):
+    """Доступы проекта (ТЗ §18: передача доступов).
+
+    Логины/пароли от админки, хостинга, БД и т.п. — загружаются
+    на платформу при выходе в прод или сдаче проекта.
+    """
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name='accesses',
+        verbose_name='Проект',
+    )
+    service = models.CharField(
+        'Сервис', max_length=100,
+        help_text='Например: Админка сайта, Хостинг, База данных, Домен',
+    )
+    url = models.CharField('Адрес / URL', max_length=255, blank=True)
+    login = models.CharField('Логин', max_length=255, blank=True)
+    password = models.CharField('Пароль', max_length=255, blank=True)
+    comment = models.TextField('Комментарий', blank=True)
+
+    class Meta:
+        verbose_name = 'Доступ проекта'
+        verbose_name_plural = 'Доступы проектов'
+        ordering = ['service']
+
+    def __str__(self) -> str:
+        return f'{self.project.code}: {self.service}'
+
+
 class ProjectLink(models.Model):
     """Дополнительная ссылка проекта (ТЗ §6.1)."""
 

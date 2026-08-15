@@ -80,6 +80,12 @@ def delivery_checks(project: Project) -> list[dict]:
         },
         {
             'group': 'Клиент',
+            'label': 'Доступы загружены на платформу',
+            'ok': project.accesses.exists(),
+            'hint': 'Добавьте логины и пароли во вкладке «Доступы»',
+        },
+        {
+            'group': 'Клиент',
             'label': 'Все задачи чек-листа сдачи закрыты',
             'ok': open_tasks == 0,
             'hint': f'Открытых задач по проекту: {open_tasks}',

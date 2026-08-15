@@ -19,4 +19,7 @@ urlpatterns = [
     path('<int:pk>/move-stage/', views.project_move_stage, name='move_stage'),
     path('<int:pk>/complete/', views.project_complete, name='complete'),
     path('stages/<int:pk>/', views.stage_update, name='stage_update'),
+    path('<int:pk>/access/add/', views.access_create, name='access_create'),
+    path('access/<int:pk>/edit/', views.access_update, name='access_update'),
+    path('access/<int:pk>/delete/', views.access_delete, name='access_delete'),
 ]

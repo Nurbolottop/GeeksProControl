@@ -1,6 +1,6 @@
 from django import forms
 
-from apps.projects.models import Project, ProjectStage
+from apps.projects.models import Project, ProjectAccess, ProjectStage
 
 
 class ProjectForm(forms.ModelForm):
@@ -49,6 +49,18 @@ class ProjectForm(forms.ModelForm):
                     'При переносе срока обязательно укажите причину.',
                 )
         return cleaned
+
+
+class ProjectAccessForm(forms.ModelForm):
+    class Meta:
+        model = ProjectAccess
+        fields = ['service', 'url', 'login', 'password', 'comment']
+        widgets = {
+            'service': forms.TextInput(
+                attrs={'placeholder': 'Админка сайта / Хостинг / База данных…'},
+            ),
+            'comment': forms.Textarea(attrs={'rows': 2}),
+        }
 
 
 class StageUpdateForm(forms.ModelForm):

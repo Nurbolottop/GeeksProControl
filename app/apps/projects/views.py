@@ -5,12 +5,14 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from apps.projects.forms import ProjectForm, StageUpdateForm
+from apps.projects.forms import ProjectAccessForm, ProjectForm, StageUpdateForm
 from apps.projects.models import (
     Project,
+    ProjectAccess,
     ProjectStage,
     ProjectStageKey,
     ProjectStatus,
+    ProjectStatusHistory,
     ProjectType,
 )
 from apps.projects import selectors, services
@@ -129,6 +131,9 @@ def project_detail(request, pk):
         context['team_members'] = (
             project.team_members.select_related('user', 'intern')
         )
+    elif tab == 'access':
+        context['accesses'] = project.accesses.all()
+        context['access_form'] = ProjectAccessForm()
     elif tab == 'documents':
         from apps.documents import services as doc_services
         context['documents'] = (
@@ -200,6 +205,66 @@ def project_complete(request, pk):
         details = '; '.join(check['label'] for check in failed)
         messages.error(request, f'Нельзя завершить проект. Не выполнено: {details}.')
     return redirect(f'{project.get_absolute_url()}?tab=delivery')
+
+
+@login_required
+def access_create(request, pk):
+    """Добавление доступа (логин/пароль) в карточку проекта."""
+    project = get_object_or_404(Project, pk=pk)
+    if request.method == 'POST':
+        form = ProjectAccessForm(request.POST)
+        if form.is_valid():
+            access = form.save(commit=False)
+            access.project = project
+            access.save()
+            ProjectStatusHistory.objects.create(
+                project=project, field='Доступы',
+                new_value=f'Добавлен доступ: {access.service}',
+                user=request.user,
+            )
+            messages.success(request, f'Доступ «{access.service}» добавлен.')
+        else:
+            messages.error(request, 'Не удалось сохранить доступ — проверьте поля.')
+    return redirect(f'{project.get_absolute_url()}?tab=access')
+
+
+@login_required
+def access_update(request, pk):
+    access = get_object_or_404(
+        ProjectAccess.objects.select_related('project'), pk=pk,
+    )
+    form = ProjectAccessForm(request.POST or None, instance=access)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        ProjectStatusHistory.objects.create(
+            project=access.project, field='Доступы',
+            new_value=f'Изменён доступ: {access.service}',
+            user=request.user,
+        )
+        messages.success(request, 'Доступ обновлён.')
+        return redirect(f'{access.project.get_absolute_url()}?tab=access')
+    return render(
+        request, 'projects/access_form.html',
+        {'form': form, 'access': access, 'project': access.project,
+         'title': f'Доступ: {access.service}'},
+    )
+
+
+@login_required
+def access_delete(request, pk):
+    access = get_object_or_404(
+        ProjectAccess.objects.select_related('project'), pk=pk,
+    )
+    project = access.project
+    if request.method == 'POST':
+        ProjectStatusHistory.objects.create(
+            project=project, field='Доступы',
+            new_value=f'Удалён доступ: {access.service}',
+            user=request.user,
+        )
+        access.delete()
+        messages.success(request, 'Доступ удалён.')
+    return redirect(f'{project.get_absolute_url()}?tab=access')
 
 
 @login_required

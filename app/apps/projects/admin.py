@@ -2,11 +2,17 @@ from django.contrib import admin
 
 from apps.projects.models import (
     Project,
+    ProjectAccess,
     ProjectLink,
     ProjectStage,
     ProjectStatusHistory,
     ProjectType,
 )
+
+
+class ProjectAccessInline(admin.TabularInline):
+    model = ProjectAccess
+    extra = 0
 
 
 @admin.register(ProjectType)
@@ -32,7 +38,7 @@ class ProjectAdmin(admin.ModelAdmin):
     )
     list_filter = ('status', 'current_stage', 'priority', 'is_archived')
     search_fields = ('code', 'name', 'client__organization')
-    inlines = [ProjectStageInline, ProjectLinkInline]
+    inlines = [ProjectStageInline, ProjectLinkInline, ProjectAccessInline]
 
 
 @admin.register(ProjectStatusHistory)

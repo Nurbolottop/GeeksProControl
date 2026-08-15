@@ -30,6 +30,10 @@ class DeliveryTests(TestCase):
         create_project(self.project)
         # Закрываем все автоматически созданные задачи чек-листа
         self.project.tasks.update(status='done')
+        # Доступы переданы (ТЗ §18)
+        self.project.accesses.create(
+            service='Админка', login='admin', password='secret',
+        )
 
     def _add_signed_docs(self):
         today = timezone.localdate()
