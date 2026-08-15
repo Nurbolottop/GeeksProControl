@@ -883,6 +883,21 @@ input[type="file"]::file-selector-button:hover { background: #f6f7fb; }
 .form-stack .form-field { width: 100%; }
 .htmx-request.panel { opacity: .6; }
 
+/* ---- Компактная страница-форма ---- */
+.form-page { max-width: 720px; }
+.form-page .panel { padding: 26px 28px; }
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px 18px;
+}
+.form-field--lg input {
+    font-size: 15px;
+    padding: 11px 14px;
+    font-weight: 550;
+}
+.form-page textarea { resize: vertical; }
+
 /* ---- Этапы проекта ---- */
 .stage-row--done td:first-child { color: var(--text-muted); }
 .stage-row--editing td { background: #f7f8fd !important; }

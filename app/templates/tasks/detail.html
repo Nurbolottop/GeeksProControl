@@ -76,12 +76,8 @@
                     <div>{% if task.project %}<a href="{{ task.project.get_absolute_url }}">{{ task.project.name }}</a>{% else %}—{% endif %}</div>
                 </div>
                 <div class="meta-row">
-                    <span>Этап</span>
-                    <div>{% if task.stage %}{{ task.stage.get_key_display }}{% else %}—{% endif %}</div>
-                </div>
-                <div class="meta-row">
-                    <span>Исполнитель</span>
-                    <div>{{ task.assignee.display_name|default:'—' }}</div>
+                    <span>Приоритет</span>
+                    <div>{{ task.get_priority_display }}</div>
                 </div>
                 <div class="meta-row">
                     <span>Автор</span>

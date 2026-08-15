@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from apps.projects.models import Project
 from apps.tasks import selectors, services
@@ -21,10 +22,10 @@ def task_list(request):
         'page': page,
         'params': request.GET,
         'projects': Project.objects.active().order_by('name'),
-        'users': User.objects.filter(is_active=True).order_by('username'),
         'statuses': TaskStatus.choices,
         'priorities': TaskPriority.choices,
         'view': request.GET.get('view', ''),
+        'today': timezone.localdate(),
     }
     return render(request, 'tasks/list.html', context)
 
@@ -104,10 +105,7 @@ def task_update(request, pk):
     task = get_object_or_404(Task, pk=pk)
     form = TaskForm(request.POST or None, instance=task)
     if request.method == 'POST' and form.is_valid():
-        old_status = Task.objects.get(pk=task.pk).status
-        updated = form.save()
-        if updated.status != old_status:
-            services.set_task_status(updated, updated.status, user=request.user)
+        form.save()
         messages.success(request, 'Задача обновлена.')
         return redirect(task.get_absolute_url())
     return render(
@@ -127,6 +125,7 @@ def task_set_status(request, pk):
     if request.htmx:
         return render(
             request, 'tasks/partials/task_row.html',
-            {'task': task, 'statuses': TaskStatus.choices},
+            {'task': task, 'statuses': TaskStatus.choices,
+             'today': timezone.localdate()},
         )
     return redirect(request.META.get('HTTP_REFERER', task.get_absolute_url()))

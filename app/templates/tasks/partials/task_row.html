@@ -13,8 +13,14 @@
         {% elif task.priority == 'medium' %}<span class="badge badge--blue">Medium</span>
         {% else %}<span class="badge badge--gray">Low</span>{% endif %}
     </td>
-    <td>{{ task.assignee.display_name|default:'—' }}</td>
-    <td>{{ task.deadline|date:'d.m.Y'|default:'—' }}</td>
+    <td>
+        {% if task.deadline %}
+            {{ task.deadline|date:'d.m.Y' }}
+            {% if task.is_open and task.deadline < today %}
+                <span class="badge badge--red">просрочена</span>
+            {% endif %}
+        {% else %}—{% endif %}
+    </td>
     <td>
         <form hx-post="{% url 'tasks:set_status' task.pk %}"
               hx-target="#task-{{ task.pk }}" hx-swap="outerHTML"

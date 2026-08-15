@@ -30,12 +30,6 @@
             <option value="{{ project.pk }}" {% if params.project == project.pk|stringformat:'s' %}selected{% endif %}>{{ project.name }}</option>
         {% endfor %}
     </select>
-    <select name="assignee">
-        <option value="">Исполнитель: все</option>
-        {% for user in users %}
-            <option value="{{ user.pk }}" {% if params.assignee == user.pk|stringformat:'s' %}selected{% endif %}>{{ user.display_name }}</option>
-        {% endfor %}
-    </select>
     <select name="status">
         <option value="">Статус: все</option>
         {% for value, label in statuses %}
@@ -59,7 +53,6 @@
             <tr>
                 <th>Задача</th>
                 <th>Приоритет</th>
-                <th>Исполнитель</th>
                 <th>Deadline</th>
                 <th>Статус</th>
             </tr>
@@ -68,7 +61,7 @@
             {% for task in page.object_list %}
                 {% include 'tasks/partials/task_row.html' %}
             {% empty %}
-                <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Задач не найдено.</td></tr>
+                <tr><td colspan="4" class="empty" style="text-align:center; padding: 24px;">Задач не найдено.</td></tr>
             {% endfor %}
             </tbody>
         </table>

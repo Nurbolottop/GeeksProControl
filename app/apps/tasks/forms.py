@@ -7,14 +7,22 @@ from apps.tasks.models import Task, TaskAttachment, TaskComment
 
 
 class TaskForm(forms.ModelForm):
+    """Форма задачи: только то, что реально заполняют.
+
+    Этап, исполнитель и статус здесь не нужны — статус меняется кнопками
+    в списке и карточке задачи.
+    """
+
     class Meta:
         model = Task
-        fields = [
-            'title', 'description', 'project', 'stage', 'assignee',
-            'priority', 'status', 'deadline',
-        ]
+        fields = ['title', 'description', 'project', 'priority', 'deadline']
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
+            'title': forms.TextInput(
+                attrs={'placeholder': 'Что нужно сделать', 'autofocus': True},
+            ),
+            'description': forms.Textarea(
+                attrs={'rows': 4, 'placeholder': 'Детали, ссылки, требования — по желанию'},
+            ),
             'deadline': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
         }
 
