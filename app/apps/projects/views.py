@@ -62,6 +62,9 @@ def project_list(request, category='all'):
         'cities': Project.objects.active()
                   .exclude(city='').values_list('city', flat=True)
                   .distinct().order_by('city'),
+        'flows': Project.objects.active()
+                 .exclude(flow__isnull=True).values_list('flow', flat=True)
+                 .distinct().order_by('-flow'),
         'statuses': ProjectStatus.choices,
         'stages': ProjectStageKey.choices,
         'params': request.GET,

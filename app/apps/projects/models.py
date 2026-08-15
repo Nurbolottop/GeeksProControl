@@ -73,6 +73,9 @@ class Project(TimeStampedModel, ArchivableModel):
         verbose_name='Заказчик', null=True, blank=True,
     )
     city = models.CharField('Город / филиал', max_length=100, blank=True, db_index=True)
+    flow = models.PositiveSmallIntegerField(
+        'Поток', null=True, blank=True, db_index=True,
+    )
     project_type = models.ForeignKey(
         ProjectType, on_delete=models.PROTECT, related_name='projects',
         verbose_name='Тип проекта', null=True, blank=True,

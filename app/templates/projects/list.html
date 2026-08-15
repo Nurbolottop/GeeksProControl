@@ -43,6 +43,12 @@
             <option value="{{ city }}" {% if params.city == city %}selected{% endif %}>{{ city }}</option>
         {% endfor %}
     </select>
+    <select name="flow">
+        <option value="">Поток: все</option>
+        {% for flow in flows %}
+            <option value="{{ flow }}" {% if params.flow == flow|stringformat:'s' %}selected{% endif %}>Поток {{ flow }}</option>
+        {% endfor %}
+    </select>
     <select name="deadline">
         <option value="">Сроки: все</option>
         <option value="overdue" {% if params.deadline == 'overdue' %}selected{% endif %}>Просроченные</option>
@@ -77,7 +83,7 @@
                         <a href="{{ project.get_absolute_url }}"><strong>{{ project.name }}</strong></a>
                         {% if project.is_favorite %}★{% endif %}
                         <div class="sub" style="font-size: 12px; color: var(--text-muted)">
-                            {{ project.get_status_display }}{% if project.city %} · {{ project.city }}{% endif %}
+                            {{ project.get_status_display }}{% if project.city %} · {{ project.city }}{% endif %}{% if project.flow %} · Поток {{ project.flow }}{% endif %}
                         </div>
                     </td>
                     <td>{% if project.client %}<a href="{% url 'clients:detail' project.client.pk %}">{{ project.client }}</a>{% else %}—{% endif %}</td>

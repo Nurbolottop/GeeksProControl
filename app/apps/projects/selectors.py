@@ -93,6 +93,9 @@ def filter_projects(qs: QuerySet[Project], params) -> QuerySet[Project]:
     city = params.get('city')
     if city:
         qs = qs.filter(city=city)
+    flow = params.get('flow')
+    if flow:
+        qs = qs.filter(flow=flow)
     today = timezone.localdate()
     deadline = params.get('deadline')
     if deadline == 'overdue':

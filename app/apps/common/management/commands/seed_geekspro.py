@@ -390,8 +390,8 @@ class Command(BaseCommand):
                 staging_url=data.get('staging', ''),
                 production_url=data.get('production', ''),
                 github_url=data.get('gitlab', ''),
-                head_comment=f'Поток {data["flow"]}.'
-                             + (f' {data["note"]}' if data.get('note') else ''),
+                flow=data['flow'],
+                head_comment=data.get('note', ''),
             )
             self._create_stages(project, data['stage'])
             ProjectStatusHistory.objects.create(

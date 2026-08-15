@@ -18,7 +18,7 @@ class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
         fields = [
-            'name', 'client', 'city', 'project_type', 'description',
+            'name', 'client', 'city', 'flow', 'project_type', 'description',
             'contract_date', 'start_date', 'planned_end_date',
             'status', 'current_stage', 'priority', 'progress',
             'project_manager', 'team_lead', 'head_comment',
