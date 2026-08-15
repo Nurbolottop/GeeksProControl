@@ -6,11 +6,15 @@
 <div class="page-head">
     <div>
         <h1>{{ task.title }}</h1>
-        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
-            <span class="badge badge--blue">{{ task.get_status_display }}</span>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+            {% if task.status == 'done' %}<span class="badge badge--green">✓ Выполнена</span>
+            {% elif task.status == 'in_progress' %}<span class="badge badge--blue">В работе</span>
+            {% elif task.status == 'review' %}<span class="badge badge--yellow">На проверке</span>
+            {% elif task.status == 'cancelled' %}<span class="badge badge--gray">Отменена</span>
+            {% else %}<span class="badge badge--blue">Новая</span>{% endif %}
             {% if task.priority == 'critical' %}<span class="badge badge--red">Critical</span>
             {% elif task.priority == 'high' %}<span class="badge badge--orange">High</span>
-            {% elif task.priority == 'medium' %}<span class="badge badge--blue">Medium</span>
+            {% elif task.priority == 'medium' %}<span class="badge badge--gray">Medium</span>
             {% else %}<span class="badge badge--gray">Low</span>{% endif %}
             {% if task.deadline %}<span class="badge badge--gray">Deadline: {{ task.deadline|date:'d.m.Y' }}</span>{% endif %}
         </div>
@@ -27,61 +31,100 @@
     </div>
 </div>
 
-<div class="panel">
-    <dl class="def-grid">
-        <div class="def"><dt>Проект</dt><dd>{% if task.project %}<a href="{{ task.project.get_absolute_url }}">{{ task.project.name }}</a>{% else %}—{% endif %}</dd></div>
-        <div class="def"><dt>Этап</dt><dd>{% if task.stage %}{{ task.stage.get_key_display }}{% else %}—{% endif %}</dd></div>
-        <div class="def"><dt>Исполнитель</dt><dd>{{ task.assignee.display_name|default:'—' }}</dd></div>
-        <div class="def"><dt>Автор</dt><dd>{{ task.author.display_name|default:'—' }}</dd></div>
-        <div class="def"><dt>Создана</dt><dd>{{ task.created_at|date:'d.m.Y H:i' }}</dd></div>
-        <div class="def"><dt>Завершена</dt><dd>{{ task.completed_at|date:'d.m.Y'|default:'—' }}</dd></div>
-    </dl>
-    {% if task.description %}
-        <h2 style="margin-top:16px">Описание</h2>
-        <p style="margin:0">{{ task.description|linebreaksbr }}</p>
-    {% endif %}
-</div>
-
-<div class="panel">
-    <h2>Вложения ({{ attachments|length }})</h2>
-    {% for attachment in attachments %}
-        <div style="padding: 6px 0; border-bottom: 1px solid var(--border);">
-            <a href="{{ attachment.file.url }}" target="_blank" rel="noopener">{{ attachment.name }}</a>
-            <span class="sub" style="color:var(--text-muted); font-size:12px">
-                — {{ attachment.created_at|date:'d.m.Y H:i' }}
-            </span>
+<div class="detail-grid">
+    <div class="detail-grid__main">
+        <div class="panel">
+            <h2>Описание</h2>
+            {% if task.description %}
+                <p style="margin:0">{{ task.description|linebreaksbr }}</p>
+            {% else %}
+                <div class="empty">Описания нет.</div>
+            {% endif %}
         </div>
-    {% empty %}
-        <div class="empty">Вложений нет.</div>
-    {% endfor %}
-    <form method="post" enctype="multipart/form-data" style="margin-top:12px; display:flex; gap:10px; align-items:center;">
-        {% csrf_token %}
-        <input type="hidden" name="attachment" value="1">
-        {{ attachment_form.file }}
-        {% if attachment_form.file.errors %}
-            <span class="form-errors">{{ attachment_form.file.errors.0 }}</span>
-        {% endif %}
-        <button type="submit" class="btn btn--secondary btn--sm">Загрузить</button>
-    </form>
-</div>
 
-<div class="panel">
-    <h2>Комментарии ({{ comments|length }})</h2>
-    <ul class="feed">
-        {% for comment in comments %}
-            <li>
-                {{ comment.text|linebreaksbr }}
-                <div class="when">{{ comment.created_at|date:'d.m.Y H:i' }}{% if comment.author %} · {{ comment.author.display_name }}{% endif %}</div>
-            </li>
-        {% empty %}
-            <li class="empty">Комментариев нет.</li>
-        {% endfor %}
-    </ul>
-    <form method="post" style="margin-top:12px">
-        {% csrf_token %}
-        <input type="hidden" name="comment" value="1">
-        <div class="form-field">{{ comment_form.text }}</div>
-        <button type="submit" class="btn btn--secondary btn--sm" style="margin-top:8px">Отправить</button>
-    </form>
+        <div class="panel">
+            <h2>Комментарии <span class="count-chip">{{ comments|length }}</span></h2>
+            {% for comment in comments %}
+                <div class="comment">
+                    <div class="comment__avatar">{{ comment.author.display_name|default:'?'|first|upper }}</div>
+                    <div class="comment__body">
+                        <div class="comment__head">
+                            <strong>{{ comment.author.display_name|default:'—' }}</strong>
+                            <span>{{ comment.created_at|date:'d.m.Y H:i' }}</span>
+                        </div>
+                        <div>{{ comment.text|linebreaksbr }}</div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="empty" style="padding-bottom:4px">Комментариев пока нет — напишите первый.</div>
+            {% endfor %}
+            <form method="post" class="comment-form">
+                {% csrf_token %}
+                <input type="hidden" name="comment" value="1">
+                {{ comment_form.text }}
+                <button type="submit" class="btn btn--sm">Отправить</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="detail-grid__side">
+        <div class="panel">
+            <h2>Детали</h2>
+            <div class="meta-list">
+                <div class="meta-row">
+                    <span>Проект</span>
+                    <div>{% if task.project %}<a href="{{ task.project.get_absolute_url }}">{{ task.project.name }}</a>{% else %}—{% endif %}</div>
+                </div>
+                <div class="meta-row">
+                    <span>Этап</span>
+                    <div>{% if task.stage %}{{ task.stage.get_key_display }}{% else %}—{% endif %}</div>
+                </div>
+                <div class="meta-row">
+                    <span>Исполнитель</span>
+                    <div>{{ task.assignee.display_name|default:'—' }}</div>
+                </div>
+                <div class="meta-row">
+                    <span>Автор</span>
+                    <div>{{ task.author.display_name|default:'—' }}</div>
+                </div>
+                <div class="meta-row">
+                    <span>Создана</span>
+                    <div>{{ task.created_at|date:'d.m.Y H:i' }}</div>
+                </div>
+                <div class="meta-row">
+                    <span>Deadline</span>
+                    <div>{{ task.deadline|date:'d.m.Y'|default:'—' }}</div>
+                </div>
+                <div class="meta-row">
+                    <span>Завершена</span>
+                    <div>{{ task.completed_at|date:'d.m.Y'|default:'—' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Вложения <span class="count-chip">{{ attachments|length }}</span></h2>
+            {% for attachment in attachments %}
+                <div class="file-row">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                    <div>
+                        <a href="{{ attachment.file.url }}" target="_blank" rel="noopener">{{ attachment.name|truncatechars:32 }}</a>
+                        <div class="file-row__meta">{{ attachment.created_at|date:'d.m.Y H:i' }}</div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="empty" style="padding-bottom:4px">Вложений нет.</div>
+            {% endfor %}
+            <form method="post" enctype="multipart/form-data" class="upload-form">
+                {% csrf_token %}
+                <input type="hidden" name="attachment" value="1">
+                {{ attachment_form.file }}
+                {% if attachment_form.file.errors %}
+                    <div class="form-errors">{{ attachment_form.file.errors.0 }}</div>
+                {% endif %}
+                <button type="submit" class="btn btn--secondary btn--sm">Загрузить</button>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
