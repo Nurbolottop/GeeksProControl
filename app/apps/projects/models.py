@@ -115,8 +115,13 @@ class Project(TimeStampedModel, ArchivableModel):
         verbose_name='Заказчик', null=True, blank=True,
     )
     city = models.CharField('Город / филиал', max_length=100, blank=True, db_index=True)
-    flow = models.PositiveSmallIntegerField(
-        'Поток', null=True, blank=True, db_index=True,
+    flow = models.ForeignKey(
+        'flows.Flow', on_delete=models.SET_NULL, related_name='projects',
+        verbose_name='Поток', null=True, blank=True, db_index=True,
+    )
+    number_in_flow = models.PositiveSmallIntegerField(
+        'Номер в потоке', null=True, blank=True,
+        help_text='Например, 1 — тогда ID проекта будет 13.1',
     )
     project_type = models.ForeignKey(
         ProjectType, on_delete=models.PROTECT, related_name='projects',
@@ -177,13 +182,20 @@ class Project(TimeStampedModel, ArchivableModel):
         ]
 
     def __str__(self) -> str:
-        return f'{self.code} {self.name}'.strip()
+        return f'{self.display_code} {self.name}'.strip()
 
     def save(self, *args, **kwargs):
         if not self.code:
             last_id = Project.objects.aggregate(m=models.Max('id'))['m'] or 0
             self.code = f'GP-{last_id + 1:04d}'
         super().save(*args, **kwargs)
+
+    @property
+    def display_code(self) -> str:
+        """ID проекта в привычном виде: «13.1» (поток.номер)."""
+        if self.flow_id and self.number_in_flow:
+            return f'{self.flow.number}.{self.number_in_flow}'
+        return self.code
 
     def get_absolute_url(self) -> str:
         return reverse('projects:detail', args=[self.pk])

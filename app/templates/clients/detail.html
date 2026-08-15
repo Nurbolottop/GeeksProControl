@@ -51,7 +51,7 @@
             <tbody>
             {% for project in projects %}
                 <tr>
-                    <td>{{ project.code }}</td>
+                    <td>{{ project.display_code }}</td>
                     <td><a href="{{ project.get_absolute_url }}"><strong>{{ project.name }}</strong></a></td>
                     <td>{{ project.project_type|default:'—' }}</td>
                     <td>{{ project.get_status_display }}</td>

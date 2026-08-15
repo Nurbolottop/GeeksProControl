@@ -5,12 +5,12 @@
 {% block content %}
 <div class="page-head">
     <div>
-        <h1>{{ project.code }} · {{ project.name }} {% if project.is_favorite %}★{% endif %}</h1>
+        <h1>{{ project.display_code }} · {{ project.name }} {% if project.is_favorite %}★{% endif %}</h1>
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
             <span class="badge badge--blue">{{ project.get_current_stage_display }}</span>
             {% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}
             <span class="badge badge--gray">{{ project.get_status_display }}</span>
-            {% if project.flow %}<span class="badge badge--gray">Поток {{ project.flow }}</span>{% endif %}
+            {% if project.flow %}<a href="{{ project.flow.get_absolute_url }}" class="badge badge--gray">{{ project.flow }}</a>{% endif %}
         </div>
     </div>
     <div class="page-actions">
@@ -65,7 +65,6 @@
                 <tr>
                     <th>Задача</th>
                     <th>Приоритет</th>
-                    <th>Исполнитель</th>
                     <th>Deadline</th>
                     <th>Статус</th>
                 </tr>
@@ -74,7 +73,7 @@
                 {% for task in tasks %}
                     {% include 'tasks/partials/task_row.html' with statuses=task_statuses %}
                 {% empty %}
-                    <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Задач нет.</td></tr>
+                    <tr><td colspan="4" class="empty" style="text-align:center; padding: 24px;">Задач нет.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

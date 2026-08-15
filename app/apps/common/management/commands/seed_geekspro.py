@@ -22,6 +22,7 @@ from apps.audit.models import AuditLog
 from apps.clients.models import Client, ClientContact
 from apps.documents import services as doc_services
 from apps.documents.models import CONTRACT, Document, DocumentType, REQUIREMENTS
+from apps.flows.models import Flow
 from apps.interns.models import Intern, InternEvaluation, InternStatus
 from apps.meetings.models import Meeting
 from apps.notifications.models import Notification
@@ -331,8 +332,12 @@ class Command(BaseCommand):
 
         self.projects = self._create_projects()
         self._create_staff()
-        roster_count = self._import_roster(wb['Ведомость 13'], name_col=5)
-        roster_count += self._import_roster(wb['Ведомость 12'], name_col=6)
+        roster_count = self._import_roster(
+            wb['Ведомость 13'], name_col=5, roster_flow=13,
+        )
+        roster_count += self._import_roster(
+            wb['Ведомость 12'], name_col=6, roster_flow=12,
+        )
         self._assign_team_leads(wb['тимлиды'])
         self._assign_pms_and_extras()
         groups = self._import_training_groups(wb[' план '])
@@ -356,7 +361,7 @@ class Command(BaseCommand):
             AuditLog, Notification, Risk, WeeklyReport, KPISnapshot,
             Meeting, Document, Task, TeamMember, InternEvaluation, Intern,
             TrainingGroup, PlannedProject, ProjectStatusHistory, ProjectStage,
-            Project, ClientContact, Client,
+            Project, ClientContact, Client, Flow,
         ):
             model.objects.all().delete()
         User.objects.filter(is_superuser=False).delete()
@@ -368,6 +373,17 @@ class Command(BaseCommand):
         tz_type = DocumentType.objects.get(code=REQUIREMENTS)
         clients: dict[str, Client] = {}
         projects: dict[str, Project] = {}
+
+        # Потоки: 13 и новее — активные, остальные завершены
+        flows = {
+            number: Flow.objects.create(
+                number=number,
+                status=Flow.Status.ACTIVE if number >= 13 else Flow.Status.FINISHED,
+            )
+            for number in sorted({item['flow'] for item in PROJECTS})
+        }
+        self.flows = flows
+        flow_counters = {number: 0 for number in flows}
 
         for data in PROJECTS:
             client_name = data.get('client', data['name'])
@@ -390,7 +406,8 @@ class Command(BaseCommand):
                 staging_url=data.get('staging', ''),
                 production_url=data.get('production', ''),
                 github_url=data.get('gitlab', ''),
-                flow=data['flow'],
+                flow=flows[data['flow']],
+                number_in_flow=self._next_number(flow_counters, data['flow']),
                 head_comment=data.get('note', ''),
             )
             self._create_stages(project, data['stage'])
@@ -413,6 +430,11 @@ class Command(BaseCommand):
                 )
             projects[data['name']] = project
         return projects
+
+    @staticmethod
+    def _next_number(counters: dict, flow_number: int) -> int:
+        counters[flow_number] += 1
+        return counters[flow_number]
 
     def _create_stages(self, project: Project, current_stage: str):
         stage_order = lifecycle_stages(project.project_type)
@@ -474,7 +496,7 @@ class Command(BaseCommand):
                 return project
         return None
 
-    def _import_roster(self, ws, *, name_col: int) -> int:
+    def _import_roster(self, ws, *, name_col: int, roster_flow: int | None = None) -> int:
         """Ведомость: A поток, B старт, D/E направление, E/F проект, F/G ФИО…"""
         count = 0
         offset = name_col - 5  # 0 для «Ведомость 13», 1 для «Ведомость 12»
@@ -507,6 +529,7 @@ class Command(BaseCommand):
                     city=city,
                     branch=branch_raw or '',
                     internship_start_date=start.date() if start else None,
+                    flow=self.flows.get(roster_flow),
                 )
                 self.interns[name] = intern
                 count += 1

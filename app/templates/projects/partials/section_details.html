@@ -17,7 +17,8 @@
         </div></div>
         <div class="meta-row"><span>Этап</span><div><span class="badge badge--blue">{{ project.get_current_stage_display }}</span></div></div>
         <div class="meta-row"><span>Срок</span><div>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</div></div>
-        <div class="meta-row"><span>Поток</span><div>{% if project.flow %}Поток {{ project.flow }}{% else %}—{% endif %}</div></div>
+        <div class="meta-row"><span>Поток</span><div>{% if project.flow %}<a href="{{ project.flow.get_absolute_url }}">{{ project.flow }}</a>{% else %}—{% endif %}</div></div>
+        <div class="meta-row"><span>Номер в потоке</span><div>{{ project.display_code }}</div></div>
         <div class="meta-row"><span>Приоритет</span><div>{{ project.get_priority_display }}</div></div>
         <div class="meta-row"><span>Тип проекта</span><div>{{ project.project_type|default:'—' }}</div></div>
         <div class="meta-row"><span>Project Manager</span><div>{{ project.project_manager.display_name|default:'—' }}</div></div>

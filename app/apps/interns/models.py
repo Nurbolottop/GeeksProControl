@@ -39,6 +39,10 @@ class Intern(TimeStampedModel, ArchivableModel):
         TrainingGroup, on_delete=models.SET_NULL, related_name='interns',
         verbose_name='Учебная группа', null=True, blank=True,
     )
+    flow = models.ForeignKey(
+        'flows.Flow', on_delete=models.SET_NULL, related_name='interns',
+        verbose_name='Поток', null=True, blank=True, db_index=True,
+    )
     education_end_date = models.DateField(
         'Дата окончания обучения', null=True, blank=True,
     )

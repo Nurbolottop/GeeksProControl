@@ -26,6 +26,7 @@ from apps.projects.models import (
     ProjectStatusHistory,
     ProjectType,
 )
+from apps.flows.models import Flow
 from apps.projects import selectors, services
 
 
@@ -75,9 +76,7 @@ def project_list(request, category='all'):
         'cities': Project.objects.active()
                   .exclude(city='').values_list('city', flat=True)
                   .distinct().order_by('city'),
-        'flows': Project.objects.active()
-                 .exclude(flow__isnull=True).values_list('flow', flat=True)
-                 .distinct().order_by('-flow'),
+        'flows': Flow.objects.filter(projects__isnull=False).distinct(),
         'statuses': ProjectStatus.choices,
         'stages': ProjectStageKey.choices,
         'params': request.GET,

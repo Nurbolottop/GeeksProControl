@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'apps.audit',
     'apps.resources',
     'apps.reports',
+    'apps.flows',
 ]
 
 # =============================================================================

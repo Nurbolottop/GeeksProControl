@@ -28,7 +28,7 @@
                             <a href="{{ project.get_absolute_url }}">{{ project.name }}</a>
                         </div>
                         <div class="kanban-card__meta">
-                            <span>{{ project.code }}{% if project.client %} · {{ project.client }}{% endif %}</span>
+                            <span>{{ project.display_code }}{% if project.client %} · {{ project.client }}{% endif %}</span>
                             <span>PM: {{ project.project_manager.display_name|default:'—' }} · TL: {{ project.team_lead.display_name|default:'—' }}</span>
                             {% if project.planned_end_date %}<span>Deadline: {{ project.planned_end_date|date:'d.m.Y' }}</span>{% endif %}
                             <span>
