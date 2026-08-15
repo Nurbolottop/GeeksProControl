@@ -7,9 +7,17 @@ from apps.common.models import ArchivableModel, TimeStampedModel
 
 
 class ProjectType(models.Model):
-    """Тип проекта (ТЗ §6.2). Справочник, пополняется через админку."""
+    """Тип проекта. Справочник, пополняется через админку.
+
+    ``is_mobile`` определяет набор этапов разработки: у мобильных проектов
+    вместо Frontend идёт «Мобильная разработка».
+    """
 
     name = models.CharField('Название', max_length=100, unique=True)
+    is_mobile = models.BooleanField(
+        'Мобильная разработка', default=False,
+        help_text='У таких проектов этап Frontend заменяется на «Мобильная разработка»',
+    )
 
     class Meta:
         verbose_name = 'Тип проекта'
@@ -43,13 +51,41 @@ class ProjectStageKey(models.TextChoices):
     REQUIREMENTS = 'requirements', 'ТЗ'
     TEAM_FORMING = 'team_forming', 'Формирование команды'
     DESIGN = 'design', 'Дизайн'
-    DEVELOPMENT = 'development', 'Разработка'
+    BACKEND = 'backend', 'Backend'
+    FRONTEND = 'frontend', 'Frontend'
+    MOBILE_DEV = 'mobile_dev', 'Мобильная разработка'
     STAGING = 'staging', 'Тестовый сервер'
     TESTING = 'testing', 'Тестирование'
     REWORK = 'rework', 'Доработка'
     DELIVERY = 'delivery', 'Сдача'
     PRODUCTION = 'production', 'Продакшен'
     COMPLETED = 'completed', 'Завершён'
+
+
+# Этапы до и после разработки — общие для всех типов проектов
+STAGES_BEFORE_DEV = [
+    ProjectStageKey.NEW, ProjectStageKey.DOCUMENTS, ProjectStageKey.REQUIREMENTS,
+    ProjectStageKey.TEAM_FORMING, ProjectStageKey.DESIGN,
+]
+STAGES_AFTER_DEV = [
+    ProjectStageKey.STAGING, ProjectStageKey.TESTING, ProjectStageKey.REWORK,
+    ProjectStageKey.DELIVERY, ProjectStageKey.PRODUCTION,
+    ProjectStageKey.COMPLETED,
+]
+
+
+def lifecycle_stages(project_type=None) -> list[str]:
+    """Набор этапов под тип проекта.
+
+    Веб-сайт / веб-приложение: … Дизайн → Backend → Frontend → …
+    Мобильное приложение:      … Дизайн → Backend → Мобильная разработка → …
+    """
+    development = [ProjectStageKey.BACKEND]
+    if project_type is not None and project_type.is_mobile:
+        development.append(ProjectStageKey.MOBILE_DEV)
+    else:
+        development.append(ProjectStageKey.FRONTEND)
+    return [*STAGES_BEFORE_DEV, *development, *STAGES_AFTER_DEV]
 
 
 class ProjectPriority(models.TextChoices):
@@ -173,11 +209,9 @@ class ProjectStage(TimeStampedModel):
     """Этап конкретного проекта (ТЗ §9)."""
 
     class Status(models.TextChoices):
-        NOT_STARTED = 'not_started', 'Не начато'
-        IN_PROGRESS = 'in_progress', 'В работе'
-        REVIEW = 'review', 'На проверке'
-        DONE = 'done', 'Завершено'
-        BLOCKED = 'blocked', 'Заблокировано'
+        NOT_STARTED = 'not_started', 'Не начат'
+        IN_PROGRESS = 'in_progress', 'В процессе'
+        DONE = 'done', 'Завершён'
 
     project = models.ForeignKey(
         Project, on_delete=models.CASCADE, related_name='stages',

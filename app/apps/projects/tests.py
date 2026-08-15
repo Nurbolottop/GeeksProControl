@@ -11,6 +11,8 @@ from apps.projects.models import (
     Project,
     ProjectStageKey,
     ProjectStatus,
+    ProjectType,
+    lifecycle_stages,
 )
 from apps.projects.services import calculate_deadline_status, create_project
 
@@ -82,12 +84,42 @@ class DeadlineStatusTests(TestCase):
 
 
 class CreateProjectTests(TestCase):
-    def test_creates_all_lifecycle_stages_and_history(self):
+    """Набор этапов зависит от типа проекта."""
+
+    def test_web_project_gets_backend_and_frontend(self):
+        web_type = ProjectType.objects.create(name='Web-сайт')
+        project = make_project(project_type=web_type)
+        create_project(project)
+        keys = list(project.stages.order_by('order').values_list('key', flat=True))
+        self.assertEqual(keys, lifecycle_stages(web_type))
+        self.assertIn(ProjectStageKey.BACKEND, keys)
+        self.assertIn(ProjectStageKey.FRONTEND, keys)
+        self.assertNotIn(ProjectStageKey.MOBILE_DEV, keys)
+
+    def test_mobile_project_gets_mobile_development(self):
+        mobile_type = ProjectType.objects.create(name='Mobile App', is_mobile=True)
+        project = make_project(project_type=mobile_type)
+        create_project(project)
+        keys = list(project.stages.values_list('key', flat=True))
+        self.assertIn(ProjectStageKey.MOBILE_DEV, keys)
+        self.assertNotIn(ProjectStageKey.FRONTEND, keys)
+
+    def test_stage_order_puts_delivery_before_production(self):
         project = make_project()
         create_project(project)
-        self.assertEqual(
-            project.stages.count(), len(ProjectStageKey.values),
+        keys = list(project.stages.order_by('order').values_list('key', flat=True))
+        self.assertLess(
+            keys.index(ProjectStageKey.DELIVERY),
+            keys.index(ProjectStageKey.PRODUCTION),
         )
+        self.assertLess(
+            keys.index(ProjectStageKey.BACKEND),
+            keys.index(ProjectStageKey.STAGING),
+        )
+
+    def test_creates_history_and_code(self):
+        project = make_project()
+        create_project(project)
         self.assertEqual(project.history.count(), 1)
         self.assertTrue(project.code.startswith('GP-'))
 

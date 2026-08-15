@@ -32,6 +32,7 @@ from apps.projects.models import (
     ProjectStatus,
     ProjectStatusHistory,
     ProjectType,
+    lifecycle_stages,
 )
 from apps.reports.models import KPISnapshot, WeeklyReport
 from apps.resources.models import PlannedProject
@@ -162,19 +163,19 @@ PROJECTS = [
     # -------- Поток 13 — в работе --------
     dict(name='Олимпийская школа', city='Бишкек', type=WEB, flow=13,
          contract=D(2026, 5, 18), deadline=D(2026, 8, 16),
-         status='active', stage=ProjectStageKey.DEVELOPMENT, progress=60),
+         status='active', stage=ProjectStageKey.BACKEND, progress=60),
     dict(name='Омур клиника', city='Ош', type=WEB, flow=13,
          contract=D(2026, 4, 14), deadline=D(2026, 7, 13),
          status='active', stage=ProjectStageKey.TESTING, progress=75),
     dict(name='ОБА', city='Ош', type=WEB, flow=13,
          contract=D(2026, 3, 1), deadline=D(2026, 7, 3),
-         status='active', stage=ProjectStageKey.DEVELOPMENT, progress=65),
+         status='active', stage=ProjectStageKey.BACKEND, progress=65),
     dict(name='Ислам-медресе (Абдушукур Нарматов)', city='Ош', type=WEB, flow=13,
          contract=D(2026, 5, 19), deadline=D(2026, 8, 17),
-         status='active', stage=ProjectStageKey.DEVELOPMENT, progress=60),
+         status='active', stage=ProjectStageKey.BACKEND, progress=60),
     dict(name='Мин просвещения', city='Бишкек', type=WEB, flow=13,
          contract=D(2026, 6, 23), deadline=D(2026, 9, 21),
-         status='active', stage=ProjectStageKey.DEVELOPMENT, progress=45),
+         status='active', stage=ProjectStageKey.BACKEND, progress=45),
     dict(name='Учкун', city='Бишкек', type=WEB, flow=13,
          status='active', stage=ProjectStageKey.DESIGN, progress=25),
     dict(name='Полароид', city='Бишкек', type=WEB, flow=13,
@@ -227,7 +228,7 @@ PROJECTS = [
          note='Вышел в прод 30.03. ТЗ не было.'),
     dict(name='EkiAl', city='Бишкек', type=MOBILE, flow=11,
          contract=D(2025, 11, 21), deadline=D(2026, 4, 30),
-         status='refused', stage=ProjectStageKey.DEVELOPMENT, progress=40,
+         status='refused', stage=ProjectStageKey.BACKEND, progress=40,
          gitlab='https://gitlab.geeks.kg/ekial', has_tz=True),
 
     # -------- Поток 10 --------
@@ -256,7 +257,7 @@ PROJECTS = [
          gitlab='https://gitlab.geeks.kg/abiyirfinance', has_tz=True,
          note='Сервер клиента не подходит.'),
     dict(name='USTAT', city='Бишкек', type=WEB, flow=10,
-         status='paused', stage=ProjectStageKey.DEVELOPMENT, progress=50,
+         status='paused', stage=ProjectStageKey.BACKEND, progress=50,
          has_tz=True, note='Сроки под вопросом, договора нет.'),
     dict(name='БАТ-МУ', city='Бишкек', type=WEB, flow=10,
          contract=D(2025, 8, 8), deadline=D(2026, 1, 21),
@@ -275,14 +276,14 @@ PROJECTS = [
          status='completed', stage=ProjectStageKey.COMPLETED, progress=100),
     dict(name='АДДК-Садик', city='Ош', type=WEB, flow=10, client='АДДК',
          contract=D(2026, 4, 1), deadline=D(2026, 6, 30),
-         status='active', stage=ProjectStageKey.DEVELOPMENT, progress=70),
+         status='active', stage=ProjectStageKey.BACKEND, progress=70),
     dict(name='АДДК-Мектеп', city='Ош', type=WEB, flow=10, client='АДДК',
          contract=D(2026, 4, 1), deadline=D(2026, 6, 30),
-         status='active', stage=ProjectStageKey.DEVELOPMENT, progress=70),
+         status='active', stage=ProjectStageKey.BACKEND, progress=70),
 
     # -------- Вне потоков --------
     dict(name='Умай', city='Бишкек', type=WEB, flow=13,
-         status='active', stage=ProjectStageKey.DEVELOPMENT, progress=40,
+         status='active', stage=ProjectStageKey.BACKEND, progress=40,
          gitlab='https://gitlab.geeks.kg/umai', has_tz=True),
     dict(name='КИТ форум', city='Бишкек', type=WEB, flow=13,
          status='active', stage=ProjectStageKey.NEW, progress=0),
@@ -299,7 +300,6 @@ PROJECT_NAME_ALIASES = {
     'promontage': 'ПроМонтаж', 'enactus': 'Энактас КЖ', 'biclean': 'БиКлин',
 }
 
-STAGE_ORDER = list(ProjectStageKey.values)
 STATUS_MAP = {
     'active': ProjectStatus.ACTIVE, 'paused': ProjectStatus.PAUSED,
     'completed': ProjectStatus.COMPLETED, 'cancelled': ProjectStatus.CANCELLED,
@@ -415,9 +415,12 @@ class Command(BaseCommand):
         return projects
 
     def _create_stages(self, project: Project, current_stage: str):
-        current_index = STAGE_ORDER.index(current_stage)
+        stage_order = lifecycle_stages(project.project_type)
+        current_index = (
+            stage_order.index(current_stage) if current_stage in stage_order else 0
+        )
         stages = []
-        for index, key in enumerate(STAGE_ORDER):
+        for index, key in enumerate(stage_order):
             if project.status == ProjectStatus.COMPLETED or index < current_index:
                 stage_status, stage_progress = ProjectStage.Status.DONE, 100
             elif index == current_index:

@@ -182,12 +182,27 @@ class ProjectAccessForm(forms.ModelForm):
 
 
 class StageUpdateForm(forms.ModelForm):
-    """Инлайн-редактирование этапа в карточке проекта."""
+    """Настройка этапа: статус, дедлайн и комментарий."""
 
     class Meta:
         model = ProjectStage
-        fields = ['status', 'progress', 'deadline', 'responsible', 'comment']
+        fields = ['status', 'deadline', 'comment']
         widgets = {
             'deadline': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'comment': forms.TextInput(),
         }
+
+
+class StageExtendForm(forms.Form):
+    """Продление дедлайна этапа — новая дата и обязательная причина."""
+
+    deadline = forms.DateField(
+        label='Новый deadline',
+        widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+    )
+    reason = forms.CharField(
+        label='Причина продления',
+        widget=forms.TextInput(
+            attrs={'placeholder': 'Например: клиент задержал материалы'},
+        ),
+    )

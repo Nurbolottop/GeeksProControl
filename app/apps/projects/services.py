@@ -12,6 +12,7 @@ from apps.projects.models import (
     ProjectStageKey,
     ProjectStatus,
     ProjectStatusHistory,
+    lifecycle_stages,
 )
 
 # Пороговые значения автоматических проверок (ТЗ §22).
@@ -68,7 +69,7 @@ def create_project(project: Project, user=None) -> Project:
     project.save()
     stages = [
         ProjectStage(project=project, key=key, order=index)
-        for index, key in enumerate(ProjectStageKey.values)
+        for index, key in enumerate(lifecycle_stages(project.project_type))
     ]
     ProjectStage.objects.bulk_create(stages)
     ProjectStatusHistory.objects.create(
@@ -146,22 +147,73 @@ def move_project_to_stage(project: Project, stage_key: str, user=None) -> Projec
 
 
 @transaction.atomic
-def update_stage(
-    stage: ProjectStage, *, status: str | None = None,
-    progress: int | None = None, user=None,
-) -> ProjectStage:
-    """Обновление этапа с автоматикой дат начала/завершения."""
-    if status is not None and status != stage.status:
-        stage.status = status
-        if status == ProjectStage.Status.IN_PROGRESS and not stage.start_date:
-            stage.start_date = timezone.localdate()
-        if status == ProjectStage.Status.DONE:
-            stage.end_date = timezone.localdate()
-            stage.progress = 100
-    if progress is not None:
-        stage.progress = min(100, max(0, progress))
+def update_stage(stage: ProjectStage, user=None) -> ProjectStage:
+    """Сохранение этапа с автоматикой дат начала и завершения."""
+    if stage.status == ProjectStage.Status.IN_PROGRESS and not stage.start_date:
+        stage.start_date = timezone.localdate()
+    if stage.status == ProjectStage.Status.DONE and not stage.end_date:
+        stage.end_date = timezone.localdate()
+    if stage.status == ProjectStage.Status.NOT_STARTED:
+        stage.start_date = None
+        stage.end_date = None
     stage.save()
+    _touch_project(stage.project)
+    return stage
+
+
+@transaction.atomic
+def complete_stage(stage: ProjectStage, user=None) -> ProjectStage:
+    """Завершение этапа: ставит дату завершения и двигает проект дальше."""
+    stage.status = ProjectStage.Status.DONE
+    stage.end_date = timezone.localdate()
+    if not stage.start_date:
+        stage.start_date = timezone.localdate()
+    stage.save()
+
     project = stage.project
+    ProjectStatusHistory.objects.create(
+        project=project, field=f'Этап «{stage.get_key_display()}»',
+        new_value='Завершён', user=user,
+    )
+    # Проект автоматически переходит на следующий незавершённый этап
+    next_stage = (
+        project.stages.filter(order__gt=stage.order)
+        .exclude(status=ProjectStage.Status.DONE)
+        .order_by('order').first()
+    )
+    if next_stage and project.current_stage != next_stage.key:
+        move_project_to_stage(project, next_stage.key, user=user)
+    else:
+        _touch_project(project)
+    return stage
+
+
+@transaction.atomic
+def extend_stage_deadline(
+    stage: ProjectStage, new_deadline, reason: str, user=None,
+) -> ProjectStage:
+    """Продление дедлайна этапа. Причина обязательна и пишется в историю."""
+    old_deadline = stage.deadline
+    stage.deadline = new_deadline
+    stage.save(update_fields=['deadline', 'updated_at'])
+
+    ProjectStatusHistory.objects.create(
+        project=stage.project,
+        field=f'Deadline этапа «{stage.get_key_display()}»',
+        old_value=f'{old_deadline:%d.%m.%Y}' if old_deadline else '',
+        new_value=f'{new_deadline:%d.%m.%Y}',
+        reason=reason, user=user,
+    )
+    from apps.audit.services import log as audit_log
+    audit_log(
+        stage.project, f'Продление этапа «{stage.get_key_display()}»',
+        old_value=f'{old_deadline:%d.%m.%Y}' if old_deadline else '',
+        new_value=f'{new_deadline:%d.%m.%Y}', reason=reason, user=user,
+    )
+    _touch_project(stage.project)
+    return stage
+
+
+def _touch_project(project: Project) -> None:
     project.last_activity_at = timezone.now()
     project.save(update_fields=['last_activity_at', 'updated_at'])
-    return stage

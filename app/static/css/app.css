@@ -883,6 +883,19 @@ input[type="file"]::file-selector-button:hover { background: #f6f7fb; }
 .form-stack .form-field { width: 100%; }
 .htmx-request.panel { opacity: .6; }
 
+/* ---- Этапы проекта ---- */
+.stage-row--done td:first-child { color: var(--text-muted); }
+.stage-row--editing td { background: #f7f8fd !important; }
+.stage-form {
+    display: flex;
+    gap: 14px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    padding: 6px 0;
+}
+.stage-form__title { min-width: 150px; padding-bottom: 8px; }
+.stage-form__actions { display: flex; gap: 8px; padding-bottom: 2px; }
+
 /* ---- Кнопка копирования ---- */
 .copy-btn {
     padding: 2px 8px;

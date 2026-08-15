@@ -14,6 +14,7 @@ from apps.projects.forms import (
     ProjectForm,
     ProjectLinksForm,
     ProjectProgressForm,
+    StageExtendForm,
     StageUpdateForm,
 )
 from apps.projects.models import (
@@ -127,7 +128,7 @@ def project_detail(request, pk):
     context = {
         'project': project,
         'tab': tab,
-        'stages': project.stages.select_related('responsible'),
+        'stages': project.stages.all(),
         'history': project.history.select_related('user')[:50],
         'today': timezone.localdate(),
     }
@@ -336,19 +337,74 @@ def access_delete(request, pk):
 
 @login_required
 def stage_update(request, pk):
-    """HTMX endpoint: инлайн-обновление этапа в карточке проекта."""
+    """Настройка этапа: статус, дедлайн, комментарий (AJAX)."""
     stage = get_object_or_404(
         ProjectStage.objects.select_related('project'), pk=pk,
     )
-    form = StageUpdateForm(request.POST or None, instance=stage)
-    if request.method == 'POST' and form.is_valid():
-        updated = form.save()
-        services.update_stage(updated, user=request.user)
+    if request.method == 'POST':
+        form = StageUpdateForm(request.POST, instance=stage)
+        if form.is_valid():
+            services.update_stage(form.save(commit=False), user=request.user)
+            return _stage_row(request, stage)
         return render(
-            request, 'projects/partials/stage_row.html',
-            {'stage': updated, 'project': updated.project},
+            request, 'projects/partials/stage_form.html',
+            {'form': form, 'stage': stage},
         )
     return render(
         request, 'projects/partials/stage_form.html',
-        {'form': form, 'stage': stage},
+        {'form': StageUpdateForm(instance=stage), 'stage': stage},
+    )
+
+
+@login_required
+def stage_complete(request, pk):
+    """Кнопка «Завершить» у этапа (AJAX)."""
+    stage = get_object_or_404(
+        ProjectStage.objects.select_related('project'), pk=pk,
+    )
+    if request.method == 'POST':
+        services.complete_stage(stage, user=request.user)
+    return _stage_row(request, stage)
+
+
+@login_required
+def stage_extend(request, pk):
+    """Кнопка «Продлить дедлайн»: новая дата и обязательная причина (AJAX)."""
+    stage = get_object_or_404(
+        ProjectStage.objects.select_related('project'), pk=pk,
+    )
+    if request.method == 'POST':
+        form = StageExtendForm(request.POST)
+        if form.is_valid():
+            services.extend_stage_deadline(
+                stage, form.cleaned_data['deadline'],
+                form.cleaned_data['reason'], user=request.user,
+            )
+            return _stage_row(request, stage)
+        return render(
+            request, 'projects/partials/stage_extend_form.html',
+            {'form': form, 'stage': stage},
+        )
+    return render(
+        request, 'projects/partials/stage_extend_form.html',
+        {'form': StageExtendForm(initial={'deadline': stage.deadline}),
+         'stage': stage},
+    )
+
+
+@login_required
+def stage_row(request, pk):
+    """Возврат строки этапа в режим просмотра (кнопка «Отмена»)."""
+    stage = get_object_or_404(
+        ProjectStage.objects.select_related('project'), pk=pk,
+    )
+    return _stage_row(request, stage)
+
+
+def _stage_row(request, stage):
+    stage.refresh_from_db()
+    return render(
+        request, 'projects/partials/stage_row.html',
+        {'stage': stage, 'project': stage.project,
+         'today': timezone.localdate()},
     )
