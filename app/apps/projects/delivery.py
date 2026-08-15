@@ -38,7 +38,13 @@ def delivery_checks(project: Project) -> list[dict]:
         },
         {
             'group': 'Техническая готовность',
-            'label': 'Production развёрнут',
+            'label': 'Выложен на тестовый сервер',
+            'ok': bool(project.staging_url),
+            'hint': 'Заполните Staging URL в карточке проекта',
+        },
+        {
+            'group': 'Техническая готовность',
+            'label': 'Выложен на боевой сервер (продакшен)',
             'ok': bool(project.production_url),
             'hint': 'Заполните Production URL в карточке проекта',
         },

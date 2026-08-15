@@ -25,6 +25,7 @@ class DeliveryTests(TestCase):
         doc_services.ensure_default_types()
         self.project = Project(
             name='Готовый', progress=100,
+            staging_url='https://stage.example.com',
             production_url='https://prod.example.com', domain='example.com',
         )
         create_project(self.project)

@@ -31,7 +31,12 @@ class ProjectStatus(models.TextChoices):
 
 
 class ProjectStageKey(models.TextChoices):
-    """Этапы жизненного цикла проекта (ТЗ §6.3)."""
+    """Этапы жизненного цикла проекта.
+
+    Порядок соответствует реальному процессу GeeksPro: после разработки
+    проект выкладывается на тестовый сервер, тестируется и дорабатывается,
+    сдаётся заказчику и только потом переносится на боевой сервер.
+    """
 
     NEW = 'new', 'Новый'
     DOCUMENTS = 'documents', 'Документы'
@@ -39,10 +44,11 @@ class ProjectStageKey(models.TextChoices):
     TEAM_FORMING = 'team_forming', 'Формирование команды'
     DESIGN = 'design', 'Дизайн'
     DEVELOPMENT = 'development', 'Разработка'
+    STAGING = 'staging', 'Тестовый сервер'
     TESTING = 'testing', 'Тестирование'
     REWORK = 'rework', 'Доработка'
-    PRODUCTION = 'production', 'Продакшен'
     DELIVERY = 'delivery', 'Сдача'
+    PRODUCTION = 'production', 'Продакшен'
     COMPLETED = 'completed', 'Завершён'
 
 
