@@ -333,104 +333,15 @@
 {% else %}
 <div class="detail-grid">
     <div class="detail-grid__main">
-        <div class="panel">
-            <h2>Прогресс</h2>
-            <div class="progress">
-                <div class="progress__bar" style="height: 10px"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>
-                <span class="progress__label">{{ project.progress }}%</span>
-            </div>
-            <div style="margin-top: 10px; font-size: 13px; color: var(--text-muted)">
-                Текущий этап: <strong style="color: var(--text)">{{ project.get_current_stage_display }}</strong>
-                — <a href="?tab=stages">все этапы →</a>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>Клиент</h2>
-            <div class="meta-list">
-                <div class="meta-row">
-                    <span>Заказчик</span>
-                    <div>{% if project.client %}<a href="{% url 'clients:detail' project.client.pk %}">{{ project.client }}</a>{% else %}—{% endif %}</div>
-                </div>
-                <div class="meta-row"><span>Контактное лицо</span><div>{{ project.client.contact_name|default:'—' }}</div></div>
-                <div class="meta-row"><span>Телефон</span><div>{{ project.client.phone|default:'—' }}</div></div>
-                <div class="meta-row"><span>Email</span><div>{{ project.client.email|default:'—' }}</div></div>
-                <div class="meta-row"><span>Город / филиал</span><div>{{ project.city|default:'—' }}</div></div>
-            </div>
-        </div>
-
-        {% if project.description %}
-            <div class="panel"><h2>Описание</h2><p style="margin:0">{{ project.description|linebreaksbr }}</p></div>
-        {% endif %}
-        {% if project.head_comment %}
-            <div class="panel"><h2>Комментарий руководителя</h2><p style="margin:0">{{ project.head_comment|linebreaksbr }}</p></div>
-        {% endif %}
-
-        {% if project.github_url or project.figma_url or project.staging_url or project.production_url or project.domain %}
-        <div class="panel">
-            <h2>Ссылки</h2>
-            <div class="meta-list">
-                {% if project.staging_url %}
-                    <div class="meta-row"><span>Staging</span><div><a href="{{ project.staging_url }}" target="_blank" rel="noopener">{{ project.staging_url|cut:'https://'|cut:'http://' }}</a></div></div>
-                {% endif %}
-                {% if project.production_url %}
-                    <div class="meta-row"><span>Production</span><div><a href="{{ project.production_url }}" target="_blank" rel="noopener">{{ project.production_url|cut:'https://'|cut:'http://' }}</a></div></div>
-                {% endif %}
-                {% if project.github_url %}
-                    <div class="meta-row"><span>Репозиторий</span><div><a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url|cut:'https://'|cut:'http://' }}</a></div></div>
-                {% endif %}
-                {% if project.figma_url %}
-                    <div class="meta-row"><span>Figma</span><div><a href="{{ project.figma_url }}" target="_blank" rel="noopener">{{ project.figma_url|cut:'https://'|cut:'http://' }}</a></div></div>
-                {% endif %}
-                {% if project.domain %}
-                    <div class="meta-row"><span>Домен</span><div>{{ project.domain }}</div></div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
+        {% include 'projects/partials/section_progress.html' %}
+        {% include 'projects/partials/section_client.html' %}
+        {% include 'projects/partials/section_links.html' %}
+        {% include 'projects/partials/section_about.html' %}
     </div>
 
     <div class="detail-grid__side">
-        <div class="panel">
-            <h2>Детали</h2>
-            <div class="meta-list">
-                <div class="meta-row"><span>Статус</span><div>
-                    {% if project.status == 'active' %}<span class="badge badge--green">{{ project.get_status_display }}</span>
-                    {% elif project.status == 'completed' %}<span class="badge badge--blue">{{ project.get_status_display }}</span>
-                    {% elif project.status == 'paused' %}<span class="badge badge--yellow">{{ project.get_status_display }}</span>
-                    {% else %}<span class="badge badge--red">{{ project.get_status_display }}</span>{% endif %}
-                </div></div>
-                <div class="meta-row"><span>Этап</span><div><span class="badge badge--blue">{{ project.get_current_stage_display }}</span></div></div>
-                <div class="meta-row"><span>Срок</span><div>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</div></div>
-                <div class="meta-row"><span>Поток</span><div>{% if project.flow %}Поток {{ project.flow }}{% else %}—{% endif %}</div></div>
-                <div class="meta-row"><span>Приоритет</span><div>{{ project.get_priority_display }}</div></div>
-                <div class="meta-row"><span>Тип проекта</span><div>{{ project.project_type|default:'—' }}</div></div>
-                <div class="meta-row"><span>Project Manager</span><div>{{ project.project_manager.display_name|default:'—' }}</div></div>
-                <div class="meta-row"><span>Team Lead</span><div>{{ project.team_lead.display_name|default:'—' }}</div></div>
-                <div class="meta-row">
-                    <span>Команда</span>
-                    <div><a href="?tab=team">{{ project.team_members.count }} чел. →</a></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="panel">
-            <h2>Сроки</h2>
-            <div class="meta-list">
-                <div class="meta-row"><span>Дата договора</span><div>{{ project.contract_date|date:'d.m.Y'|default:'—' }}</div></div>
-                <div class="meta-row"><span>Дата начала</span><div>{{ project.start_date|date:'d.m.Y'|default:'—' }}</div></div>
-                <div class="meta-row"><span>Плановое завершение</span><div>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</div></div>
-                <div class="meta-row"><span>Фактическое завершение</span><div>{{ project.actual_end_date|date:'d.m.Y'|default:'—' }}</div></div>
-                <div class="meta-row"><span>Продолжительность</span><div>{% if project.duration_days %}{{ project.duration_days }} дн.{% else %}—{% endif %}</div></div>
-                {% if project.delay_days is not None %}
-                    <div class="meta-row"><span>Задержка</span><div>
-                        {% if project.delay_days > 0 %}<span class="badge badge--red">+{{ project.delay_days }} дн.</span>
-                        {% else %}<span class="badge badge--green">В срок</span>{% endif %}
-                    </div></div>
-                {% endif %}
-                <div class="meta-row"><span>Последняя активность</span><div>{{ project.last_activity_at|date:'d.m.Y H:i'|default:'—' }}</div></div>
-            </div>
-        </div>
+        {% include 'projects/partials/section_details.html' %}
+        {% include 'projects/partials/section_dates.html' %}
     </div>
 </div>
 {% endif %}

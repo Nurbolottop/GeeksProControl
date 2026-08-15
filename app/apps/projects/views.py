@@ -1,11 +1,21 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from apps.projects.forms import ProjectAccessForm, ProjectForm, StageUpdateForm
+from apps.projects.forms import (
+    ProjectAboutForm,
+    ProjectAccessForm,
+    ProjectClientForm,
+    ProjectDatesForm,
+    ProjectDetailsForm,
+    ProjectForm,
+    ProjectLinksForm,
+    ProjectProgressForm,
+    StageUpdateForm,
+)
 from apps.projects.models import (
     Project,
     ProjectAccess,
@@ -205,6 +215,63 @@ def project_complete(request, pk):
         details = '; '.join(check['label'] for check in failed)
         messages.error(request, f'Нельзя завершить проект. Не выполнено: {details}.')
     return redirect(f'{project.get_absolute_url()}?tab=delivery')
+
+
+# Инлайн-редактирование панелей карточки проекта (AJAX через HTMX)
+PROJECT_SECTIONS = {
+    'progress': ProjectProgressForm,
+    'client': ProjectClientForm,
+    'links': ProjectLinksForm,
+    'about': ProjectAboutForm,
+    'details': ProjectDetailsForm,
+    'dates': ProjectDatesForm,
+}
+
+
+@login_required
+def project_section(request, pk, section):
+    """Отдаёт панель обзора: в режиме просмотра или редактирования.
+
+    GET  ?edit=1 — форма панели, GET — просмотр, POST — сохранение.
+    Каждая панель редактируется отдельно, без общей формы проекта.
+    """
+    if section not in PROJECT_SECTIONS:
+        raise Http404
+    project = get_object_or_404(
+        Project.objects.select_related(
+            'client', 'project_type', 'project_manager', 'team_lead',
+        ),
+        pk=pk,
+    )
+    form_class = PROJECT_SECTIONS[section]
+    view_template = f'projects/partials/section_{section}.html'
+    form_template = f'projects/partials/section_{section}_form.html'
+
+    if request.method == 'POST':
+        old_values = {
+            field: getattr(project, field) for field in services.TRACKED_FIELDS
+        }
+        form = form_class(request.POST, instance=project)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            services.update_project(
+                updated, old_values, user=request.user,
+                reason=form.cleaned_data.get('change_reason', ''),
+            )
+            if hasattr(form, 'save_client'):
+                form.save_client()
+            project.refresh_from_db()
+            project.deadline_status = services.calculate_deadline_status(project)
+            return render(request, view_template, {'project': project})
+        return render(request, form_template, {'form': form, 'project': project})
+
+    if request.GET.get('edit'):
+        return render(
+            request, form_template,
+            {'form': form_class(instance=project), 'project': project},
+        )
+    project.deadline_status = services.calculate_deadline_status(project)
+    return render(request, view_template, {'project': project})
 
 
 @login_required
