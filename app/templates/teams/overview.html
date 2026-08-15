@@ -24,10 +24,7 @@
             <tbody>
             {% for person in people %}
                 <tr>
-                    <td>
-                        <strong>{{ person.name }}</strong>
-                        {% if person.is_intern %}<span class="badge badge--blue">Стажёр</span>{% endif %}
-                    </td>
+                    <td><strong>{{ person.name }}</strong></td>
                     <td>
                         <div class="progress">
                             <div class="progress__bar">

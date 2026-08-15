@@ -60,9 +60,9 @@ class TeamMember(TimeStampedModel):
 
     def clean(self):
         if not self.user and not self.intern:
-            raise ValidationError('Укажите сотрудника или стажёра.')
+            raise ValidationError('Укажите участника команды.')
         if self.user and self.intern:
-            raise ValidationError('Укажите либо сотрудника, либо стажёра — не обоих.')
+            raise ValidationError('Участник должен быть указан только один раз.')
 
     @property
     def person_name(self) -> str:

@@ -105,7 +105,9 @@
                         <td>
                             {% if member.intern %}
                                 <a href="{{ member.intern.get_absolute_url }}"><strong>{{ member.person_name }}</strong></a>
-                                <span class="badge badge--blue">Стажёр</span>
+                                {% if member.intern.specialization %}
+                                    <div style="font-size:12px; color: var(--text-muted)">{{ member.intern.specialization }}</div>
+                                {% endif %}
                             {% else %}
                                 <strong>{{ member.person_name }}</strong>
                             {% endif %}

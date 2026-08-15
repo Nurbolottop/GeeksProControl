@@ -5,40 +5,43 @@ from apps.teams.models import TeamMember
 
 
 class TeamMemberForm(forms.ModelForm):
-    """Добавление участника в команду.
+    """Добавление участника в команду проекта.
 
-    При суммарной загрузке > 100% форма не блокирует сохранение,
-    но предупреждение показывается пользователю (ТЗ §11).
+    Люди GeeksPro (кураторы, PM, тимлиды, стажёры) — единый список,
+    роль в проекте задаётся отдельным полем. При суммарной загрузке > 100%
+    форма не блокирует сохранение, но показывает предупреждение (ТЗ §11).
     """
 
     class Meta:
         model = TeamMember
         fields = [
-            'user', 'intern', 'role', 'workload',
+            'intern', 'role', 'workload',
             'joined_at', 'left_at', 'status', 'comment',
         ]
+        labels = {'intern': 'Участник'}
         widgets = {
             'joined_at': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'left_at': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'comment': forms.Textarea(attrs={'rows': 2}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields['intern']
+        field.required = True
+        field.queryset = field.queryset.filter(is_archived=False).order_by('full_name')
+        field.empty_label = 'Выберите человека'
+
     def overload_warning(self) -> str | None:
         """Текст предупреждения о перегрузе после валидации формы."""
         if not self.is_valid():
             return None
-        member = self.instance
+        intern = self.cleaned_data.get('intern')
+        if not intern:
+            return None
         total = services.person_workload(
-            user=self.cleaned_data.get('user'),
-            intern=self.cleaned_data.get('intern'),
-            exclude_pk=member.pk,
+            intern=intern, exclude_pk=self.instance.pk,
         ) + self.cleaned_data.get('workload', 0)
         if total > 100:
-            name = (
-                self.cleaned_data.get('user')
-                and self.cleaned_data['user'].display_name
-                or self.cleaned_data.get('intern')
-                and self.cleaned_data['intern'].full_name
-            )
-            return f'Внимание: суммарная загрузка {name} составит {total}%.'
+            return f'Внимание: суммарная загрузка {intern.full_name} составит {total}%.'
         return None
