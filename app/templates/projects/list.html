@@ -5,11 +5,7 @@
 {% block content %}
 <div class="page-head">
     <div>
-        <h1>
-            {% if view == 'delivery' %}Проекты на сдаче
-            {% elif view == 'completed' %}Завершённые проекты
-            {% else %}Проекты{% endif %}
-        </h1>
+        <h1>{{ title }}</h1>
         <div class="sub">Всего: {{ page.paginator.count }}</div>
     </div>
     <div class="page-actions">
@@ -19,15 +15,16 @@
 </div>
 
 <form method="get" class="filters">
-    {% if view != 'all' %}<input type="hidden" name="view" value="{{ view }}">{% endif %}
     <input type="text" name="q" placeholder="Поиск: название, ID, клиент"
            value="{{ params.q|default:'' }}">
+    {% if show_status_filter %}
     <select name="status">
         <option value="">Статус: все</option>
         {% for value, label in statuses %}
             <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
+    {% endif %}
     <select name="stage">
         <option value="">Этап: все</option>
         {% for value, label in stages %}
@@ -53,7 +50,7 @@
         <option value="at_risk" {% if params.deadline == 'at_risk' %}selected{% endif %}>Риск задержки</option>
     </select>
     <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
-    <a href="{% url 'projects:list' %}" class="btn btn--secondary btn--sm">Сбросить</a>
+    <a href="{{ request.path }}" class="btn btn--secondary btn--sm">Сбросить</a>
 </form>
 
 <div class="panel" style="padding: 0;">

@@ -25,19 +25,25 @@
             </a>
 
             <div class="nav-label">Работа</div>
-            <div class="nav-group">
-                <a href="{% url 'projects:list' %}"
-                   class="nav-item {% if request.resolver_match.namespace == 'projects' %}is-active{% endif %}">
+            <div class="nav-group"
+                 x-data="{ open: {% if request.resolver_match.namespace == 'projects' %}true{% else %}false{% endif %} }">
+                <button type="button" @click="open = !open"
+                        class="nav-item nav-item--toggle {% if request.resolver_match.namespace == 'projects' %}is-active{% endif %}">
                     <span class="nav-item__label">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
                         Проекты
                     </span>
-                </a>
-                <div class="nav-sub">
-                    <a href="{% url 'projects:list' %}">Все проекты</a>
-                    <a href="{% url 'projects:kanban' %}">Pipeline</a>
-                    <a href="{% url 'projects:list' %}?view=delivery">На сдаче</a>
-                    <a href="{% url 'projects:list' %}?view=completed">Завершённые</a>
+                    <svg class="nav-chevron" :class="open && 'is-open'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+                <div class="nav-sub" x-show="open" x-cloak>
+                    <a href="{% url 'projects:list' %}"
+                       class="{% if request.resolver_match.url_name == 'list' %}is-active{% endif %}">Все проекты</a>
+                    <a href="{% url 'projects:list_in_progress' %}"
+                       class="{% if request.resolver_match.url_name == 'list_in_progress' %}is-active{% endif %}">В процессе</a>
+                    <a href="{% url 'projects:list_rejected' %}"
+                       class="{% if request.resolver_match.url_name == 'list_rejected' %}is-active{% endif %}">Отклонён</a>
+                    <a href="{% url 'projects:list_completed' %}"
+                       class="{% if request.resolver_match.url_name == 'list_completed' %}is-active{% endif %}">Завершён</a>
                 </div>
             </div>
             <a href="{% url 'tasks:list' %}"

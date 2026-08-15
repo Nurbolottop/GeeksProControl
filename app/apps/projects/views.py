@@ -16,16 +16,35 @@ from apps.projects.models import (
 from apps.projects import selectors, services
 
 
+# Категории списка проектов — отдельные страницы (не query-фильтры)
+PROJECT_CATEGORIES = {
+    'all': {'title': 'Все проекты', 'statuses': None},
+    'in_progress': {
+        'title': 'Проекты в процессе',
+        'statuses': [ProjectStatus.ACTIVE, ProjectStatus.PAUSED],
+    },
+    'rejected': {
+        'title': 'Отклонённые проекты',
+        'statuses': [ProjectStatus.CANCELLED, ProjectStatus.REFUSED],
+    },
+    'completed': {
+        'title': 'Завершённые проекты',
+        'statuses': [ProjectStatus.COMPLETED],
+    },
+}
+
+
 @login_required
-def project_list(request):
+def project_list(request, category='all'):
+    config = PROJECT_CATEGORIES[category]
     qs = selectors.filter_projects(selectors.projects_qs(), request.GET)
-    view = request.GET.get('view', 'all')
-    if view == 'delivery':
+    if config['statuses']:
+        qs = qs.filter(status__in=config['statuses'])
+    # Переход со «На сдаче» на dashboard
+    if request.GET.get('view') == 'delivery':
         qs = qs.filter(
             current_stage=ProjectStageKey.DELIVERY, status=ProjectStatus.ACTIVE,
         )
-    elif view == 'completed':
-        qs = qs.filter(status=ProjectStatus.COMPLETED)
 
     per_page = request.GET.get('per_page', '25')
     if per_page not in ('25', '50', '100'):
@@ -36,7 +55,9 @@ def project_list(request):
 
     context = {
         'page': page,
-        'view': view,
+        'category': category,
+        'title': config['title'],
+        'show_status_filter': config['statuses'] is None,
         'project_types': ProjectType.objects.all(),
         'cities': Project.objects.active()
                   .exclude(city='').values_list('city', flat=True)

@@ -6,6 +6,12 @@ app_name = 'projects'
 
 urlpatterns = [
     path('', views.project_list, name='list'),
+    path('in-progress/', views.project_list,
+         {'category': 'in_progress'}, name='list_in_progress'),
+    path('rejected/', views.project_list,
+         {'category': 'rejected'}, name='list_rejected'),
+    path('completed/', views.project_list,
+         {'category': 'completed'}, name='list_completed'),
     path('kanban/', views.project_kanban, name='kanban'),
     path('create/', views.project_create, name='create'),
     path('<int:pk>/', views.project_detail, name='detail'),

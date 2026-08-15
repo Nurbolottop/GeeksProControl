@@ -58,7 +58,7 @@ def kpi_cards() -> list[dict]:
                 status=ProjectStatus.COMPLETED,
                 actual_end_date__gte=month_start,
             ).count(),
-            'url': f'{projects_url}?view=completed', 'tone': 'green',
+            'url': reverse('projects:list_completed'), 'tone': 'green',
         },
         {
             'label': 'Активные стажёры',
