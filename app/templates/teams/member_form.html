@@ -6,7 +6,10 @@
 <div class="page-head">
     <div>
         <h1>{{ title }}</h1>
-        <div class="sub">Проект: <a href="{{ project.get_absolute_url }}">{{ project.name }}</a></div>
+        <div class="sub">
+            {% if group %}Группа <a href="{{ group.get_absolute_url }}">{{ group.code }}</a>{% if project %} · {% endif %}{% endif %}
+            {% if project %}Проект: <a href="{{ project.get_absolute_url }}">{{ project.name }}</a>{% endif %}
+        </div>
     </div>
 </div>
 

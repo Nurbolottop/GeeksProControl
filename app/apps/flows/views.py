@@ -4,11 +4,25 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from apps.flows.models import Flow
+from apps.flows.models import Flow, Group
 from apps.interns.models import Intern, InternStatus, WORKING_STATUSES
 from apps.projects import selectors as project_selectors
+from apps.projects.services import calculate_deadline_status
 from apps.projects.models import Project, ProjectStatus
 from apps.teams.models import TeamMember
+
+
+class GroupForm(forms.ModelForm):
+    class Meta:
+        model = Group
+        fields = ['number', 'name', 'project', 'comment']
+        labels = {'number': 'Номер группы в потоке'}
+        widgets = {
+            'name': forms.TextInput(
+                attrs={'placeholder': 'Например: команда Олимпийской школы'},
+            ),
+            'comment': forms.Textarea(attrs={'rows': 2}),
+        }
 
 
 class FlowForm(forms.ModelForm):
@@ -45,8 +59,24 @@ def flow_list(request):
 @login_required
 def flow_detail(request, pk):
     flow = get_object_or_404(Flow, pk=pk)
-    tab = request.GET.get('tab', 'projects')
+    tab = request.GET.get('tab', 'groups')
     context = {'flow': flow, 'tab': tab}
+
+    if tab == 'groups':
+        groups = list(
+            flow.groups.select_related('project', 'project__client')
+            .prefetch_related('members__intern')
+        )
+        for group in groups:
+            if group.project:
+                group.project.deadline_status = calculate_deadline_status(
+                    group.project,
+                )
+            group.active_count = sum(
+                1 for m in group.members.all() if m.status == 'active'
+            )
+        context['groups'] = groups
+        return render(request, 'flows/detail.html', context)
 
     if tab == 'roster':
         interns = (
@@ -92,6 +122,52 @@ def flow_detail(request, pk):
         project_selectors.annotate_deadline_statuses(projects)
         context['projects'] = projects
     return render(request, 'flows/detail.html', context)
+
+
+@login_required
+def group_detail(request, pk):
+    """Карточка группы: состав команды и её проект."""
+    group = get_object_or_404(
+        Group.objects.select_related('flow', 'project', 'project__client'), pk=pk,
+    )
+    members = group.members.select_related('intern__specialization', 'user')
+    if group.project:
+        group.project.deadline_status = calculate_deadline_status(group.project)
+    return render(request, 'flows/group_detail.html', {
+        'group': group,
+        'members': members,
+        'active_members': [m for m in members if m.status == 'active'],
+    })
+
+
+@login_required
+def group_create(request, flow_pk):
+    flow = get_object_or_404(Flow, pk=flow_pk)
+    next_number = (flow.groups.count() or 0) + 1
+    form = GroupForm(request.POST or None, initial={'number': next_number})
+    if request.method == 'POST' and form.is_valid():
+        group = form.save(commit=False)
+        group.flow = flow
+        group.save()
+        messages.success(request, f'{group} создана.')
+        return redirect(group.get_absolute_url())
+    return render(request, 'flows/group_form.html', {
+        'form': form, 'flow': flow, 'title': f'Новая группа потока {flow.number}',
+    })
+
+
+@login_required
+def group_update(request, pk):
+    group = get_object_or_404(Group, pk=pk)
+    form = GroupForm(request.POST or None, instance=group)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Группа обновлена.')
+        return redirect(group.get_absolute_url())
+    return render(request, 'flows/group_form.html', {
+        'form': form, 'flow': group.flow, 'group': group,
+        'title': f'Редактирование: {group}',
+    })
 
 
 @login_required

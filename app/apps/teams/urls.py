@@ -7,5 +7,7 @@ app_name = 'teams'
 urlpatterns = [
     path('', views.team_overview, name='overview'),
     path('project/<int:project_pk>/add/', views.member_add, name='member_add'),
+    path('group/<int:group_pk>/add/', views.member_add_to_group,
+         name='member_add_group'),
     path('member/<int:pk>/edit/', views.member_edit, name='member_edit'),
 ]

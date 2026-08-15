@@ -22,7 +22,7 @@ from apps.audit.models import AuditLog
 from apps.clients.models import Client, ClientContact
 from apps.documents import services as doc_services
 from apps.documents.models import CONTRACT, Document, DocumentType, REQUIREMENTS
-from apps.flows.models import Flow
+from apps.flows.models import Flow, Group
 from apps.interns.models import Intern, InternEvaluation, InternStatus
 from apps.meetings.models import Meeting
 from apps.notifications.models import Notification
@@ -361,7 +361,7 @@ class Command(BaseCommand):
             AuditLog, Notification, Risk, WeeklyReport, KPISnapshot,
             Meeting, Document, Task, TeamMember, InternEvaluation, Intern,
             TrainingGroup, PlannedProject, ProjectStatusHistory, ProjectStage,
-            Project, ClientContact, Client, Flow,
+            Project, ClientContact, Client, Group, Flow,
         ):
             model.objects.all().delete()
         User.objects.filter(is_superuser=False).delete()
@@ -409,6 +409,10 @@ class Command(BaseCommand):
                 flow=flows[data['flow']],
                 number_in_flow=self._next_number(flow_counters, data['flow']),
                 head_comment=data.get('note', ''),
+            )
+            Group.objects.create(
+                flow=project.flow, number=project.number_in_flow,
+                project=project,
             )
             self._create_stages(project, data['stage'])
             ProjectStatusHistory.objects.create(
@@ -551,7 +555,8 @@ class Command(BaseCommand):
             ProjectStatus.ACTIVE, ProjectStatus.PAUSED,
         )
         TeamMember.objects.create(
-            project=project, intern=intern, role=role,
+            project=project, group=getattr(project, 'group', None),
+            intern=intern, role=role,
             workload=0,  # проставим при распределении
             joined_at=project.start_date,
             left_at=None if is_active_project else (

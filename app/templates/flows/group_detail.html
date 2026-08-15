@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Группа {{ group.code }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Группа {{ group.code }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <a href="{{ group.flow.get_absolute_url }}" class="badge badge--gray">← Поток {{ group.flow.number }}</a>
+            {% if group.name %}<span class="badge badge--gray">{{ group.name }}</span>{% endif %}
+            <span class="badge badge--blue">{{ active_members|length }} человек</span>
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'flows:group_update' group.pk %}" class="btn btn--secondary">Редактировать</a>
+        {% if group.project %}
+            <a href="{% url 'teams:member_add_group' group.pk %}" class="btn">+ Участник</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="detail-grid">
+    <div class="detail-grid__main">
+        <div class="panel" style="padding: 0;">
+            <h2 style="padding: 20px 24px 0">Состав команды ({{ members|length }})</h2>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                    <tr>
+                        <th>Человек</th>
+                        <th>Роль в проекте</th>
+                        <th>Направление</th>
+                        <th>Загрузка</th>
+                        <th>Статус</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for member in members %}
+                        <tr>
+                            <td>
+                                {% if member.intern %}
+                                    <a href="{{ member.intern.get_absolute_url }}"><strong>{{ member.person_name }}</strong></a>
+                                {% else %}
+                                    <strong>{{ member.person_name }}</strong>
+                                {% endif %}
+                            </td>
+                            <td>{{ member.get_role_display }}</td>
+                            <td>{{ member.intern.specialization|default:'—' }}</td>
+                            <td>{{ member.workload }}%</td>
+                            <td>
+                                {% if member.status == 'active' %}<span class="badge badge--green">Активен</span>
+                                {% else %}<span class="badge badge--gray">Вышел</span>{% endif %}
+                            </td>
+                            <td><a href="{% url 'teams:member_edit' member.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">
+                            Команда не сформирована — добавьте участников.
+                        </td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="detail-grid__side">
+        <div class="panel">
+            <h2>Проект группы</h2>
+            {% if group.project %}
+                <div class="meta-list">
+                    <div class="meta-row">
+                        <span>Проект</span>
+                        <div><a href="{{ group.project.get_absolute_url }}">{{ group.project.name }}</a></div>
+                    </div>
+                    <div class="meta-row"><span>Клиент</span><div>{{ group.project.client|default:'—' }}</div></div>
+                    <div class="meta-row"><span>Этап</span><div><span class="badge badge--blue">{{ group.project.get_current_stage_display }}</span></div></div>
+                    <div class="meta-row"><span>Срок</span><div>{% include 'projects/partials/deadline_badge.html' with status=group.project.deadline_status %}</div></div>
+                    <div class="meta-row"><span>Deadline</span><div>{{ group.project.planned_end_date|date:'d.m.Y'|default:'—' }}</div></div>
+                    <div class="meta-row"><span>Прогресс</span><div>{{ group.project.progress }}%</div></div>
+                </div>
+            {% else %}
+                <div class="empty">Проект не назначен. Укажите его в настройках группы.</div>
+                <a href="{% url 'flows:group_update' group.pk %}" class="btn btn--secondary btn--sm" style="margin-top:10px">Назначить проект</a>
+            {% endif %}
+        </div>
+
+        {% if group.comment %}
+            <div class="panel"><h2>Комментарий</h2><p style="margin:0">{{ group.comment|linebreaksbr }}</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

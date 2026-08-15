@@ -995,6 +995,50 @@ a:hover { color: var(--accent-dark); }
 .flow-card__stats strong { font-size: 19px; font-weight: 700; }
 .flow-card__stats span { font-size: 11px; color: var(--text-muted); }
 
+/* ---- Группы потока ---- */
+.group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+.group-card {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 18px 20px;
+    color: var(--text);
+    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.group-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+    border-color: var(--accent-soft);
+    color: var(--text);
+}
+.group-card__head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.group-card__code {
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    font-weight: 750;
+    font-size: 13px;
+    padding: 6px 11px;
+    border-radius: 9px;
+    flex-shrink: 0;
+}
+.group-card__title { font-weight: 650; font-size: 14.5px; line-height: 1.35; min-width: 0; }
+.group-card__sub { font-size: 12px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
+.group-card__row { display: flex; gap: 6px; flex-wrap: wrap; }
+.group-card__members {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+.group-card__members strong { color: var(--text); font-size: 15px; }
+
 /* ---- Компактная страница-форма ---- */
 .form-page { max-width: 720px; }
 .form-page .panel { padding: 26px 28px; }

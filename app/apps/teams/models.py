@@ -26,9 +26,13 @@ class TeamMember(TimeStampedModel):
         ACTIVE = 'active', 'Активен'
         LEFT = 'left', 'Вышел'
 
+    group = models.ForeignKey(
+        'flows.Group', on_delete=models.CASCADE, related_name='members',
+        verbose_name='Группа', null=True, blank=True,
+    )
     project = models.ForeignKey(
         Project, on_delete=models.CASCADE, related_name='team_members',
-        verbose_name='Проект',
+        verbose_name='Проект', null=True, blank=True,
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -57,6 +61,12 @@ class TeamMember(TimeStampedModel):
 
     def __str__(self) -> str:
         return f'{self.person_name} — {self.get_role_display()} ({self.project.code})'
+
+    def save(self, *args, **kwargs):
+        # Проект берётся из группы: одна группа ведёт один проект
+        if self.group_id and self.group.project_id:
+            self.project_id = self.group.project_id
+        super().save(*args, **kwargs)
 
     def clean(self):
         if not self.user and not self.intern:

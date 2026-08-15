@@ -19,17 +19,51 @@
     </div>
     <div class="page-actions">
         <a href="{% url 'flows:update' flow.pk %}" class="btn btn--secondary">Редактировать</a>
-        <a href="{% url 'projects:create' %}" class="btn">+ Проект потока</a>
+        <a href="{% url 'flows:group_create' flow.pk %}" class="btn">+ Группа</a>
     </div>
 </div>
 
 <div class="tabs">
+    <a href="?tab=groups" class="{% if tab == 'groups' %}is-active{% endif %}">Группы</a>
     <a href="?tab=projects" class="{% if tab == 'projects' %}is-active{% endif %}">Проекты</a>
     <a href="?tab=roster" class="{% if tab == 'roster' %}is-active{% endif %}">Ведомость</a>
     <a href="?tab=stats" class="{% if tab == 'stats' %}is-active{% endif %}">Статистика</a>
 </div>
 
-{% if tab == 'roster' %}
+{% if tab == 'groups' %}
+    <div class="group-grid">
+        {% for group in groups %}
+            <a href="{{ group.get_absolute_url }}" class="group-card">
+                <div class="group-card__head">
+                    <span class="group-card__code">{{ group.code }}</span>
+                    <div class="group-card__title">
+                        {% if group.project %}{{ group.project.name }}{% else %}{{ group.name|default:'Без проекта' }}{% endif %}
+                        <div class="group-card__sub">
+                            {% if group.project %}{{ group.project.client|default:'' }}{% else %}Проект не назначен{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="group-card__body">
+                    {% if group.project %}
+                        <div class="group-card__row">
+                            <span class="badge badge--blue">{{ group.project.get_current_stage_display }}</span>
+                            {% include 'projects/partials/deadline_badge.html' with status=group.project.deadline_status %}
+                        </div>
+                        <div class="progress" style="margin-top:10px">
+                            <div class="progress__bar"><div class="progress__fill" style="width: {{ group.project.progress }}%"></div></div>
+                            <span class="progress__label">{{ group.project.progress }}%</span>
+                        </div>
+                    {% endif %}
+                    <div class="group-card__members">
+                        <strong>{{ group.active_count }}</strong> человек в команде
+                    </div>
+                </div>
+            </a>
+        {% empty %}
+            <div class="panel empty">У потока пока нет групп — создайте первую.</div>
+        {% endfor %}
+    </div>
+{% elif tab == 'roster' %}
     <div class="panel" style="padding: 0;">
         <h2 style="padding: 18px 24px 0">Ведомость потока ({{ interns|length }})</h2>
         <div class="table-wrap">
