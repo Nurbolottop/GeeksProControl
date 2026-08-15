@@ -43,6 +43,9 @@ def calculate_deadline_status(
     """
     if project.status == ProjectStatus.COMPLETED:
         return DeadlineStatus.COMPLETED
+    if project.status != ProjectStatus.ACTIVE:
+        # Приостановлен / отменён / отказ — контроль срока не ведётся
+        return ''
     if not project.planned_end_date:
         return DeadlineStatus.ON_TRACK
 

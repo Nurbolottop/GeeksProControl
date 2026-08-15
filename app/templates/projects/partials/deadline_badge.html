@@ -1,4 +1,6 @@
-{% if status == 'overdue' %}
+{% if not status %}
+    <span class="badge badge--gray">—</span>
+{% elif status == 'overdue' %}
     <span class="badge badge--red">⚠ Просрочен</span>
 {% elif status == 'behind' %}
     <span class="badge badge--orange">▲ Отставание</span>
