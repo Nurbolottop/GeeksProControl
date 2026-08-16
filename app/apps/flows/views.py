@@ -9,6 +9,7 @@ from apps.interns.models import Intern, InternStatus, WORKING_STATUSES
 from apps.projects import selectors as project_selectors
 from apps.projects.services import calculate_deadline_status
 from apps.projects.models import Project, ProjectStatus
+from apps.teams import selectors as team_selectors
 from apps.teams.models import TeamMember
 
 
@@ -91,7 +92,17 @@ def flow_detail(request, pk):
         )
         for intern in interns:
             intern.is_busy = intern.pk in busy
+        # Ведомость разбита по направлениям
+        by_spec: dict[str, list] = {}
+        for intern in interns:
+            key = str(intern.specialization) if intern.specialization else 'Без направления'
+            by_spec.setdefault(key, []).append(intern)
         context['interns'] = interns
+        context['roster_sections'] = [
+            {'label': label, 'interns': people, 'count': len(people),
+             'busy': sum(1 for i in people if i.is_busy)}
+            for label, people in sorted(by_spec.items())
+        ]
     elif tab == 'stats':
         context['by_spec'] = (
             flow.interns.filter(is_archived=False)
@@ -130,12 +141,15 @@ def group_detail(request, pk):
     group = get_object_or_404(
         Group.objects.select_related('flow', 'project', 'project__client'), pk=pk,
     )
-    members = group.members.select_related('intern__specialization', 'user')
+    members = list(
+        group.members.select_related('intern__specialization', 'user'),
+    )
     if group.project:
         group.project.deadline_status = calculate_deadline_status(group.project)
     return render(request, 'flows/group_detail.html', {
         'group': group,
         'members': members,
+        'sections': team_selectors.group_by_role(members),
         'active_members': [m for m in members if m.status == 'active'],
     })
 

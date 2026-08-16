@@ -138,9 +138,14 @@ def project_detail(request, pk):
         )
         context['task_statuses'] = TaskStatus.choices
     elif tab == 'team':
-        context['team_members'] = (
-            project.team_members.select_related('user', 'intern')
+        from apps.teams import selectors as team_selectors
+        members = list(
+            project.team_members.select_related(
+                'user', 'intern__specialization',
+            ),
         )
+        context['team_members'] = members
+        context['team_sections'] = team_selectors.group_by_role(members)
     elif tab == 'access':
         context['accesses'] = project.accesses.all()
         context['access_form'] = ProjectAccessForm()

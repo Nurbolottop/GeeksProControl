@@ -64,41 +64,42 @@
         {% endfor %}
     </div>
 {% elif tab == 'roster' %}
-    <div class="panel" style="padding: 0;">
-        <h2 style="padding: 18px 24px 0">Ведомость потока ({{ interns|length }})</h2>
-        <div class="table-wrap">
-            <table class="data">
-                <thead>
-                <tr>
-                    <th>ФИО</th>
-                    <th>Направление</th>
-                    <th>Статус</th>
-                    <th>Филиал</th>
-                    <th>Занятость</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for intern in interns %}
+    {% for section in roster_sections %}
+        <div class="panel" style="padding: 0;">
+            <div class="team-section__head" style="padding: 18px 24px 0">
+                <h2><span class="badge badge--blue">{{ section.label }}</span></h2>
+                <span class="team-section__count">{{ section.count }} чел. · на проектах: {{ section.busy }}</span>
+            </div>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
                     <tr>
-                        <td><a href="{{ intern.get_absolute_url }}"><strong>{{ intern.full_name }}</strong></a></td>
-                        <td>{{ intern.specialization|default:'—' }}</td>
-                        <td>
-                            {% if intern.status == 'dropped' %}<span class="badge badge--red">Выбыл</span>
-                            {% elif intern.status == 'active' or intern.status == 'internship' %}<span class="badge badge--green">{{ intern.get_status_display }}</span>
-                            {% else %}<span class="badge badge--gray">{{ intern.get_status_display }}</span>{% endif %}
-                        </td>
-                        <td>{{ intern.branch|default:intern.city|default:'—' }}</td>
-                        <td>{% if intern.is_busy %}<span class="badge badge--blue">На проекте</span>{% else %}<span class="badge badge--gray">Свободен</span>{% endif %}</td>
+                        <th>ФИО</th>
+                        <th>Статус</th>
+                        <th>Филиал</th>
+                        <th>Занятость</th>
                     </tr>
-                {% empty %}
-                    <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">
-                        В ведомости потока пока никого нет.
-                    </td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                    {% for intern in section.interns %}
+                        <tr>
+                            <td><a href="{{ intern.get_absolute_url }}"><strong>{{ intern.full_name }}</strong></a></td>
+                            <td>
+                                {% if intern.status == 'dropped' %}<span class="badge badge--red">Выбыл</span>
+                                {% elif intern.status == 'active' or intern.status == 'internship' %}<span class="badge badge--green">{{ intern.get_status_display }}</span>
+                                {% else %}<span class="badge badge--gray">{{ intern.get_status_display }}</span>{% endif %}
+                            </td>
+                            <td>{{ intern.branch|default:intern.city|default:'—' }}</td>
+                            <td>{% if intern.is_busy %}<span class="badge badge--blue">На проекте</span>{% else %}<span class="badge badge--gray">Свободен</span>{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
+    {% empty %}
+        <div class="panel empty">В ведомости потока пока никого нет.</div>
+    {% endfor %}
 {% elif tab == 'stats' %}
     <div class="kpi-grid">
         <div class="kpi-card kpi-card--info"><div class="kpi-card__value">{{ stats.projects }}</div><div class="kpi-card__label">Проектов в потоке</div></div>

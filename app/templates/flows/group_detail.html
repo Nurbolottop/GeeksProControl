@@ -22,48 +22,37 @@
 
 <div class="detail-grid">
     <div class="detail-grid__main">
-        <div class="panel" style="padding: 0;">
-            <h2 style="padding: 20px 24px 0">Состав команды ({{ members|length }})</h2>
-            <div class="table-wrap">
-                <table class="data">
-                    <thead>
-                    <tr>
-                        <th>Человек</th>
-                        <th>Роль в проекте</th>
-                        <th>Направление</th>
-                        <th>Загрузка</th>
-                        <th>Статус</th>
-                        <th></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for member in members %}
-                        <tr>
-                            <td>
+        {% for section in sections %}
+            <div class="panel team-section">
+                <div class="team-section__head">
+                    <h2>
+                        <span class="badge badge--{{ section.tone }}">{{ section.label }}</span>
+                    </h2>
+                    <span class="team-section__count">{{ section.count }} чел.</span>
+                </div>
+                <div class="member-list">
+                    {% for member in section.members %}
+                        <div class="member {% if member.status != 'active' %}member--left{% endif %}">
+                            <div class="member__avatar">{{ member.person_name|first|upper }}</div>
+                            <div class="member__body">
                                 {% if member.intern %}
-                                    <a href="{{ member.intern.get_absolute_url }}"><strong>{{ member.person_name }}</strong></a>
+                                    <a href="{{ member.intern.get_absolute_url }}" class="member__name">{{ member.person_name }}</a>
                                 {% else %}
-                                    <strong>{{ member.person_name }}</strong>
+                                    <span class="member__name">{{ member.person_name }}</span>
                                 {% endif %}
-                            </td>
-                            <td>{{ member.get_role_display }}</td>
-                            <td>{{ member.intern.specialization|default:'—' }}</td>
-                            <td>{{ member.workload }}%</td>
-                            <td>
-                                {% if member.status == 'active' %}<span class="badge badge--green">Активен</span>
-                                {% else %}<span class="badge badge--gray">Вышел</span>{% endif %}
-                            </td>
-                            <td><a href="{% url 'teams:member_edit' member.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">
-                            Команда не сформирована — добавьте участников.
-                        </td></tr>
+                                <div class="member__meta">
+                                    {{ member.intern.specialization|default:'—' }} · загрузка {{ member.workload }}%
+                                    {% if member.status != 'active' %} · вышел{% endif %}
+                                </div>
+                            </div>
+                            <a href="{% url 'teams:member_edit' member.pk %}" class="btn-edit">✎</a>
+                        </div>
                     {% endfor %}
-                    </tbody>
-                </table>
+                </div>
             </div>
-        </div>
+        {% empty %}
+            <div class="panel empty">Команда не сформирована — добавьте участников.</div>
+        {% endfor %}
     </div>
 
     <div class="detail-grid__side">

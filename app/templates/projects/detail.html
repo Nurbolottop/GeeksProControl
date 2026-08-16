@@ -80,59 +80,44 @@
         </div>
     </div>
 {% elif tab == 'team' %}
-    <div class="panel" style="padding: 0;">
-        <div style="display:flex; justify-content: space-between; align-items:center; padding: 16px 20px 0;">
-            <h2 style="margin:0">
-                Команда ({{ team_members|length }})
-                {% if project.group %}
-                    — <a href="{{ project.group.get_absolute_url }}">группа {{ project.group.code }} потока {{ project.group.flow.number }} →</a>
-                {% endif %}
-            </h2>
-            <a href="{% url 'teams:member_add' project.pk %}" class="btn btn--sm">+ Участник</a>
-        </div>
-        <div class="table-wrap">
-            <table class="data">
-                <thead>
-                <tr>
-                    <th>Человек</th>
-                    <th>Роль</th>
-                    <th>Загрузка</th>
-                    <th>Подключение</th>
-                    <th>Выход</th>
-                    <th>Статус</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for member in team_members %}
-                    <tr>
-                        <td>
-                            {% if member.intern %}
-                                <a href="{{ member.intern.get_absolute_url }}"><strong>{{ member.person_name }}</strong></a>
-                                {% if member.intern.specialization %}
-                                    <div style="font-size:12px; color: var(--text-muted)">{{ member.intern.specialization }}</div>
-                                {% endif %}
-                            {% else %}
-                                <strong>{{ member.person_name }}</strong>
-                            {% endif %}
-                        </td>
-                        <td>{{ member.get_role_display }}</td>
-                        <td>{{ member.workload }}%</td>
-                        <td>{{ member.joined_at|date:'d.m.Y'|default:'—' }}</td>
-                        <td>{{ member.left_at|date:'d.m.Y'|default:'—' }}</td>
-                        <td>
-                            {% if member.status == 'active' %}<span class="badge badge--green">Активен</span>
-                            {% else %}<span class="badge badge--gray">Вышел</span>{% endif %}
-                        </td>
-                        <td><a href="{% url 'teams:member_edit' member.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Команда не сформирована.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 14px;">
+        <h2 style="margin:0">
+            Команда ({{ team_members|length }})
+            {% if project.group %}
+                — <a href="{{ project.group.get_absolute_url }}">группа {{ project.group.code }} потока {{ project.group.flow.number }} →</a>
+            {% endif %}
+        </h2>
+        <a href="{% url 'teams:member_add' project.pk %}" class="btn btn--sm">+ Участник</a>
     </div>
+    {% for section in team_sections %}
+        <div class="panel team-section">
+            <div class="team-section__head">
+                <h2><span class="badge badge--{{ section.tone }}">{{ section.label }}</span></h2>
+                <span class="team-section__count">{{ section.count }} чел.</span>
+            </div>
+            <div class="member-list">
+                {% for member in section.members %}
+                    <div class="member {% if member.status != 'active' %}member--left{% endif %}">
+                        <div class="member__avatar">{{ member.person_name|first|upper }}</div>
+                        <div class="member__body">
+                            {% if member.intern %}
+                                <a href="{{ member.intern.get_absolute_url }}" class="member__name">{{ member.person_name }}</a>
+                            {% else %}
+                                <span class="member__name">{{ member.person_name }}</span>
+                            {% endif %}
+                            <div class="member__meta">
+                                {{ member.intern.specialization|default:'—' }} · загрузка {{ member.workload }}%
+                                {% if member.status != 'active' %} · вышел{% endif %}
+                            </div>
+                        </div>
+                        <a href="{% url 'teams:member_edit' member.pk %}" class="btn-edit">✎</a>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% empty %}
+        <div class="panel empty">Команда не сформирована.</div>
+    {% endfor %}
 {% elif tab == 'access' %}
     <div class="panel" style="padding: 0;">
         <h2 style="padding: 16px 20px 0">Доступы проекта ({{ accesses|length }})</h2>
