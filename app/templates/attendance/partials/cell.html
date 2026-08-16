@@ -1,9 +1,9 @@
-<td class="att-cell {% if cell.is_weekend %}att-cell--weekend{% endif %} {% if cell.is_today %}att-cell--today{% endif %}">
+<td class="att-cell">
     <button type="button"
             class="att-mark att-mark--{{ cell.status|default:'empty' }}"
-            title="{{ cell.date|date:'d.m.Y' }}"
-            hx-post="{% url 'attendance:toggle' group.pk %}"
-            hx-vals='{"intern": "{{ intern.pk }}", "date": "{{ cell.date|date:"Y-m-d" }}"}'
+            title="{{ cell.meeting.get_kind_display }} {{ cell.meeting.date|date:'d.m.Y' }}"
+            hx-post="{% url 'attendance:toggle' cell.meeting.pk %}"
+            hx-vals='{"intern": "{{ intern.pk }}"}'
             hx-target="closest td"
             hx-swap="outerHTML">
         {% if cell.status == 'present' %}✓

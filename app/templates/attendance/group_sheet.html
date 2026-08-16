@@ -17,10 +17,12 @@
         </div>
     </div>
     <div class="page-actions">
-        <form method="post" action="{% url 'attendance:mark_day' group.pk %}" style="margin:0">
+        <a href="{% url 'attendance:plan_list' group.pk %}" class="btn btn--secondary">План собраний</a>
+        <form method="post" action="{% url 'attendance:generate' group.pk %}" style="margin:0">
             {% csrf_token %}
-            <input type="hidden" name="date" value="{{ today|date:'Y-m-d' }}">
-            <button type="submit" class="btn">✓ Отметить всех сегодня</button>
+            <input type="hidden" name="year" value="{{ year }}">
+            <input type="hidden" name="month" value="{{ month }}">
+            <button type="submit" class="btn">Сформировать собрания месяца</button>
         </form>
     </div>
 </div>
@@ -37,50 +39,73 @@
     </span>
 </div>
 
-<div class="panel" style="padding: 0;">
-    <div class="table-wrap">
-        <table class="data att-table">
-            <thead>
-            <tr>
-                <th class="att-name">Человек</th>
-                {% for day in sheet.days %}
-                    <th class="att-day {% if day.is_weekend %}att-cell--weekend{% endif %} {% if day.is_today %}att-cell--today{% endif %}">
-                        {{ day.day }}
-                    </th>
-                {% endfor %}
-                <th class="att-total">%</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for row in sheet.rows %}
-                <tr>
-                    <td class="att-name">
-                        <a href="{{ row.intern.get_absolute_url }}"><strong>{{ row.intern.full_name }}</strong></a>
-                        <div style="font-size:11.5px; color: var(--text-muted)">{{ row.member.get_role_display }}</div>
-                    </td>
-                    {% for cell in row.cells %}
-                        {% include 'attendance/partials/cell.html' with intern=row.intern %}
-                    {% endfor %}
-                    <td class="att-total">
-                        {% if row.rate is not None %}
-                            <span class="badge badge--{% if row.rate >= 80 %}green{% elif row.rate >= 60 %}yellow{% else %}red{% endif %}">{{ row.rate }}%</span>
-                        {% else %}—{% endif %}
-                    </td>
-                </tr>
-            {% empty %}
-                <tr>
-                    <td colspan="33" class="empty" style="text-align:center; padding: 24px;">
-                        В группе нет участников — добавьте команду, чтобы вести табель.
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+{% if sheet.by_kind %}
+    <div class="kind-summary">
+        {% for kind in sheet.by_kind %}
+            <div class="kind-summary__item">
+                <strong>{{ kind.held }}/{{ kind.planned }}</strong>
+                <span>{{ kind.label }}</span>
+            </div>
+        {% endfor %}
     </div>
-</div>
+{% endif %}
 
-<div class="sub" style="color: var(--text-muted); font-size: 12.5px">
-    Клик по клетке меняет отметку: пусто → был → не был → опоздал → уважительная → пусто.
-    Отмечено дней: {{ sheet.marked }}.
-</div>
+{% if sheet.meetings %}
+    <div class="panel" style="padding: 0;">
+        <div class="table-wrap">
+            <table class="data att-table">
+                <thead>
+                <tr>
+                    <th class="att-name">Человек</th>
+                    {% for meeting in sheet.meetings %}
+                        <th class="att-day">
+                            <div class="att-day__date">{{ meeting.date|date:'d.m' }}</div>
+                            <div class="att-day__kind">{{ meeting.short_kind }}</div>
+                        </th>
+                    {% endfor %}
+                    <th class="att-total">%</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in sheet.rows %}
+                    <tr>
+                        <td class="att-name">
+                            <a href="{{ row.intern.get_absolute_url }}"><strong>{{ row.intern.full_name }}</strong></a>
+                            <div style="font-size:11.5px; color: var(--text-muted)">{{ row.member.get_role_display }}</div>
+                        </td>
+                        {% for cell in row.cells %}
+                            {% include 'attendance/partials/cell.html' with intern=row.intern %}
+                        {% endfor %}
+                        <td class="att-total">
+                            {% if row.rate is not None %}
+                                <span class="badge badge--{% if row.rate >= 80 %}green{% elif row.rate >= 60 %}yellow{% else %}red{% endif %}">{{ row.rate }}%</span>
+                            {% else %}—{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="20" class="empty" style="text-align:center; padding: 24px;">
+                        В группе нет участников — добавьте команду, чтобы вести табель.
+                    </td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="sub" style="color: var(--text-muted); font-size: 12.5px">
+        Клик по клетке: пусто → был → не был → опоздал → уважительная → пусто.
+        Колонки — только дни собраний по плану (PM — с PM, ТЛ — с тимлидом, Вн — внутреннее).
+    </div>
+{% else %}
+    <div class="panel empty" style="text-align:center; padding: 36px 20px;">
+        <p style="margin: 0 0 6px"><strong>В этом месяце собраний пока нет.</strong></p>
+        <p style="margin: 0 0 16px">
+            {% if plans %}
+                Нажмите «Сформировать собрания месяца» — даты проставятся по плану.
+            {% else %}
+                Сначала составьте план: сколько собраний в неделю и кто их проводит.
+            {% endif %}
+        </p>
+        <a href="{% url 'attendance:plan_list' group.pk %}" class="btn">Перейти к плану собраний</a>
+    </div>
+{% endif %}
 {% endblock %}

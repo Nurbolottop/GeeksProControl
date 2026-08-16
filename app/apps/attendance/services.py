@@ -1,10 +1,11 @@
-"""Табель посещаемости: сетка месяца и переключение отметок."""
+"""Планирование собраний группы и табель посещаемости."""
 import calendar
 import datetime
 
+from django.db import transaction
 from django.utils import timezone
 
-from apps.attendance.models import Attendance
+from apps.attendance.models import Attendance, GroupMeeting, MeetingPlan
 
 
 def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -12,26 +13,42 @@ def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
     return datetime.date(year, month, 1), datetime.date(year, month, last_day)
 
 
-def month_days(year: int, month: int) -> list[dict]:
-    """Дни месяца с пометкой выходных."""
+@transaction.atomic
+def generate_meetings(group, year: int, month: int, user=None) -> int:
+    """Создаёт собрания месяца по планам группы.
+
+    Для каждого активного плана берём указанные дни недели (или первые
+    N дней недели, если они не заданы) и ставим собрание на каждую такую дату.
+    """
     first, last = month_bounds(year, month)
-    days = []
-    for day in range(1, last.day + 1):
-        date = datetime.date(year, month, day)
-        days.append({
-            'date': date,
-            'day': day,
-            'is_weekend': date.weekday() >= 5,
-            'is_today': date == timezone.localdate(),
-        })
-    return days
+    created = 0
+
+    for plan in group.meeting_plans.filter(is_active=True):
+        weekdays = plan.weekday_list
+        if not weekdays:
+            # Дни не заданы — распределяем равномерно с понедельника
+            weekdays = [0, 2, 4, 1, 3][:max(1, plan.times_per_week)]
+        weekdays = sorted(set(weekdays))[:max(1, plan.times_per_week)]
+
+        date = first
+        while date <= last:
+            if date.weekday() in weekdays:
+                _, is_new = GroupMeeting.objects.get_or_create(
+                    group=group, kind=plan.kind, date=date,
+                    defaults={'plan': plan, 'host': plan.host},
+                )
+                created += int(is_new)
+            date += datetime.timedelta(days=1)
+    return created
 
 
 def build_sheet(group, year: int, month: int) -> dict:
-    """Табель группы за месяц: строки — люди, колонки — дни."""
+    """Табель: строки — люди группы, колонки — собрания месяца."""
     first, last = month_bounds(year, month)
-    days = month_days(year, month)
-
+    meetings = list(
+        group.meetings.filter(date__gte=first, date__lte=last)
+        .order_by('date', 'kind'),
+    )
     members = [
         member for member in group.members.select_related(
             'intern__specialization',
@@ -40,26 +57,21 @@ def build_sheet(group, year: int, month: int) -> dict:
     ]
 
     marks = {
-        (mark.intern_id, mark.date): mark
-        for mark in Attendance.objects.filter(
-            group=group, date__gte=first, date__lte=last,
-        )
+        (mark.intern_id, mark.meeting_id): mark
+        for mark in Attendance.objects.filter(meeting__in=meetings)
     }
 
     rows = []
     for member in members:
         cells, attended, marked = [], 0, 0
-        for day in days:
-            mark = marks.get((member.intern_id, day['date']))
+        for meeting in meetings:
+            mark = marks.get((member.intern_id, meeting.pk))
             if mark:
                 marked += 1
                 if mark.is_attended:
                     attended += 1
             cells.append({
-                'date': day['date'],
-                'day': day['day'],
-                'is_weekend': day['is_weekend'],
-                'is_today': day['is_today'],
+                'meeting': meeting,
                 'status': mark.status if mark else '',
             })
         rows.append({
@@ -73,22 +85,35 @@ def build_sheet(group, year: int, month: int) -> dict:
 
     total_marked = sum(row['marked'] for row in rows)
     total_attended = sum(row['attended'] for row in rows)
+
+    # Сводка по видам собраний: сколько запланировано и проведено
+    by_kind: dict[str, dict] = {}
+    for meeting in meetings:
+        entry = by_kind.setdefault(meeting.kind, {
+            'label': meeting.get_kind_display(), 'planned': 0, 'held': 0,
+        })
+        entry['planned'] += 1
+        entry['held'] += int(meeting.status == GroupMeeting.Status.HELD)
+
     return {
-        'days': days,
+        'meetings': meetings,
         'rows': rows,
         'rate': round(total_attended / total_marked * 100) if total_marked else None,
         'marked': total_marked,
+        'by_kind': list(by_kind.values()),
     }
 
 
-def toggle_mark(group, intern, date: datetime.date, user=None) -> Attendance | None:
-    """Переключает отметку по кругу: Был → Не был → Опоздал → Уважительная → пусто."""
-    mark = Attendance.objects.filter(
-        group=group, intern=intern, date=date,
-    ).first()
+def toggle_mark(meeting, intern, user=None) -> Attendance | None:
+    """Переключает отметку: Был → Не был → Опоздал → Уважительная → пусто."""
+    mark = Attendance.objects.filter(meeting=meeting, intern=intern).first()
     if mark is None:
+        # Первая отметка на собрании — считаем его проведённым
+        if meeting.status == GroupMeeting.Status.PLANNED:
+            meeting.status = GroupMeeting.Status.HELD
+            meeting.save(update_fields=['status', 'updated_at'])
         return Attendance.objects.create(
-            group=group, intern=intern, date=date,
+            meeting=meeting, intern=intern,
             status=Attendance.Status.PRESENT, marked_by=user,
         )
     cycle = Attendance.CYCLE
@@ -102,13 +127,24 @@ def toggle_mark(group, intern, date: datetime.date, user=None) -> Attendance | N
     return None
 
 
-def mark_all_present(group, date: datetime.date, user=None) -> int:
-    """Отметить всю активную команду присутствующей на дату."""
+@transaction.atomic
+def mark_all_present(meeting, user=None) -> int:
+    """Отметить всю активную команду присутствующей на собрании."""
     created = 0
-    for member in group.members.filter(status='active').exclude(intern__isnull=True):
+    for member in meeting.group.members.filter(
+        status='active',
+    ).exclude(intern__isnull=True):
         _, is_new = Attendance.objects.get_or_create(
-            group=group, intern=member.intern, date=date,
+            meeting=meeting, intern=member.intern,
             defaults={'status': Attendance.Status.PRESENT, 'marked_by': user},
         )
         created += int(is_new)
+    if created and meeting.status == GroupMeeting.Status.PLANNED:
+        meeting.status = GroupMeeting.Status.HELD
+        meeting.save(update_fields=['status', 'updated_at'])
     return created
+
+
+def upcoming_meetings(group, limit: int = 5):
+    today = timezone.localdate()
+    return group.meetings.filter(date__gte=today).order_by('date')[:limit]

@@ -1,14 +1,134 @@
+import datetime
+
 from django.conf import settings
 from django.db import models
 
 from apps.common.models import TimeStampedModel
 
 
-class Attendance(TimeStampedModel):
-    """Отметка табеля: был ли человек на месте в конкретный день.
+class MeetingKind(models.TextChoices):
+    """Виды регулярных собраний GeeksPro."""
 
-    Табель ведётся по группам — как в ведомостях GeeksPro.
+    PM_INTERNS = 'pm_interns', 'PM со стажёрами'
+    LEAD_INTERNS = 'lead_interns', 'Тимлид со стажёрами'
+    INTERNAL = 'internal', 'Внутреннее (PM и тимлиды)'
+    OTHER = 'other', 'Другое'
+
+
+WEEKDAYS = [
+    (0, 'Пн'), (1, 'Вт'), (2, 'Ср'), (3, 'Чт'),
+    (4, 'Пт'), (5, 'Сб'), (6, 'Вс'),
+]
+
+
+class MeetingPlan(TimeStampedModel):
+    """План собраний группы: какие собрания и сколько раз в неделю.
+
+    Например: PM со стажёрами — 2 раза в неделю (пн, чт);
+    тимлид со стажёрами — 1 раз (ср).
     """
+
+    group = models.ForeignKey(
+        'flows.Group', on_delete=models.CASCADE, related_name='meeting_plans',
+        verbose_name='Группа',
+    )
+    kind = models.CharField(
+        'Вид собрания', max_length=20,
+        choices=MeetingKind.choices, default=MeetingKind.PM_INTERNS,
+    )
+    times_per_week = models.PositiveSmallIntegerField('Раз в неделю', default=1)
+    weekdays = models.CharField(
+        'Дни недели', max_length=20, blank=True,
+        help_text='Номера дней через запятую: 0 — понедельник, 6 — воскресенье',
+    )
+    host = models.ForeignKey(
+        'interns.Intern', on_delete=models.SET_NULL, related_name='hosted_plans',
+        verbose_name='Кто проводит', null=True, blank=True,
+    )
+    is_active = models.BooleanField('Действует', default=True)
+
+    class Meta:
+        verbose_name = 'План собраний'
+        verbose_name_plural = 'Планы собраний'
+        ordering = ['kind']
+
+    def __str__(self) -> str:
+        return f'{self.get_kind_display()} — {self.times_per_week}/нед.'
+
+    @property
+    def weekday_list(self) -> list[int]:
+        return [
+            int(value) for value in self.weekdays.split(',')
+            if value.strip().isdigit()
+        ]
+
+    @property
+    def weekday_labels(self) -> str:
+        names = dict(WEEKDAYS)
+        return ', '.join(names[day] for day in self.weekday_list if day in names)
+
+
+class GroupMeeting(TimeStampedModel):
+    """Собрание группы: конкретная дата, по которой ведётся табель."""
+
+    class Status(models.TextChoices):
+        PLANNED = 'planned', 'Запланировано'
+        HELD = 'held', 'Проведено'
+        MISSED = 'missed', 'Не проведено'
+
+    group = models.ForeignKey(
+        'flows.Group', on_delete=models.CASCADE, related_name='meetings',
+        verbose_name='Группа',
+    )
+    plan = models.ForeignKey(
+        MeetingPlan, on_delete=models.SET_NULL, related_name='meetings',
+        verbose_name='План', null=True, blank=True,
+    )
+    kind = models.CharField(
+        'Вид', max_length=20,
+        choices=MeetingKind.choices, default=MeetingKind.PM_INTERNS,
+    )
+    date = models.DateField('Дата', db_index=True)
+    host = models.ForeignKey(
+        'interns.Intern', on_delete=models.SET_NULL, related_name='hosted_meetings',
+        verbose_name='Провёл', null=True, blank=True,
+    )
+    status = models.CharField(
+        'Статус', max_length=10,
+        choices=Status.choices, default=Status.PLANNED, db_index=True,
+    )
+    topic = models.CharField('Тема', max_length=255, blank=True)
+    comment = models.TextField('Комментарий', blank=True)
+
+    class Meta:
+        verbose_name = 'Собрание группы'
+        verbose_name_plural = 'Собрания групп'
+        ordering = ['date']
+        unique_together = [('group', 'kind', 'date')]
+        indexes = [models.Index(fields=['group', 'date'])]
+
+    def __str__(self) -> str:
+        return f'{self.get_kind_display()} {self.date:%d.%m.%Y}'
+
+    @property
+    def short_kind(self) -> str:
+        return {
+            MeetingKind.PM_INTERNS: 'PM',
+            MeetingKind.LEAD_INTERNS: 'ТЛ',
+            MeetingKind.INTERNAL: 'Вн',
+        }.get(self.kind, '—')
+
+    @property
+    def attendance_rate(self):
+        marks = list(self.attendance.all())
+        if not marks:
+            return None
+        attended = sum(1 for mark in marks if mark.is_attended)
+        return round(attended / len(marks) * 100)
+
+
+class Attendance(TimeStampedModel):
+    """Отметка посещения конкретного собрания."""
 
     class Status(models.TextChoices):
         PRESENT = 'present', 'Был'
@@ -19,15 +139,14 @@ class Attendance(TimeStampedModel):
     # Порядок переключения по клику в табеле
     CYCLE = [Status.PRESENT, Status.ABSENT, Status.LATE, Status.EXCUSED]
 
-    group = models.ForeignKey(
-        'flows.Group', on_delete=models.CASCADE, related_name='attendance',
-        verbose_name='Группа',
+    meeting = models.ForeignKey(
+        GroupMeeting, on_delete=models.CASCADE, related_name='attendance',
+        verbose_name='Собрание',
     )
     intern = models.ForeignKey(
         'interns.Intern', on_delete=models.CASCADE, related_name='attendance',
         verbose_name='Человек',
     )
-    date = models.DateField('Дата', db_index=True)
     status = models.CharField(
         'Отметка', max_length=10, choices=Status.choices,
         default=Status.PRESENT,
@@ -39,16 +158,13 @@ class Attendance(TimeStampedModel):
     )
 
     class Meta:
-        verbose_name = 'Отметка табеля'
-        verbose_name_plural = 'Табель'
-        ordering = ['date']
-        unique_together = [('group', 'intern', 'date')]
-        indexes = [models.Index(fields=['group', 'date'])]
+        verbose_name = 'Отметка посещения'
+        verbose_name_plural = 'Табель посещаемости'
+        unique_together = [('meeting', 'intern')]
 
     def __str__(self) -> str:
-        return f'{self.intern} — {self.date:%d.%m.%Y}: {self.get_status_display()}'
+        return f'{self.intern} — {self.meeting}: {self.get_status_display()}'
 
     @property
     def is_attended(self) -> bool:
-        """Считается ли отметка присутствием (для процента посещаемости)."""
         return self.status in (self.Status.PRESENT, self.Status.LATE)
