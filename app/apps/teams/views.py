@@ -7,7 +7,7 @@ from apps.flows.models import Group
 from apps.interns.models import Intern
 from apps.projects.models import Project
 from apps.teams import services
-from apps.teams.forms import TeamMemberForm
+from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
 
 User = get_user_model()
@@ -93,7 +93,7 @@ def member_edit(request, pk):
     member = get_object_or_404(
         TeamMember.objects.select_related('project', 'group'), pk=pk,
     )
-    form = TeamMemberForm(request.POST or None, instance=member)
+    form = TeamMemberEditForm(request.POST or None, instance=member)
     if request.method == 'POST' and form.is_valid():
         form.save()
         warning = form.overload_warning()

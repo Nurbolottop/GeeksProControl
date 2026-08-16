@@ -3,27 +3,75 @@
 {% block title %}{{ title }} — GeeksPro Control{% endblock %}
 
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>{{ title }}</h1>
-        <div class="sub">
-            {% if group %}Группа <a href="{{ group.get_absolute_url }}">{{ group.code }}</a>{% if project %} · {% endif %}{% endif %}
-            {% if project %}Проект: <a href="{{ project.get_absolute_url }}">{{ project.name }}</a>{% endif %}
+<div class="form-page">
+    <div class="page-head">
+        <div>
+            <h1>{{ title }}</h1>
+            <div class="sub">
+                {% if group %}Группа <a href="{{ group.get_absolute_url }}">{{ group.code }}</a>{% if project %} · {% endif %}{% endif %}
+                {% if project %}Проект: <a href="{{ project.get_absolute_url }}">{{ project.name }}</a>{% endif %}
+            </div>
         </div>
     </div>
-</div>
 
-<form method="post" class="panel">
-    {% csrf_token %}
-    {% if form.non_field_errors %}
-        <div class="message message--error">{{ form.non_field_errors }}</div>
-    {% endif %}
-    <div class="form-grid">
-        {% include 'partials/form_fields.html' %}
-    </div>
-    <div class="form-actions">
-        <button type="submit" class="btn">Сохранить</button>
-        <a href="{{ project.get_absolute_url }}?tab=team" class="btn btn--secondary">Отмена</a>
-    </div>
-</form>
+    <form method="post" class="panel">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="message message--error">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="form-field">
+            <label for="{{ form.intern.id_for_label }}">Участник</label>
+            {{ form.intern }}
+            <div class="field-hint">Направление подставится из карточки человека</div>
+            {% if form.intern.errors %}<div class="form-errors">{{ form.intern.errors.0 }}</div>{% endif %}
+        </div>
+
+        <label class="checkbox-field">
+            {{ form.is_lead }}
+            <span>
+                <strong>Тимлид направления</strong>
+                <span>Отметьте, если человек ведёт своё направление в этой команде</span>
+            </span>
+        </label>
+
+        <div class="form-row" style="margin-top: 18px">
+            <div class="form-field">
+                <label for="{{ form.workload.id_for_label }}">Загрузка, %</label>
+                {{ form.workload }}
+                {% if form.workload.errors %}<div class="form-errors">{{ form.workload.errors.0 }}</div>{% endif %}
+            </div>
+            {% if form.status %}
+                <div class="form-field">
+                    <label for="{{ form.status.id_for_label }}">Статус</label>
+                    {{ form.status }}
+                </div>
+            {% endif %}
+        </div>
+
+        {% if form.joined_at %}
+            <div class="form-row" style="margin-top: 16px">
+                <div class="form-field">
+                    <label for="{{ form.joined_at.id_for_label }}">Дата подключения</label>
+                    {{ form.joined_at }}
+                </div>
+                <div class="form-field">
+                    <label for="{{ form.left_at.id_for_label }}">Дата выхода</label>
+                    {{ form.left_at }}
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="form-field" style="margin-top: 16px">
+            <label for="{{ form.comment.id_for_label }}">Комментарий</label>
+            {{ form.comment }}
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn">Сохранить</button>
+            <a href="{% if group %}{{ group.get_absolute_url }}{% elif project %}{{ project.get_absolute_url }}?tab=team{% else %}{% url 'teams:overview' %}{% endif %}"
+               class="btn btn--secondary">Отмена</a>
+        </div>
+    </form>
+</div>
 {% endblock %}
