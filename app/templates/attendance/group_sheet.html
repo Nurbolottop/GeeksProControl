@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Табель группы {{ group.code }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Табель группы {{ group.code }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <a href="{{ group.get_absolute_url }}" class="badge badge--gray">← Состав группы</a>
+            {% if group.project %}<a href="{{ group.project.get_absolute_url }}" class="badge badge--gray">{{ group.project.name }}</a>{% endif %}
+            {% if sheet.rate is not None %}
+                <span class="badge badge--{% if sheet.rate >= 80 %}green{% elif sheet.rate >= 60 %}yellow{% else %}red{% endif %}">
+                    Посещаемость: {{ sheet.rate }}%
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        <form method="post" action="{% url 'attendance:mark_day' group.pk %}" style="margin:0">
+            {% csrf_token %}
+            <input type="hidden" name="date" value="{{ today|date:'Y-m-d' }}">
+            <button type="submit" class="btn">✓ Отметить всех сегодня</button>
+        </form>
+    </div>
+</div>
+
+<div class="month-nav">
+    <a href="?year={{ prev_month.year }}&month={{ prev_month.month }}" class="btn btn--secondary btn--sm">‹ {{ prev_month|date:'F' }}</a>
+    <strong>{{ current|date:'F Y' }}</strong>
+    <a href="?year={{ next_month.year }}&month={{ next_month.month }}" class="btn btn--secondary btn--sm">{{ next_month|date:'F' }} ›</a>
+    <span class="att-legend">
+        <span><i class="att-mark att-mark--present">✓</i> был</span>
+        <span><i class="att-mark att-mark--absent">✕</i> не был</span>
+        <span><i class="att-mark att-mark--late">О</i> опоздал</span>
+        <span><i class="att-mark att-mark--excused">У</i> уважительная</span>
+    </span>
+</div>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data att-table">
+            <thead>
+            <tr>
+                <th class="att-name">Человек</th>
+                {% for day in sheet.days %}
+                    <th class="att-day {% if day.is_weekend %}att-cell--weekend{% endif %} {% if day.is_today %}att-cell--today{% endif %}">
+                        {{ day.day }}
+                    </th>
+                {% endfor %}
+                <th class="att-total">%</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in sheet.rows %}
+                <tr>
+                    <td class="att-name">
+                        <a href="{{ row.intern.get_absolute_url }}"><strong>{{ row.intern.full_name }}</strong></a>
+                        <div style="font-size:11.5px; color: var(--text-muted)">{{ row.member.get_role_display }}</div>
+                    </td>
+                    {% for cell in row.cells %}
+                        {% include 'attendance/partials/cell.html' with intern=row.intern %}
+                    {% endfor %}
+                    <td class="att-total">
+                        {% if row.rate is not None %}
+                            <span class="badge badge--{% if row.rate >= 80 %}green{% elif row.rate >= 60 %}yellow{% else %}red{% endif %}">{{ row.rate }}%</span>
+                        {% else %}—{% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="33" class="empty" style="text-align:center; padding: 24px;">
+                        В группе нет участников — добавьте команду, чтобы вести табель.
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="sub" style="color: var(--text-muted); font-size: 12.5px">
+    Клик по клетке меняет отметку: пусто → был → не был → опоздал → уважительная → пусто.
+    Отмечено дней: {{ sheet.marked }}.
+</div>
+{% endblock %}

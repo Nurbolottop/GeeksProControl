@@ -1,0 +1,15 @@
+<td class="att-cell {% if cell.is_weekend %}att-cell--weekend{% endif %} {% if cell.is_today %}att-cell--today{% endif %}">
+    <button type="button"
+            class="att-mark att-mark--{{ cell.status|default:'empty' }}"
+            title="{{ cell.date|date:'d.m.Y' }}"
+            hx-post="{% url 'attendance:toggle' group.pk %}"
+            hx-vals='{"intern": "{{ intern.pk }}", "date": "{{ cell.date|date:"Y-m-d" }}"}'
+            hx-target="closest td"
+            hx-swap="outerHTML">
+        {% if cell.status == 'present' %}✓
+        {% elif cell.status == 'absent' %}✕
+        {% elif cell.status == 'late' %}О
+        {% elif cell.status == 'excused' %}У
+        {% endif %}
+    </button>
+</td>

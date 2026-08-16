@@ -13,6 +13,7 @@
         </div>
     </div>
     <div class="page-actions">
+        <a href="{% url 'attendance:group_sheet' group.pk %}" class="btn btn--secondary">📋 Табель</a>
         <a href="{% url 'flows:group_update' group.pk %}" class="btn btn--secondary">Редактировать</a>
         {% if group.project %}
             <a href="{% url 'teams:member_add_group' group.pk %}" class="btn">+ Участник</a>

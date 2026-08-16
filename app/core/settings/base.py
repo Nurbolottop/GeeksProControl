@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'apps.resources',
     'apps.reports',
     'apps.flows',
+    'apps.attendance',
 ]
 
 # =============================================================================

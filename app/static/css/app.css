@@ -995,6 +995,71 @@ a:hover { color: var(--accent-dark); }
 .flow-card__stats strong { font-size: 19px; font-weight: 700; }
 .flow-card__stats span { font-size: 11px; color: var(--text-muted); }
 
+/* ---- Табель посещаемости ---- */
+.month-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.month-nav > strong {
+    font-size: 15px;
+    text-transform: capitalize;
+    min-width: 140px;
+    text-align: center;
+}
+.att-legend {
+    display: flex;
+    gap: 14px;
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+}
+.att-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.att-legend i { font-style: normal; cursor: default; }
+
+.att-table { font-size: 12.5px; }
+.att-table th, .att-table td { padding: 4px 3px; text-align: center; }
+.att-table .att-name {
+    text-align: left;
+    min-width: 190px;
+    padding-left: 20px !important;
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 1;
+}
+.att-table thead .att-name { background: #f6f7fb; }
+.att-table .att-day { font-size: 11px; width: 30px; }
+.att-table .att-total { padding-right: 16px !important; min-width: 62px; }
+.att-cell--weekend { background: #f7f8fc; }
+.att-cell--today { box-shadow: inset 0 -2px 0 var(--accent); }
+
+.att-mark {
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .1s ease, background .12s ease;
+}
+.att-mark:hover { transform: scale(1.12); }
+.att-mark--empty { background: #fbfcfe; }
+.att-mark--present { background: var(--green-bg); border-color: var(--green-line); color: var(--green); }
+.att-mark--absent { background: var(--red-bg); border-color: var(--red-line); color: var(--red); }
+.att-mark--late { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
+.att-mark--excused { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
+
 /* ---- Подсказки и чекбоксы в формах ---- */
 .field-hint { font-size: 11.5px; color: var(--text-muted); }
 .checkbox-field {
