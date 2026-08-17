@@ -1102,6 +1102,28 @@ a:hover { color: var(--accent-dark); }
 .att-mark--late { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
 .att-mark--excused { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
 
+/* ---- Месячный отчёт ---- */
+.report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.report-block { margin-bottom: 0; }
+.report-rows { display: flex; flex-direction: column; }
+.report-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px solid #eef0f5;
+    font-size: 13.5px;
+}
+.report-row:last-child { border-bottom: none; }
+.report-row span { color: var(--text-muted); }
+.report-row strong { font-size: 18px; font-weight: 750; flex-shrink: 0; }
+
 /* ---- Сводка по направлениям ---- */
 .spec-grid {
     display: grid;

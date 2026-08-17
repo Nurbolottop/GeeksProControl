@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Отчёт за {{ report.month_start|date:'F Y' }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1 style="text-transform: capitalize">Отчёт за {{ report.month_start|date:'F Y' }}</h1>
+        <div class="sub">Сформирован {{ report.updated_at|date:'d.m.Y H:i' }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'reports:monthly_list' %}" class="btn btn--secondary">Все отчёты</a>
+        <form method="post" action="{% url 'reports:monthly_generate' %}" style="margin:0">
+            {% csrf_token %}
+            <input type="hidden" name="year" value="{{ report.month_start.year }}">
+            <input type="hidden" name="month" value="{{ report.month_start.month }}">
+            <button type="submit" class="btn">Пересчитать</button>
+        </form>
+    </div>
+</div>
+
+<div class="report-grid">
+    {% for section in sections %}
+        <div class="panel report-block">
+            <h2>{{ section.title }}</h2>
+            <div class="report-rows">
+                {% for row in section.rows %}
+                    <div class="report-row">
+                        <span>{{ row.label }}</span>
+                        <strong>
+                            {% if row.value is None %}—{% else %}{{ row.value }}{{ row.suffix }}{% endif %}
+                        </strong>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="panel">
+    <h2>Комментарий руководителя</h2>
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-field">
+            <textarea name="comment" rows="3">{{ report.comment }}</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn--secondary">Сохранить</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

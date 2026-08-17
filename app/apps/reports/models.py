@@ -19,6 +19,22 @@ class WeeklyReport(TimeStampedModel):
         return f'Неделя с {self.week_start:%d.%m.%Y}'
 
 
+class MonthlyReport(TimeStampedModel):
+    """Месячный отчёт по форме рабочей таблицы. Показатели — в JSON."""
+
+    month_start = models.DateField('Месяц', unique=True)
+    data = models.JSONField('Показатели', default=dict)
+    comment = models.TextField('Комментарий руководителя', blank=True)
+
+    class Meta:
+        verbose_name = 'Месячный отчёт'
+        verbose_name_plural = 'Месячные отчёты'
+        ordering = ['-month_start']
+
+    def __str__(self) -> str:
+        return f'Отчёт за {self.month_start:%m.%Y}'
+
+
 class KPISnapshot(TimeStampedModel):
     """Снимок KPI за период (ТЗ §25)."""
 
