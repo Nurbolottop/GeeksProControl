@@ -5,8 +5,8 @@
 {% block content %}
 <div class="page-head">
     <div>
-        <h1>Прогноз потребности</h1>
-        <div class="sub">Доступные стажёры + выпуски против потребностей планируемых проектов</div>
+        <h1>Стажёры по направлениям</h1>
+        <div class="sub">Сколько людей в каждом направлении, сколько занято и свободно</div>
     </div>
     <div class="page-actions">
         <a href="{% url 'resources:graduations' %}" class="btn btn--secondary">Выпуски</a>
@@ -20,33 +20,27 @@
             <thead>
             <tr>
                 <th>Направление</th>
-                <th>Доступно</th>
-                <th>Выпуск (3 мес.)</th>
-                <th>Нужно</th>
-                <th>Баланс</th>
+                <th>Всего стажёров</th>
+                <th>Занято на проектах</th>
+                <th>Свободно</th>
             </tr>
             </thead>
             <tbody>
             {% for row in rows %}
                 <tr>
                     <td><strong>{{ row.specialization }}</strong></td>
-                    <td>{{ row.available }}</td>
-                    <td>{{ row.graduating }}</td>
-                    <td>{{ row.needed }}</td>
+                    <td><strong style="font-size:15px">{{ row.total }}</strong></td>
+                    <td>{{ row.busy }}</td>
                     <td>
-                        {% if row.deficit %}
-                            <span class="badge badge--red">▼ {{ row.balance }} — дефицит</span>
-                        {% elif row.balance == 0 %}
-                            <span class="badge badge--yellow">0 — впритык</span>
+                        {% if row.free %}
+                            <span class="badge badge--green">{{ row.free }}</span>
                         {% else %}
-                            <span class="badge badge--green">+{{ row.balance }}</span>
+                            <span class="badge badge--gray">0</span>
                         {% endif %}
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">
-                    Нет направлений. Добавьте направления в админке или через seed_demo.
-                </td></tr>
+                <tr><td colspan="4" class="empty" style="text-align:center; padding: 24px;">Нет направлений.</td></tr>
             {% endfor %}
             </tbody>
         </table>

@@ -12,6 +12,32 @@ from apps.training.models import Specialization, TrainingGroup
 FORECAST_MONTHS = 3
 
 
+def interns_summary() -> list[dict]:
+    """По каждому направлению: всего стажёров, занято на проектах, свободно."""
+    busy_ids = set(
+        TeamMember.objects.filter(
+            status=TeamMember.Status.ACTIVE, intern__isnull=False,
+        ).values_list('intern_id', flat=True),
+    )
+    rows = []
+    for spec in Specialization.objects.all():
+        people = list(
+            Intern.objects.active()
+            .filter(specialization=spec)
+            .exclude(status=InternStatus.DROPPED)
+            .values_list('pk', flat=True),
+        )
+        busy = sum(1 for pk in people if pk in busy_ids)
+        rows.append({
+            'specialization': spec,
+            'total': len(people),
+            'busy': busy,
+            'free': len(people) - busy,
+        })
+    rows.sort(key=lambda row: -row['total'])
+    return rows
+
+
 def resource_balance(today: datetime.date | None = None) -> list[dict]:
     """Таблица баланса: Направление | Доступно | Выпуск | Нужно | Баланс.
 

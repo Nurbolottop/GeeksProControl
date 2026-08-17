@@ -47,11 +47,11 @@ def intern_list(request):
     page = paginator.get_page(params.get('page'))
     for intern in page.object_list:
         intern.is_busy = intern.pk in busy_ids
-    from apps.resources.services import resource_balance
+    from apps.resources.services import interns_summary
     context = {
         'page': page,
         'params': params,
-        'balance': resource_balance(),
+        'balance': interns_summary(),
         'specializations': Specialization.objects.all(),
         'groups': TrainingGroup.objects.select_related('specialization'),
         'statuses': InternStatus.choices,

@@ -33,7 +33,7 @@ NeedFormSet = inlineformset_factory(
 def forecast(request):
     """Прогноз потребности (ТЗ §14)."""
     return render(request, 'resources/forecast.html', {
-        'rows': services.resource_balance(),
+        'rows': services.interns_summary(),
         'planned': (
             PlannedProject.objects
             .exclude(status__in=[

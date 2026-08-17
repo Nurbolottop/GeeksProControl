@@ -16,22 +16,12 @@
 {% if balance %}
     <div class="spec-grid">
         {% for row in balance %}
-            <a href="?specialization={{ row.specialization.pk }}"
-               class="spec-card {% if row.deficit %}spec-card--deficit{% endif %}">
+            <a href="?specialization={{ row.specialization.pk }}" class="spec-card">
                 <div class="spec-card__name">{{ row.specialization }}</div>
                 <div class="spec-card__row">
-                    <div><strong>{{ row.available }}</strong><span>свободно</span></div>
-                    <div><strong>{{ row.graduating }}</strong><span>выпуск</span></div>
-                    <div><strong>{{ row.needed }}</strong><span>нужно</span></div>
-                </div>
-                <div class="spec-card__balance">
-                    {% if row.deficit %}
-                        <span class="badge badge--red">дефицит {{ row.balance }}</span>
-                    {% elif row.balance == 0 %}
-                        <span class="badge badge--yellow">впритык</span>
-                    {% else %}
-                        <span class="badge badge--green">+{{ row.balance }}</span>
-                    {% endif %}
+                    <div><strong>{{ row.total }}</strong><span>всего</span></div>
+                    <div><strong>{{ row.busy }}</strong><span>занято</span></div>
+                    <div><strong style="color: var(--green)">{{ row.free }}</strong><span>свободно</span></div>
                 </div>
             </a>
         {% endfor %}
