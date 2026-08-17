@@ -14,23 +14,18 @@ def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
 
 
 @transaction.atomic
-def create_meetings(
-    group, kind: str, weekdays: list[int], year: int, month: int,
-    host=None, topic: str = '',
-) -> int:
-    """Создаёт собрания в выбранные дни недели указанного месяца."""
-    first, last = month_bounds(year, month)
-    created = 0
-    date = first
-    while date <= last:
-        if date.weekday() in weekdays:
-            _, is_new = GroupMeeting.objects.get_or_create(
-                group=group, kind=kind, date=date,
-                defaults={'host': host, 'topic': topic},
-            )
-            created += int(is_new)
-        date += datetime.timedelta(days=1)
-    return created
+def create_meeting(
+    group, kind: str, date: datetime.date, host=None, topic: str = '',
+) -> GroupMeeting | None:
+    """Создаёт одно собрание на конкретную дату.
+
+    Возвращает None, если такое собрание уже есть.
+    """
+    meeting, is_new = GroupMeeting.objects.get_or_create(
+        group=group, kind=kind, date=date,
+        defaults={'host': host, 'topic': topic},
+    )
+    return meeting if is_new else None
 
 
 def build_sheet(group, year: int, month: int) -> dict:

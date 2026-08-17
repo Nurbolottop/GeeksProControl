@@ -8,19 +8,19 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.attendance import services
-from apps.attendance.models import GroupMeeting, MeetingKind, WEEKDAYS
+from apps.attendance.models import GroupMeeting, MeetingKind
 from apps.flows.models import Group
 from apps.interns.models import Intern
 
 
 class MeetingCreateForm(forms.Form):
-    """Создание собраний: вид, дни недели и кто проводит."""
+    """Создание собрания: вид, дата и кто проводит."""
 
     kind = forms.ChoiceField(label='Вид собрания', choices=MeetingKind.choices)
-    weekdays = forms.MultipleChoiceField(
-        label='Дни недели', choices=WEEKDAYS,
-        widget=forms.CheckboxSelectMultiple,
-        error_messages={'required': 'Выберите хотя бы один день недели.'},
+    date = forms.DateField(
+        label='Дата собрания',
+        widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+        error_messages={'required': 'Укажите дату собрания.'},
     )
     host = forms.ModelChoiceField(
         label='Кто проводит', queryset=Intern.objects.none(),
@@ -37,10 +37,6 @@ class MeetingCreateForm(forms.Form):
             self.fields['host'].queryset = Intern.objects.filter(
                 team_memberships__group=group,
             ).distinct().order_by('full_name')
-
-    @property
-    def weekday_numbers(self) -> list[int]:
-        return [int(value) for value in self.cleaned_data['weekdays']]
 
 
 def _period(request) -> tuple[int, int]:
@@ -81,28 +77,32 @@ def group_sheet(request, pk):
 
 @login_required
 def meeting_create(request, pk):
-    """Создать собрания группы в выбранные дни недели месяца."""
+    """Создать одно собрание группы на выбранную дату."""
     group = get_object_or_404(Group.objects.select_related('flow'), pk=pk)
     year, month = _period(request)
-    form = MeetingCreateForm(request.POST or None, group=group)
+    form = MeetingCreateForm(
+        request.POST or None, group=group,
+        initial={'date': timezone.localdate()},
+    )
 
     if request.method == 'POST' and form.is_valid():
-        created = services.create_meetings(
+        date = form.cleaned_data['date']
+        meeting = services.create_meeting(
             group,
             kind=form.cleaned_data['kind'],
-            weekdays=form.weekday_numbers,
-            year=year, month=month,
+            date=date,
             host=form.cleaned_data.get('host'),
             topic=form.cleaned_data.get('topic', ''),
         )
-        if created:
-            messages.success(request, f'Добавлено собраний: {created}.')
-        else:
-            messages.info(
-                request, 'Такие собрания в этом месяце уже есть.',
+        if meeting:
+            messages.success(
+                request, f'Собрание на {date:%d.%m.%Y} добавлено.',
             )
+        else:
+            messages.info(request, 'Такое собрание в этот день уже есть.')
         return redirect(
-            f'/attendance/groups/{group.pk}/?year={year}&month={month}',
+            f'/attendance/groups/{group.pk}/'
+            f'?year={date.year}&month={date.month}',
         )
 
     return render(request, 'attendance/meeting_form.html', {

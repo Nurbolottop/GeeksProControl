@@ -38,8 +38,8 @@
     <div class="kind-summary">
         {% for kind in sheet.by_kind %}
             <div class="kind-summary__item">
-                <strong>{{ kind.held }}/{{ kind.total }}</strong>
-                <span>{{ kind.label }} — проведено</span>
+                <span class="kind-summary__label">{{ kind.label }}</span>
+                <strong>Проведено {{ kind.held }} из {{ kind.total }}</strong>
             </div>
         {% endfor %}
     </div>
@@ -54,6 +54,7 @@
                     <th class="att-name">Человек</th>
                     {% for meeting in sheet.meetings %}
                         <th class="att-day">
+                            <div class="att-day__weekday">{{ meeting.date|date:'D' }}</div>
                             <div class="att-day__date">{{ meeting.date|date:'d.m' }}</div>
                             <div class="att-day__kind">{{ meeting.short_kind }}</div>
                         </th>

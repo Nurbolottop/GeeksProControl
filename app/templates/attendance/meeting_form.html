@@ -8,8 +8,7 @@
         <div>
             <h1>Создать собрание</h1>
             <div class="sub">
-                Группа <a href="{{ group.get_absolute_url }}">{{ group.code }}</a> ·
-                {{ current|date:'F Y' }}
+                Группа <a href="{{ group.get_absolute_url }}">{{ group.code }}</a>
             </div>
         </div>
     </div>
@@ -26,12 +25,10 @@
         </div>
 
         <div class="form-field" style="margin-top: 18px">
-            <label>В какие дни недели</label>
-            <div class="weekday-picker">{{ form.weekdays }}</div>
-            <div class="field-hint">
-                Собрания появятся в эти дни в течение {{ current|date:'F Y' }}
-            </div>
-            {% if form.weekdays.errors %}<div class="form-errors">{{ form.weekdays.errors.0 }}</div>{% endif %}
+            <label for="{{ form.date.id_for_label }}">Дата собрания</label>
+            {{ form.date }}
+            <div class="field-hint">Одна дата — одно собрание, одна колонка в табеле</div>
+            {% if form.date.errors %}<div class="form-errors">{{ form.date.errors.0 }}</div>{% endif %}
         </div>
 
         <div class="form-row" style="margin-top: 18px">
