@@ -17,11 +17,6 @@ class MeetingCreateForm(forms.Form):
     """Создание собрания: вид, дата и кто проводит."""
 
     kind = forms.ChoiceField(label='Вид собрания', choices=MeetingKind.choices)
-    date = forms.DateField(
-        label='Дата собрания',
-        widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
-        error_messages={'required': 'Укажите дату собрания.'},
-    )
     host = forms.ModelChoiceField(
         label='Кто проводит', queryset=Intern.objects.none(),
         required=False, empty_label='Не указан',
@@ -80,30 +75,42 @@ def meeting_create(request, pk):
     """Создать одно собрание группы на выбранную дату."""
     group = get_object_or_404(Group.objects.select_related('flow'), pk=pk)
     year, month = _period(request)
-    form = MeetingCreateForm(
-        request.POST or None, group=group,
-        initial={'date': timezone.localdate()},
-    )
+    form = MeetingCreateForm(request.POST or None, group=group)
 
+    date_error = ''
     if request.method == 'POST' and form.is_valid():
-        date = form.cleaned_data['date']
-        meeting = services.create_meeting(
-            group,
-            kind=form.cleaned_data['kind'],
-            date=date,
-            host=form.cleaned_data.get('host'),
-            topic=form.cleaned_data.get('topic', ''),
-        )
-        if meeting:
-            messages.success(
-                request, f'Собрание на {date:%d.%m.%Y} добавлено.',
-            )
+        dates = []
+        for raw in request.POST.getlist('date'):
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                dates.append(datetime.date.fromisoformat(raw))
+            except ValueError:
+                continue
+        if not dates:
+            date_error = 'Укажите хотя бы одну дату собрания.'
         else:
-            messages.info(request, 'Такое собрание в этот день уже есть.')
-        return redirect(
-            f'/attendance/groups/{group.pk}/'
-            f'?year={date.year}&month={date.month}',
-        )
+            created = [
+                services.create_meeting(
+                    group,
+                    kind=form.cleaned_data['kind'],
+                    date=date,
+                    host=form.cleaned_data.get('host'),
+                    topic=form.cleaned_data.get('topic', ''),
+                )
+                for date in sorted(set(dates))
+            ]
+            new_count = len([item for item in created if item])
+            if new_count:
+                messages.success(request, f'Добавлено собраний: {new_count}.')
+            else:
+                messages.info(request, 'Такие собрания уже есть в табеле.')
+            first = sorted(set(dates))[0]
+            return redirect(
+                f'/attendance/groups/{group.pk}/'
+                f'?year={first.year}&month={first.month}',
+            )
 
     return render(request, 'attendance/meeting_form.html', {
         'group': group,
@@ -111,6 +118,8 @@ def meeting_create(request, pk):
         'year': year,
         'month': month,
         'current': datetime.date(year, month, 1),
+        'today': timezone.localdate(),
+        'date_error': date_error,
     })
 
 

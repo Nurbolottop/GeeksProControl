@@ -1102,6 +1102,35 @@ a:hover { color: var(--accent-dark); }
 .att-mark--late { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
 .att-mark--excused { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
 
+/* ---- Список дат в форме собрания ---- */
+.date-list { display: flex; flex-direction: column; gap: 8px; }
+.date-row { display: flex; gap: 8px; align-items: center; }
+.date-row input[type="date"] {
+    flex: 1;
+    padding: 9px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+}
+.date-row input[type="date"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.date-row__remove {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.date-row__remove:hover { background: var(--red-bg); color: var(--red); border-color: var(--red-line); }
+
 /* ---- Чек-лист документов ---- */
 .doc-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .doc-row {
