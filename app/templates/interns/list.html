@@ -13,6 +13,31 @@
     </div>
 </div>
 
+{% if balance %}
+    <div class="spec-grid">
+        {% for row in balance %}
+            <a href="?specialization={{ row.specialization.pk }}"
+               class="spec-card {% if row.deficit %}spec-card--deficit{% endif %}">
+                <div class="spec-card__name">{{ row.specialization }}</div>
+                <div class="spec-card__row">
+                    <div><strong>{{ row.available }}</strong><span>свободно</span></div>
+                    <div><strong>{{ row.graduating }}</strong><span>выпуск</span></div>
+                    <div><strong>{{ row.needed }}</strong><span>нужно</span></div>
+                </div>
+                <div class="spec-card__balance">
+                    {% if row.deficit %}
+                        <span class="badge badge--red">дефицит {{ row.balance }}</span>
+                    {% elif row.balance == 0 %}
+                        <span class="badge badge--yellow">впритык</span>
+                    {% else %}
+                        <span class="badge badge--green">+{{ row.balance }}</span>
+                    {% endif %}
+                </div>
+            </a>
+        {% endfor %}
+    </div>
+{% endif %}
+
 <form method="get" class="filters">
     <input type="text" name="q" placeholder="Поиск: ФИО, телефон, email" value="{{ params.q|default:'' }}">
     <select name="specialization">

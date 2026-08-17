@@ -1102,6 +1102,36 @@ a:hover { color: var(--accent-dark); }
 .att-mark--late { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
 .att-mark--excused { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
 
+/* ---- Сводка по направлениям ---- */
+.spec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.spec-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 14px 16px;
+    color: var(--text);
+    transition: transform .13s ease, box-shadow .13s ease, border-color .13s ease;
+}
+.spec-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+    color: var(--text);
+    border-color: var(--accent-soft);
+}
+.spec-card--deficit { border-color: var(--red-line); background: #fffbfb; }
+.spec-card__name { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+.spec-card__row { display: flex; gap: 12px; }
+.spec-card__row div { display: flex; flex-direction: column; }
+.spec-card__row strong { font-size: 16px; font-weight: 700; }
+.spec-card__row span { font-size: 10.5px; color: var(--text-muted); }
+.spec-card__balance { margin-top: 10px; }
+
 /* ---- Список дат в форме собрания ---- */
 .date-list { display: flex; flex-direction: column; gap: 8px; }
 .date-row { display: flex; gap: 8px; align-items: center; }
