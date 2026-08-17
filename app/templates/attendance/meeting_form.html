@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Создать собрание — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="page-head">
+        <div>
+            <h1>Создать собрание</h1>
+            <div class="sub">
+                Группа <a href="{{ group.get_absolute_url }}">{{ group.code }}</a> ·
+                {{ current|date:'F Y' }}
+            </div>
+        </div>
+    </div>
+
+    <form method="post" class="panel">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="message message--error">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="form-field">
+            <label for="{{ form.kind.id_for_label }}">Вид собрания</label>
+            {{ form.kind }}
+        </div>
+
+        <div class="form-field" style="margin-top: 18px">
+            <label>В какие дни недели</label>
+            <div class="weekday-picker">{{ form.weekdays }}</div>
+            <div class="field-hint">
+                Собрания появятся в эти дни в течение {{ current|date:'F Y' }}
+            </div>
+            {% if form.weekdays.errors %}<div class="form-errors">{{ form.weekdays.errors.0 }}</div>{% endif %}
+        </div>
+
+        <div class="form-row" style="margin-top: 18px">
+            <div class="form-field">
+                <label for="{{ form.host.id_for_label }}">Кто проводит</label>
+                {{ form.host }}
+            </div>
+            <div class="form-field">
+                <label for="{{ form.topic.id_for_label }}">Тема</label>
+                {{ form.topic }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn">Создать</button>
+            <a href="{% url 'attendance:group_sheet' group.pk %}?year={{ year }}&month={{ month }}"
+               class="btn btn--secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -151,9 +151,22 @@ def project_detail(request, pk):
         context['access_form'] = ProjectAccessForm()
     elif tab == 'documents':
         from apps.documents import services as doc_services
-        context['documents'] = (
-            project.documents.active().select_related('doc_type')
+        from apps.documents.models import DocumentType
+        doc_services.ensure_default_types()
+        documents = list(
+            project.documents.active().select_related('doc_type'),
         )
+        by_type = {}
+        for document in documents:
+            by_type.setdefault(document.doc_type_id, document)
+        # Чек-лист: все типы документов, у каждого — загружен или нет
+        context['checklist'] = [
+            {'type': doc_type, 'document': by_type.get(doc_type.pk)}
+            for doc_type in DocumentType.objects.order_by(
+                '-required_for_delivery', 'name',
+            )
+        ]
+        context['documents'] = documents
         context['doc_progress'] = doc_services.document_progress(project)
     elif tab == 'delivery':
         from apps.projects import delivery

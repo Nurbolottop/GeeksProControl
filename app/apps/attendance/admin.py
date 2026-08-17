@@ -1,17 +1,11 @@
 from django.contrib import admin
 
-from apps.attendance.models import Attendance, GroupMeeting, MeetingPlan
+from apps.attendance.models import Attendance, GroupMeeting
 
 
 class AttendanceInline(admin.TabularInline):
     model = Attendance
     extra = 0
-
-
-@admin.register(MeetingPlan)
-class MeetingPlanAdmin(admin.ModelAdmin):
-    list_display = ('group', 'kind', 'times_per_week', 'host', 'is_active')
-    list_filter = ('kind', 'is_active')
 
 
 @admin.register(GroupMeeting)

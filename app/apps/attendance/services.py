@@ -1,11 +1,11 @@
-"""Планирование собраний группы и табель посещаемости."""
+"""Собрания группы и табель посещаемости."""
 import calendar
 import datetime
 
 from django.db import transaction
 from django.utils import timezone
 
-from apps.attendance.models import Attendance, GroupMeeting, MeetingPlan
+from apps.attendance.models import Attendance, GroupMeeting
 
 
 def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -14,31 +14,22 @@ def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
 
 
 @transaction.atomic
-def generate_meetings(group, year: int, month: int, user=None) -> int:
-    """Создаёт собрания месяца по планам группы.
-
-    Для каждого активного плана берём указанные дни недели (или первые
-    N дней недели, если они не заданы) и ставим собрание на каждую такую дату.
-    """
+def create_meetings(
+    group, kind: str, weekdays: list[int], year: int, month: int,
+    host=None, topic: str = '',
+) -> int:
+    """Создаёт собрания в выбранные дни недели указанного месяца."""
     first, last = month_bounds(year, month)
     created = 0
-
-    for plan in group.meeting_plans.filter(is_active=True):
-        weekdays = plan.weekday_list
-        if not weekdays:
-            # Дни не заданы — распределяем равномерно с понедельника
-            weekdays = [0, 2, 4, 1, 3][:max(1, plan.times_per_week)]
-        weekdays = sorted(set(weekdays))[:max(1, plan.times_per_week)]
-
-        date = first
-        while date <= last:
-            if date.weekday() in weekdays:
-                _, is_new = GroupMeeting.objects.get_or_create(
-                    group=group, kind=plan.kind, date=date,
-                    defaults={'plan': plan, 'host': plan.host},
-                )
-                created += int(is_new)
-            date += datetime.timedelta(days=1)
+    date = first
+    while date <= last:
+        if date.weekday() in weekdays:
+            _, is_new = GroupMeeting.objects.get_or_create(
+                group=group, kind=kind, date=date,
+                defaults={'host': host, 'topic': topic},
+            )
+            created += int(is_new)
+        date += datetime.timedelta(days=1)
     return created
 
 
@@ -86,13 +77,13 @@ def build_sheet(group, year: int, month: int) -> dict:
     total_marked = sum(row['marked'] for row in rows)
     total_attended = sum(row['attended'] for row in rows)
 
-    # Сводка по видам собраний: сколько запланировано и проведено
+    # Сводка по видам: сколько собраний всего и сколько уже проведено
     by_kind: dict[str, dict] = {}
     for meeting in meetings:
         entry = by_kind.setdefault(meeting.kind, {
-            'label': meeting.get_kind_display(), 'planned': 0, 'held': 0,
+            'label': meeting.get_kind_display(), 'total': 0, 'held': 0,
         })
-        entry['planned'] += 1
+        entry['total'] += 1
         entry['held'] += int(meeting.status == GroupMeeting.Status.HELD)
 
     return {

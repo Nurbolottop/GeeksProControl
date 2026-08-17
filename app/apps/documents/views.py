@@ -41,6 +41,8 @@ def document_create(request):
     initial = {}
     if request.GET.get('project'):
         initial['project'] = request.GET['project']
+    if request.GET.get('type'):
+        initial['doc_type'] = request.GET['type']
     form = DocumentForm(request.POST or None, request.FILES or None, initial=initial)
     if request.method == 'POST' and form.is_valid():
         document = form.save()

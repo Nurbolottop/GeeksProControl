@@ -1073,11 +1073,62 @@ a:hover { color: var(--accent-dark); }
     transition: transform .1s ease, background .12s ease;
 }
 .att-mark:hover { transform: scale(1.12); }
+.att-remove {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: #b0b6c4;
+    font-size: 11px;
+    cursor: pointer;
+}
+.att-remove:hover { background: var(--red-bg); color: var(--red); border-color: var(--red-line); }
 .att-mark--empty { background: #fbfcfe; }
 .att-mark--present { background: var(--green-bg); border-color: var(--green-line); color: var(--green); }
 .att-mark--absent { background: var(--red-bg); border-color: var(--red-line); color: var(--red); }
 .att-mark--late { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
 .att-mark--excused { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
+
+/* ---- Чек-лист документов ---- */
+.doc-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.doc-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    box-shadow: var(--shadow-sm);
+}
+.doc-row--done { border-color: var(--green-line); background: #fbfefc; }
+.doc-row__icon {
+    width: 34px; height: 34px;
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--gray-bg);
+    color: #9aa1b0;
+    flex-shrink: 0;
+    font-size: 15px; font-weight: 700;
+}
+.doc-row__icon svg { width: 17px; height: 17px; }
+.doc-row--done .doc-row__icon { background: var(--green-bg); color: var(--green); }
+.doc-row__name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
+.doc-row__req {
+    font-size: 10.5px;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--orange);
+    background: var(--orange-bg);
+    padding: 2px 7px;
+    border-radius: 99px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.doc-row__meta { font-size: 11.5px; font-weight: 500; color: var(--text-muted); margin-top: 2px; }
+.doc-row__status { flex-shrink: 0; min-width: 140px; }
+.doc-row__actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 /* ---- Подсказки и чекбоксы в формах ---- */
 .field-hint { font-size: 11.5px; color: var(--text-muted); }

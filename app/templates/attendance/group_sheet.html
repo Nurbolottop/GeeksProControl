@@ -17,13 +17,8 @@
         </div>
     </div>
     <div class="page-actions">
-        <a href="{% url 'attendance:plan_list' group.pk %}" class="btn btn--secondary">План собраний</a>
-        <form method="post" action="{% url 'attendance:generate' group.pk %}" style="margin:0">
-            {% csrf_token %}
-            <input type="hidden" name="year" value="{{ year }}">
-            <input type="hidden" name="month" value="{{ month }}">
-            <button type="submit" class="btn">Сформировать собрания месяца</button>
-        </form>
+        <a href="{% url 'attendance:meeting_create' group.pk %}?year={{ year }}&month={{ month }}"
+           class="btn">+ Создать собрание</a>
     </div>
 </div>
 
@@ -43,8 +38,8 @@
     <div class="kind-summary">
         {% for kind in sheet.by_kind %}
             <div class="kind-summary__item">
-                <strong>{{ kind.held }}/{{ kind.planned }}</strong>
-                <span>{{ kind.label }}</span>
+                <strong>{{ kind.held }}/{{ kind.total }}</strong>
+                <span>{{ kind.label }} — проведено</span>
             </div>
         {% endfor %}
     </div>
@@ -88,24 +83,36 @@
                     </td></tr>
                 {% endfor %}
                 </tbody>
+                <tfoot>
+                <tr>
+                    <td class="att-name" style="color: var(--text-muted); font-size: 11.5px">Удалить собрание</td>
+                    {% for meeting in sheet.meetings %}
+                        <td class="att-cell">
+                            <form method="post" action="{% url 'attendance:meeting_delete' meeting.pk %}"
+                                  style="margin:0" onsubmit="return confirm('Удалить собрание {{ meeting.date|date:'d.m.Y' }} вместе с отметками?')">
+                                {% csrf_token %}
+                                <button type="submit" class="att-remove" title="Удалить собрание">✕</button>
+                            </form>
+                        </td>
+                    {% endfor %}
+                    <td></td>
+                </tr>
+                </tfoot>
             </table>
         </div>
     </div>
     <div class="sub" style="color: var(--text-muted); font-size: 12.5px">
         Клик по клетке: пусто → был → не был → опоздал → уважительная → пусто.
-        Колонки — только дни собраний по плану (PM — с PM, ТЛ — с тимлидом, Вн — внутреннее).
+        Колонки — дни собраний (PM — с PM, ТЛ — с тимлидом, Вн — внутреннее).
     </div>
 {% else %}
     <div class="panel empty" style="text-align:center; padding: 36px 20px;">
-        <p style="margin: 0 0 6px"><strong>В этом месяце собраний пока нет.</strong></p>
+        <p style="margin: 0 0 6px"><strong>В этом месяце собраний нет.</strong></p>
         <p style="margin: 0 0 16px">
-            {% if plans %}
-                Нажмите «Сформировать собрания месяца» — даты проставятся по плану.
-            {% else %}
-                Сначала составьте план: сколько собраний в неделю и кто их проводит.
-            {% endif %}
+            Нажмите «Создать собрание», выберите вид и дни недели — собрания появятся в табеле.
         </p>
-        <a href="{% url 'attendance:plan_list' group.pk %}" class="btn">Перейти к плану собраний</a>
+        <a href="{% url 'attendance:meeting_create' group.pk %}?year={{ year }}&month={{ month }}"
+           class="btn">+ Создать собрание</a>
     </div>
 {% endif %}
 {% endblock %}

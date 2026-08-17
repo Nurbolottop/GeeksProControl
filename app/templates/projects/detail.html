@@ -192,56 +192,61 @@
         </form>
     </div>
 {% elif tab == 'documents' %}
-    <div class="panel">
-        <div style="display:flex; justify-content: space-between; align-items:center;">
-            <h2 style="margin:0">
-                Документы: {{ doc_progress.done }}/{{ doc_progress.total }} обязательных
-            </h2>
-            <a href="{% url 'documents:create' %}?project={{ project.pk }}" class="btn btn--sm">+ Документ</a>
-        </div>
-        {% if doc_progress.missing %}
-            <div class="message message--warning" style="margin-top:12px">
-                Отсутствуют: {% for doc_type in doc_progress.missing %}{{ doc_type.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+    <div class="page-head" style="margin-bottom: 16px">
+        <div>
+            <h2 style="margin:0">Документы проекта</h2>
+            <div class="sub">
+                Обязательных загружено: <strong>{{ doc_progress.done }}/{{ doc_progress.total }}</strong>
             </div>
-        {% endif %}
-    </div>
-    <div class="panel" style="padding: 0;">
-        <div class="table-wrap">
-            <table class="data">
-                <thead>
-                <tr>
-                    <th>Тип</th>
-                    <th>Номер</th>
-                    <th>Дата</th>
-                    <th>Статус</th>
-                    <th>Подписан</th>
-                    <th>Файл</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for document in documents %}
-                    <tr>
-                        <td><strong>{{ document.doc_type }}</strong></td>
-                        <td>{{ document.number|default:'—' }}</td>
-                        <td>{{ document.document_date|date:'d.m.Y'|default:'—' }}</td>
-                        <td>
-                            {% if document.status == 'signed' %}<span class="badge badge--green">Подписан</span>
-                            {% elif document.status == 'awaiting' %}<span class="badge badge--yellow">Ожидает подписи</span>
-                            {% elif document.status == 'expired' %}<span class="badge badge--red">Истёк</span>
-                            {% elif document.status == 'cancelled' %}<span class="badge badge--gray">Отменён</span>
-                            {% else %}<span class="badge badge--gray">Черновик</span>{% endif %}
-                        </td>
-                        <td>{% if document.is_signed %}✓ {{ document.signed_date|date:'d.m.Y' }}{% else %}—{% endif %}</td>
-                        <td>{% if document.file %}<a href="{{ document.file.url }}" target="_blank" rel="noopener">Открыть</a>{% else %}—{% endif %}</td>
-                        <td><a href="{% url 'documents:update' document.pk %}" class="btn btn--secondary btn--sm">Изменить</a></td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Документов нет.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
         </div>
+    </div>
+
+    <div class="doc-list">
+        {% for item in checklist %}
+            <div class="doc-row {% if item.document %}doc-row--done{% endif %}">
+                <div class="doc-row__icon">
+                    {% if item.document %}✓{% else %}
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                    {% endif %}
+                </div>
+                <div class="doc-row__name">
+                    {{ item.type.name }}
+                    {% if item.type.required_for_delivery %}
+                        <span class="doc-row__req">обязательный</span>
+                    {% endif %}
+                    {% if item.document.number %}
+                        <div class="doc-row__meta">№ {{ item.document.number }}{% if item.document.document_date %} от {{ item.document.document_date|date:'d.m.Y' }}{% endif %}</div>
+                    {% endif %}
+                </div>
+                <div class="doc-row__status">
+                    {% if item.document %}
+                        {% if item.document.is_signed %}
+                            <span class="badge badge--green">✓ Подписан</span>
+                        {% elif item.document.status == 'awaiting' %}
+                            <span class="badge badge--yellow">Ожидает подписи</span>
+                        {% elif item.document.status == 'expired' %}
+                            <span class="badge badge--red">Истёк</span>
+                        {% elif item.document.status == 'cancelled' %}
+                            <span class="badge badge--gray">Отменён</span>
+                        {% else %}
+                            <span class="badge badge--blue">Загружен</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge badge--gray">Не загружен</span>
+                    {% endif %}
+                </div>
+                <div class="doc-row__actions">
+                    {% if item.document %}
+                        {% if item.document.file %}
+                            <a href="{{ item.document.file.url }}" target="_blank" rel="noopener" class="btn btn--secondary btn--sm">Открыть</a>
+                        {% endif %}
+                        <a href="{% url 'documents:update' item.document.pk %}" class="btn btn--secondary btn--sm">Изменить</a>
+                    {% else %}
+                        <a href="{% url 'documents:create' %}?project={{ project.pk }}&type={{ item.type.pk }}" class="btn btn--sm">Загрузить</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
     </div>
 {% elif tab == 'delivery' %}
     <div class="panel">

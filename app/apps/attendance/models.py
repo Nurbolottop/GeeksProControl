@@ -21,53 +21,6 @@ WEEKDAYS = [
 ]
 
 
-class MeetingPlan(TimeStampedModel):
-    """План собраний группы: какие собрания и сколько раз в неделю.
-
-    Например: PM со стажёрами — 2 раза в неделю (пн, чт);
-    тимлид со стажёрами — 1 раз (ср).
-    """
-
-    group = models.ForeignKey(
-        'flows.Group', on_delete=models.CASCADE, related_name='meeting_plans',
-        verbose_name='Группа',
-    )
-    kind = models.CharField(
-        'Вид собрания', max_length=20,
-        choices=MeetingKind.choices, default=MeetingKind.PM_INTERNS,
-    )
-    times_per_week = models.PositiveSmallIntegerField('Раз в неделю', default=1)
-    weekdays = models.CharField(
-        'Дни недели', max_length=20, blank=True,
-        help_text='Номера дней через запятую: 0 — понедельник, 6 — воскресенье',
-    )
-    host = models.ForeignKey(
-        'interns.Intern', on_delete=models.SET_NULL, related_name='hosted_plans',
-        verbose_name='Кто проводит', null=True, blank=True,
-    )
-    is_active = models.BooleanField('Действует', default=True)
-
-    class Meta:
-        verbose_name = 'План собраний'
-        verbose_name_plural = 'Планы собраний'
-        ordering = ['kind']
-
-    def __str__(self) -> str:
-        return f'{self.get_kind_display()} — {self.times_per_week}/нед.'
-
-    @property
-    def weekday_list(self) -> list[int]:
-        return [
-            int(value) for value in self.weekdays.split(',')
-            if value.strip().isdigit()
-        ]
-
-    @property
-    def weekday_labels(self) -> str:
-        names = dict(WEEKDAYS)
-        return ', '.join(names[day] for day in self.weekday_list if day in names)
-
-
 class GroupMeeting(TimeStampedModel):
     """Собрание группы: конкретная дата, по которой ведётся табель."""
 
@@ -79,10 +32,6 @@ class GroupMeeting(TimeStampedModel):
     group = models.ForeignKey(
         'flows.Group', on_delete=models.CASCADE, related_name='meetings',
         verbose_name='Группа',
-    )
-    plan = models.ForeignKey(
-        MeetingPlan, on_delete=models.SET_NULL, related_name='meetings',
-        verbose_name='План', null=True, blank=True,
     )
     kind = models.CharField(
         'Вид', max_length=20,
