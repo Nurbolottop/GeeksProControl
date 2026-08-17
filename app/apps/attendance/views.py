@@ -9,8 +9,10 @@ from django.utils import timezone
 
 from apps.attendance import overview, services
 from apps.attendance.models import GroupMeeting, MeetingKind
-from apps.flows.models import Group
+from apps.flows.models import Flow, Group
 from apps.interns.models import Intern
+from apps.projects.models import Project
+from django.db.models import Max
 
 
 class MeetingCreateForm(forms.Form):
@@ -200,3 +202,44 @@ def dashboard(request):
         'next_month': next_month,
         'today': timezone.localdate(),
     })
+
+
+class TeamCreateForm(forms.Form):
+    """Новая команда: проект, который она ведёт."""
+
+    project = forms.ModelChoiceField(
+        label='Проект команды', queryset=Project.objects.none(),
+        empty_label='Выберите проект',
+    )
+    name = forms.CharField(
+        label='Название (необязательно)', required=False, max_length=100,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['project'].queryset = (
+            Project.objects.active().filter(group__isnull=True).order_by('name')
+        )
+
+
+@login_required
+def team_create(request):
+    """Создание команды: поток подставляется автоматически."""
+    form = TeamCreateForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        project = form.cleaned_data['project']
+        flow = project.flow or Flow.objects.order_by('-number').first()
+        if flow is None:
+            flow = Flow.objects.create(number=1, status=Flow.Status.ACTIVE)
+        number = (flow.groups.aggregate(m=Max('number'))['m'] or 0) + 1
+        group = Group.objects.create(
+            flow=flow, number=number, project=project,
+            name=form.cleaned_data.get('name', ''),
+        )
+        if project.flow_id != flow.pk:
+            project.flow = flow
+            project.number_in_flow = number
+            project.save(update_fields=['flow', 'number_in_flow', 'updated_at'])
+        messages.success(request, f'Команда {group.code} создана.')
+        return redirect('flows:group_detail', pk=group.pk)
+    return render(request, 'attendance/team_form.html', {'form': form})
