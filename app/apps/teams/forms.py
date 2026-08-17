@@ -86,7 +86,37 @@ class TeamMemberForm(forms.ModelForm):
 
 
 class TeamMemberEditForm(TeamMemberForm):
-    """Редактирование участника: добавляются статус и даты участия."""
+    """Редактирование участника: добавляются статус и даты участия.
+
+    В списке — только люди подходящего направления: если меняем PM,
+    предлагаются PM, если бэкендера — бэкендеры.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        member = self.instance
+        if not member.pk:
+            return
+        # Направление, из которого выбираем замену
+        spec_by_role = {
+            value: key for key, value in ROLE_BY_SPECIALIZATION.items()
+        }
+        spec_name = spec_by_role.get(member.role)
+        if member.role == TeamRole.TEAM_LEAD and member.intern_id:
+            # Тимлида меняем на человека того же направления
+            spec = member.intern.specialization
+            spec_name = spec.name if spec else None
+        if spec_name:
+            queryset = self.fields['intern'].queryset.filter(
+                specialization__name=spec_name,
+            )
+            # Текущий участник всегда остаётся в списке
+            if member.intern_id:
+                queryset = queryset | self.fields['intern'].queryset.filter(
+                    pk=member.intern_id,
+                )
+            self.fields['intern'].queryset = queryset.distinct()
+            self.fields['intern'].help_text = f'Показаны только: {spec_name}'
 
     class Meta(TeamMemberForm.Meta):
         fields = [

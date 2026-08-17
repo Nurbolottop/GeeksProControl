@@ -10,6 +10,18 @@ from apps.teams import services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
 
+
+def people_options(form):
+    """Список людей для поля с поиском."""
+    return [
+        {
+            'id': person.pk,
+            'name': person.full_name,
+            'spec': str(person.specialization) if person.specialization_id else '',
+        }
+        for person in form.fields['intern'].queryset
+    ]
+
 User = get_user_model()
 
 
@@ -38,6 +50,7 @@ def member_add(request, project_pk):
     return render(
         request, 'teams/member_form.html',
         {'form': form, 'project': project, 'group': group,
+         'people': people_options(form),
          'title': 'Добавить участника'},
     )
 
@@ -62,6 +75,7 @@ def member_add_to_group(request, group_pk):
     return render(
         request, 'teams/member_form.html',
         {'form': form, 'group': group, 'project': group.project,
+         'people': people_options(form),
          'title': f'Добавить участника в группу {group.code}'},
     )
 
@@ -85,6 +99,9 @@ def member_edit(request, pk):
         request, 'teams/member_form.html',
         {
             'form': form, 'project': member.project, 'group': member.group,
+            'people': people_options(form),
+            'selected_id': member.intern_id,
+            'selected_name': member.person_name,
             'title': f'Редактирование: {member.person_name}',
         },
     )
