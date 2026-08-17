@@ -78,9 +78,9 @@
 
             <div class="nav-label">Люди</div>
             <div class="nav-group"
-                 x-data="{ open: {% if request.resolver_match.namespace == 'interns' or request.resolver_match.namespace == 'resources' or request.resolver_match.namespace == 'teams' %}true{% else %}false{% endif %} }">
+                 x-data="{ open: {% if request.resolver_match.namespace == 'interns' or request.resolver_match.namespace == 'resources' %}true{% else %}false{% endif %} }">
                 <button type="button" @click="open = !open"
-                        class="nav-item {% if request.resolver_match.namespace == 'interns' or request.resolver_match.namespace == 'resources' or request.resolver_match.namespace == 'teams' %}is-active{% endif %}">
+                        class="nav-item {% if request.resolver_match.namespace == 'interns' or request.resolver_match.namespace == 'resources' %}is-active{% endif %}">
                     <span class="nav-item__label">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
                         Стажёры
@@ -92,8 +92,6 @@
                        class="{% if request.resolver_match.url_name == 'forecast' %}is-active{% endif %}">По направлениям</a>
                     <a href="{% url 'interns:list' %}"
                        class="{% if request.resolver_match.namespace == 'interns' %}is-active{% endif %}">Все стажёры</a>
-                    <a href="{% url 'teams:overview' %}"
-                       class="{% if request.resolver_match.namespace == 'teams' %}is-active{% endif %}">Загрузка людей</a>
                     <a href="{% url 'resources:graduations' %}"
                        class="{% if request.resolver_match.url_name == 'graduations' %}is-active{% endif %}">Выпуски</a>
                 </div>

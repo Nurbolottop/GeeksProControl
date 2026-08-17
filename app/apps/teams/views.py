@@ -15,30 +15,8 @@ User = get_user_model()
 
 @login_required
 def team_overview(request):
-    """Страница «Команды»: люди и их суммарная загрузка (ТЗ §11)."""
-    people = []
-    memberships = (
-        TeamMember.objects.filter(status=TeamMember.Status.ACTIVE)
-        .select_related('project', 'user', 'intern')
-    )
-    by_person: dict[tuple, list[TeamMember]] = {}
-    for member in memberships:
-        key = ('u', member.user_id) if member.user_id else ('i', member.intern_id)
-        by_person.setdefault(key, []).append(member)
-    for member_list in by_person.values():
-        first = member_list[0]
-        total = sum(m.workload for m in member_list)
-        band, band_label = services.workload_band(total)
-        people.append({
-            'name': first.person_name,
-            'is_intern': first.intern_id is not None,
-            'total': total,
-            'band': band,
-            'band_label': band_label,
-            'memberships': member_list,
-        })
-    people.sort(key=lambda person: -person['total'])
-    return render(request, 'teams/overview.html', {'people': people})
+    """Страница загрузки убрана — данные видны в разделе «Стажёры»."""
+    return redirect('resources:forecast')
 
 
 @login_required
