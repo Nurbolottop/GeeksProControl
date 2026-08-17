@@ -18,8 +18,8 @@ class MeetingCreateForm(forms.Form):
 
     kind = forms.ChoiceField(label='Вид собрания', choices=MeetingKind.choices)
     host = forms.ModelChoiceField(
-        label='Кто проводит', queryset=Intern.objects.none(),
-        required=False, empty_label='Не указан',
+        label='Какой тимлид проводит', queryset=Intern.objects.none(),
+        required=False, empty_label='Любой / не указан',
     )
     topic = forms.CharField(
         label='Тема (необязательно)', required=False, max_length=255,
@@ -28,9 +28,13 @@ class MeetingCreateForm(forms.Form):
 
     def __init__(self, *args, group=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.group = group
         if group is not None:
+            # В списке — только тимлиды этой группы
             self.fields['host'].queryset = Intern.objects.filter(
                 team_memberships__group=group,
+                team_memberships__role='team_lead',
+                team_memberships__status='active',
             ).distinct().order_by('full_name')
 
 

@@ -13,7 +13,7 @@
         </div>
     </div>
 
-    <form method="post" class="panel">
+    <form method="post" class="panel" x-data="{ kind: 'pm_interns' }">
         {% csrf_token %}
         {% if form.non_field_errors %}
             <div class="message message--error">{{ form.non_field_errors }}</div>
@@ -21,7 +21,20 @@
 
         <div class="form-field">
             <label for="{{ form.kind.id_for_label }}">Вид собрания</label>
-            {{ form.kind }}
+            <select name="kind" id="{{ form.kind.id_for_label }}" x-model="kind">
+                {% for value, label in form.fields.kind.choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+            <div class="field-hint" x-show="kind !== 'lead_interns'">
+                Собрание проведёт PM группы — подставится автоматически
+            </div>
+        </div>
+
+        <div class="form-field" style="margin-top: 18px" x-show="kind === 'lead_interns'" x-cloak>
+            <label for="{{ form.host.id_for_label }}">Какой тимлид проводит</label>
+            {{ form.host }}
+            <div class="field-hint">В списке — тимлиды этой группы</div>
         </div>
 
         <div class="form-field" style="margin-top: 18px" x-data="{ extra: [] }">
@@ -47,10 +60,6 @@
         </div>
 
         <div class="form-row" style="margin-top: 18px">
-            <div class="form-field">
-                <label for="{{ form.host.id_for_label }}">Кто проводит</label>
-                {{ form.host }}
-            </div>
             <div class="form-field">
                 <label for="{{ form.topic.id_for_label }}">Тема</label>
                 {{ form.topic }}

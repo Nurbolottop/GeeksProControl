@@ -5,7 +5,7 @@ import datetime
 from django.db import transaction
 from django.utils import timezone
 
-from apps.attendance.models import Attendance, GroupMeeting
+from apps.attendance.models import Attendance, GroupMeeting, MeetingKind
 
 
 def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -13,17 +13,26 @@ def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
     return datetime.date(year, month, 1), datetime.date(year, month, last_day)
 
 
+def default_host(group, kind: str):
+    """Кто проводит собрание: PM или тимлид группы — по виду собрания."""
+    role = 'team_lead' if kind == MeetingKind.LEAD_INTERNS else 'pm'
+    member = group.members.filter(
+        role=role, status='active', intern__isnull=False,
+    ).select_related('intern').first()
+    return member.intern if member else None
+
+
 @transaction.atomic
 def create_meeting(
     group, kind: str, date: datetime.date, host=None, topic: str = '',
 ) -> GroupMeeting | None:
-    """Создаёт одно собрание на конкретную дату.
+    """Создаёт одно собрание на дату. Ведущий подставляется по виду собрания.
 
     Возвращает None, если такое собрание уже есть.
     """
     meeting, is_new = GroupMeeting.objects.get_or_create(
         group=group, kind=kind, date=date,
-        defaults={'host': host, 'topic': topic},
+        defaults={'host': host or default_host(group, kind), 'topic': topic},
     )
     return meeting if is_new else None
 
