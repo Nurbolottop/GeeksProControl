@@ -1,0 +1,68 @@
+"""Общий экран табеля: собрания и посещаемость по всем группам."""
+import datetime
+
+from django.utils import timezone
+
+from apps.attendance.models import Attendance, GroupMeeting
+from apps.attendance.services import month_bounds
+from apps.flows.models import Group
+
+
+def groups_summary(year: int, month: int) -> list[dict]:
+    """По каждой группе: собрания месяца, проведено, посещаемость."""
+    first, last = month_bounds(year, month)
+    groups = (
+        Group.objects.select_related('flow', 'project')
+        .prefetch_related('members')
+        .order_by('flow__number', 'number')
+    )
+    meetings = GroupMeeting.objects.filter(date__gte=first, date__lte=last)
+    marks = Attendance.objects.filter(meeting__in=meetings).select_related('meeting')
+
+    by_group_meetings: dict[int, list] = {}
+    for meeting in meetings:
+        by_group_meetings.setdefault(meeting.group_id, []).append(meeting)
+    by_group_marks: dict[int, list] = {}
+    for mark in marks:
+        by_group_marks.setdefault(mark.meeting.group_id, []).append(mark)
+
+    rows = []
+    for group in groups:
+        group_meetings = by_group_meetings.get(group.pk, [])
+        group_marks = by_group_marks.get(group.pk, [])
+        held = sum(
+            1 for meeting in group_meetings
+            if meeting.status == GroupMeeting.Status.HELD
+        )
+        attended = sum(1 for mark in group_marks if mark.is_attended)
+        rows.append({
+            'group': group,
+            'people': sum(
+                1 for member in group.members.all() if member.status == 'active'
+            ),
+            'meetings': len(group_meetings),
+            'held': held,
+            'rate': round(attended / len(group_marks) * 100) if group_marks else None,
+        })
+    return rows
+
+
+def today_meetings() -> list[GroupMeeting]:
+    """Собрания на сегодня по всем группам."""
+    return list(
+        GroupMeeting.objects.filter(date=timezone.localdate())
+        .select_related('group', 'group__project', 'group__flow', 'host')
+        .order_by('group__flow__number', 'group__number'),
+    )
+
+
+def week_meetings() -> list[GroupMeeting]:
+    """Ближайшие собрания на неделю вперёд."""
+    today = timezone.localdate()
+    return list(
+        GroupMeeting.objects.filter(
+            date__gt=today, date__lte=today + datetime.timedelta(days=7),
+        )
+        .select_related('group', 'group__project', 'host')
+        .order_by('date'),
+    )

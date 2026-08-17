@@ -5,6 +5,7 @@ from apps.attendance import views
 app_name = 'attendance'
 
 urlpatterns = [
+    path('', views.dashboard, name='dashboard'),
     path('groups/<int:pk>/', views.group_sheet, name='group_sheet'),
     path('groups/<int:pk>/meetings/create/', views.meeting_create,
          name='meeting_create'),

@@ -7,7 +7,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from apps.attendance import services
+from apps.attendance import overview, services
 from apps.attendance.models import GroupMeeting, MeetingKind
 from apps.flows.models import Group
 from apps.interns.models import Intern
@@ -171,3 +171,32 @@ def meeting_mark_all(request, pk):
         f'/attendance/groups/{meeting.group.pk}/'
         f'?year={meeting.date.year}&month={meeting.date.month}',
     )
+
+
+@login_required
+def dashboard(request):
+    """Табель: собрания сегодня и посещаемость по всем группам."""
+    year, month = _period(request)
+    current = datetime.date(year, month, 1)
+    prev_month = (current - datetime.timedelta(days=1)).replace(day=1)
+    next_month = (current + datetime.timedelta(days=32)).replace(day=1)
+
+    rows = overview.groups_summary(year, month)
+    total_meetings = sum(row['meetings'] for row in rows)
+    total_held = sum(row['held'] for row in rows)
+    rates = [row['rate'] for row in rows if row['rate'] is not None]
+
+    return render(request, 'attendance/dashboard.html', {
+        'rows': rows,
+        'today_meetings': overview.today_meetings(),
+        'week_meetings': overview.week_meetings(),
+        'total_meetings': total_meetings,
+        'total_held': total_held,
+        'average_rate': round(sum(rates) / len(rates)) if rates else None,
+        'year': year,
+        'month': month,
+        'current': current,
+        'prev_month': prev_month,
+        'next_month': next_month,
+        'today': timezone.localdate(),
+    })
