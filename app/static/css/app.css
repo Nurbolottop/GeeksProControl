@@ -1102,6 +1102,26 @@ a:hover { color: var(--accent-dark); }
 .att-mark--late { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
 .att-mark--excused { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
 
+/* ---- Кнопки отметки на собрании ---- */
+.mark-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.mark-btn {
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .12s ease;
+}
+.mark-btn:hover { border-color: var(--accent); color: var(--text); }
+.mark-btn--present.is-on { background: var(--green-bg); border-color: var(--green-line); color: var(--green); }
+.mark-btn--absent.is-on { background: var(--red-bg); border-color: var(--red-line); color: var(--red); }
+.mark-btn--late.is-on { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
+.mark-btn--excused.is-on { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
+
 /* ---- Собрания в табеле ---- */
 .today-meeting {
     display: flex;

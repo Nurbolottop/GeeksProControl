@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.attendance import overview, services
-from apps.attendance.models import GroupMeeting, MeetingKind
+from apps.attendance.models import Attendance, GroupMeeting, MeetingKind
 from apps.flows.models import Flow, Group
 from apps.interns.models import Intern
 from apps.projects.models import Project
@@ -139,9 +139,7 @@ def meeting_delete(request, pk):
     if request.method == 'POST':
         meeting.delete()
         messages.success(request, 'Собрание удалено.')
-    return redirect(
-        f'/attendance/groups/{group.pk}/?year={date.year}&month={date.month}',
-    )
+    return redirect('attendance:group_meetings', pk=group.pk)
 
 
 @login_required
@@ -169,10 +167,7 @@ def meeting_mark_all(request, pk):
     if request.method == 'POST':
         created = services.mark_all_present(meeting, user=request.user)
         messages.success(request, f'Отмечено присутствующих: {created}.')
-    return redirect(
-        f'/attendance/groups/{meeting.group.pk}/'
-        f'?year={meeting.date.year}&month={meeting.date.month}',
-    )
+    return redirect('attendance:meeting_detail', pk=meeting.pk)
 
 
 @login_required
@@ -243,3 +238,102 @@ def team_create(request):
         messages.success(request, f'Команда {group.code} создана.')
         return redirect('flows:group_detail', pk=group.pk)
     return render(request, 'attendance/team_form.html', {'form': form})
+
+
+@login_required
+def group_meetings(request, pk):
+    """Список собраний команды: отсюда заходят отмечать."""
+    group = get_object_or_404(
+        Group.objects.select_related('flow', 'project'), pk=pk,
+    )
+    meetings = list(
+        group.meetings.select_related('host')
+        .prefetch_related('attendance')
+        .order_by('-date'),
+    )
+    people = group.members.filter(
+        status='active', intern__isnull=False,
+    ).count()
+    for meeting in meetings:
+        marks = list(meeting.attendance.all())
+        meeting.marked_count = len(marks)
+        meeting.attended_count = sum(1 for mark in marks if mark.is_attended)
+    return render(request, 'attendance/group_meetings.html', {
+        'group': group,
+        'meetings': meetings,
+        'people': people,
+        'today': timezone.localdate(),
+    })
+
+
+@login_required
+def meeting_detail(request, pk):
+    """Одно собрание: список людей команды и отметки."""
+    meeting = get_object_or_404(
+        GroupMeeting.objects.select_related('group', 'group__project', 'host'),
+        pk=pk,
+    )
+    members = list(
+        meeting.group.members.select_related('intern__specialization')
+        .filter(intern__isnull=False)
+        .order_by('role', 'intern__full_name'),
+    )
+    marks = {
+        mark.intern_id: mark for mark in meeting.attendance.all()
+    }
+    rows = []
+    for member in members:
+        mark = marks.get(member.intern_id)
+        rows.append({
+            'member': member,
+            'intern': member.intern,
+            'status': mark.status if mark else '',
+        })
+    attended = sum(
+        1 for row in rows
+        if row['status'] in ('present', 'late')
+    )
+    marked = sum(1 for row in rows if row['status'])
+    return render(request, 'attendance/meeting_detail.html', {
+        'meeting': meeting,
+        'group': meeting.group,
+        'rows': rows,
+        'marked': marked,
+        'attended': attended,
+        'rate': round(attended / marked * 100) if marked else None,
+        'statuses': Attendance.Status.choices,
+    })
+
+
+@login_required
+def mark_person(request, pk):
+    """AJAX: отметка человека на собрании конкретным статусом."""
+    meeting = get_object_or_404(GroupMeeting, pk=pk)
+    if request.method != 'POST':
+        raise Http404
+    intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
+    status = request.POST.get('status', '')
+
+    mark = Attendance.objects.filter(meeting=meeting, intern=intern).first()
+    if status in Attendance.Status.values:
+        if mark:
+            mark.status = status
+            mark.marked_by = request.user
+            mark.save(update_fields=['status', 'marked_by', 'updated_at'])
+        else:
+            Attendance.objects.create(
+                meeting=meeting, intern=intern, status=status,
+                marked_by=request.user,
+            )
+        if meeting.status == GroupMeeting.Status.PLANNED:
+            meeting.status = GroupMeeting.Status.HELD
+            meeting.save(update_fields=['status', 'updated_at'])
+    elif mark:
+        mark.delete()
+        status = ''
+
+    return render(request, 'attendance/partials/person_row.html', {
+        'meeting': meeting,
+        'row': {'intern': intern, 'status': status,
+                'member': meeting.group.members.filter(intern=intern).first()},
+    })

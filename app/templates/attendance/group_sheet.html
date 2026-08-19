@@ -7,7 +7,7 @@
     <div>
         <h1>Табель группы {{ group.code }}</h1>
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
-            <a href="{{ group.get_absolute_url }}" class="badge badge--gray">← Состав группы</a>
+            <a href="{% url 'attendance:group_meetings' group.pk %}" class="badge badge--gray">← Собрания команды</a>
             {% if group.project %}<a href="{{ group.project.get_absolute_url }}" class="badge badge--gray">{{ group.project.name }}</a>{% endif %}
             {% if sheet.rate is not None %}
                 <span class="badge badge--{% if sheet.rate >= 80 %}green{% elif sheet.rate >= 60 %}yellow{% else %}red{% endif %}">

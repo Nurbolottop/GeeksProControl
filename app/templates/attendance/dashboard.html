@@ -37,7 +37,7 @@
     {% for meeting in today_meetings %}
         <div class="today-meeting">
             <div class="today-meeting__info">
-                <a href="{% url 'attendance:group_sheet' meeting.group.pk %}">
+                <a href="{% url 'attendance:group_meetings' meeting.group.pk %}">
                     <strong>Группа {{ meeting.group.code }}</strong>
                 </a>
                 <span>
@@ -52,7 +52,7 @@
                 {% else %}
                     <span class="badge badge--yellow">Не отмечено</span>
                 {% endif %}
-                <a href="{% url 'attendance:group_sheet' meeting.group.pk %}?year={{ meeting.date.year }}&month={{ meeting.date.month }}"
+                <a href="{% url 'attendance:meeting_detail' meeting.pk %}"
                    class="btn btn--sm">Отметить</a>
             </div>
         </div>
@@ -101,8 +101,8 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="{% url 'attendance:group_sheet' row.group.pk %}?year={{ year }}&month={{ month }}"
-                           class="btn btn--secondary btn--sm">Табель</a>
+                        <a href="{% url 'attendance:group_meetings' row.group.pk %}"
+                           class="btn btn--secondary btn--sm">Открыть</a>
                     </td>
                 </tr>
             {% empty %}
@@ -127,7 +127,7 @@
                         {% if meeting.group.project %} · {{ meeting.group.project.name }}{% endif %}
                     </span>
                 </div>
-                <a href="{% url 'attendance:group_sheet' meeting.group.pk %}?year={{ meeting.date.year }}&month={{ meeting.date.month }}"
+                <a href="{% url 'attendance:meeting_detail' meeting.pk %}"
                    class="btn btn--secondary btn--sm">Открыть</a>
             </div>
         {% endfor %}
