@@ -88,3 +88,88 @@ class DailyCheckTests(TestCase):
         response = self.client.get(reverse('dailycheck:index'))
         self.assertTrue(response.context['cards'])
         self.assertContains(response, 'На что смотреть сегодня')
+
+
+class ProjectDailyTests(TestCase):
+    """Ежедневная проверка внутри проекта."""
+
+    def setUp(self):
+        from apps.projects.models import Project
+        from apps.projects.services import create_project
+
+        self.user = User.objects.create_user(username="pm", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Туризм"))
+        self.today = timezone.localdate()
+
+    def test_default_items_created_per_project(self):
+        from apps.dailycheck.models import ProjectCheckItem
+
+        response = self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
+        self.assertEqual(response.status_code, 200)
+        items = ProjectCheckItem.objects.filter(project=self.project)
+        self.assertTrue(items.exists())
+        self.assertContains(response, "Команда на месте")
+
+    def test_same_default_set_for_another_project(self):
+        from apps.dailycheck.models import ProjectCheckItem
+        from apps.projects.models import Project
+        from apps.projects.services import create_project
+
+        other = create_project(Project(name="Учкун"))
+        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
+        self.client.get(f"{other.get_absolute_url()}?tab=daily")
+        first = set(ProjectCheckItem.objects.filter(
+            project=self.project).values_list("title", flat=True))
+        second = set(ProjectCheckItem.objects.filter(
+            project=other).values_list("title", flat=True))
+        self.assertEqual(first, second)
+
+    def test_toggle_and_untoggle(self):
+        from apps.dailycheck.models import ProjectCheckItem, ProjectCheckMark
+
+        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
+        item = ProjectCheckItem.objects.filter(project=self.project).first()
+        url = reverse("dailycheck:project_toggle", args=[item.pk])
+        self.client.post(url, {"date": self.today.isoformat()})
+        self.assertTrue(ProjectCheckMark.objects.filter(item=item).exists())
+        self.client.post(url, {"date": self.today.isoformat()})
+        self.assertFalse(ProjectCheckMark.objects.filter(item=item).exists())
+
+    def test_item_removed_only_from_this_project(self):
+        from apps.dailycheck.models import ProjectCheckItem
+        from apps.projects.models import Project
+        from apps.projects.services import create_project
+
+        other = create_project(Project(name="Учкун"))
+        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
+        self.client.get(f"{other.get_absolute_url()}?tab=daily")
+        item = ProjectCheckItem.objects.filter(project=self.project).first()
+        self.client.post(reverse("dailycheck:project_item_delete", args=[item.pk]))
+        item.refresh_from_db()
+        self.assertFalse(item.is_active)
+        self.assertTrue(ProjectCheckItem.objects.filter(
+            project=other, title=item.title, is_active=True).exists())
+
+    def test_custom_item_added_to_project(self):
+        from apps.dailycheck.models import ProjectCheckItem
+
+        self.client.post(
+            reverse("dailycheck:project_item_create", args=[self.project.pk]),
+            {"title": "Очередь заявок пустая"},
+        )
+        self.assertTrue(ProjectCheckItem.objects.filter(
+            project=self.project, title="Очередь заявок пустая").exists())
+
+    def test_tab_badge_counts_unchecked(self):
+        from apps.dailycheck.models import ProjectCheckItem
+
+        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
+        total = ProjectCheckItem.objects.filter(project=self.project).count()
+        item = ProjectCheckItem.objects.filter(project=self.project).first()
+        self.client.post(
+            reverse("dailycheck:project_toggle", args=[item.pk]),
+            {"date": self.today.isoformat()},
+        )
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(response.context["daily_left"], total - 1)

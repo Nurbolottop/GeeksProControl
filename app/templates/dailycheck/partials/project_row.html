@@ -1,0 +1,33 @@
+<div class="check-row {% if row.is_done %}is-done{% endif %}" id="pcheck-{{ row.item.pk }}">
+    <button type="button" class="check-box"
+            title="{% if row.is_done %}Снять отметку{% else %}Отметить проверенным{% endif %}"
+            hx-post="{% url 'dailycheck:project_toggle' row.item.pk %}"
+            hx-vals='{"date": "{{ row.date|date:"Y-m-d" }}"}'
+            hx-target="#pcheck-{{ row.item.pk }}" hx-swap="outerHTML">
+        {% if row.is_done %}✓{% endif %}
+    </button>
+    <div class="check-row__body">
+        <div class="check-row__title">{{ row.item.title }}</div>
+        {% if row.item.hint %}
+            <div class="check-row__hint">{{ row.item.hint }}</div>
+        {% endif %}
+        {% if row.mark and row.mark.checked_by and row.is_done %}
+            <div class="check-row__by">
+                отметил {{ row.mark.checked_by.display_name|default:row.mark.checked_by.username }}
+                в {{ row.mark.created_at|date:'H:i' }}
+            </div>
+        {% endif %}
+    </div>
+    <input type="text" class="check-note" name="note" autocomplete="off"
+           placeholder="что заметил" value="{{ row.note }}" maxlength="255"
+           hx-post="{% url 'dailycheck:project_note' row.item.pk %}"
+           hx-trigger="change"
+           hx-include="this"
+           hx-vals='{"date": "{{ row.date|date:"Y-m-d" }}"}'
+           hx-target="#pcheck-{{ row.item.pk }}" hx-swap="outerHTML">
+    <form method="post" action="{% url 'dailycheck:project_item_delete' row.item.pk %}"
+          style="margin:0" onsubmit="return confirm('Убрать пункт «{{ row.item.title|escapejs }}» из ежедневной проверки проекта?')">
+        {% csrf_token %}
+        <button type="submit" class="check-remove" title="Убрать пункт">✕</button>
+    </form>
+</div>

@@ -25,6 +25,9 @@
     <a href="?tab=team" class="{% if tab == 'team' %}is-active{% endif %}">Команда</a>
     <a href="?tab=documents" class="{% if tab == 'documents' %}is-active{% endif %}">Документы</a>
     <a href="?tab=access" class="{% if tab == 'access' %}is-active{% endif %}">Доступы</a>
+    <a href="?tab=daily" class="{% if tab == 'daily' %}is-active{% endif %}">
+        Ежедневно{% if daily_left %}<span class="tab-count">{{ daily_left }}</span>{% endif %}
+    </a>
     <a href="?tab=history" class="{% if tab == 'history' %}is-active{% endif %}">История</a>
     {% if project.group %}
         <a href="{% url 'attendance:group_meetings' project.group.pk %}" class="tabs__link">Табель →</a>
@@ -256,6 +259,8 @@
             </div>
         {% endfor %}
     </div>
+{% elif tab == 'daily' %}
+    {% include 'projects/partials/tab_daily.html' %}
 {% elif tab == 'history' %}
     <div class="panel">
         <h2>История изменений</h2>

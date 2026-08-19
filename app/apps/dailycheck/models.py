@@ -93,3 +93,77 @@ def ensure_default_items() -> None:
         CheckItem(block=block, title=title, hint=hint, order=(index + 1) * 10)
         for index, (block, title, hint) in enumerate(DEFAULT_ITEMS)
     ])
+
+
+class ProjectCheckItem(TimeStampedModel):
+    """Ежедневный пункт по конкретному проекту.
+
+    Набор у всех проектов одинаковый, но лишнее можно убрать,
+    а своё — добавить.
+    """
+
+    project = models.ForeignKey(
+        'projects.Project', on_delete=models.CASCADE,
+        related_name='daily_items', verbose_name='Проект',
+    )
+    title = models.CharField('Пункт', max_length=200)
+    hint = models.CharField('Пояснение', max_length=255, blank=True)
+    order = models.PositiveSmallIntegerField('Порядок', default=100)
+    is_active = models.BooleanField('Показывать', default=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Ежедневный пункт проекта'
+        verbose_name_plural = 'Ежедневные пункты проектов'
+        ordering = ['order', 'pk']
+
+    def __str__(self) -> str:
+        return f'{self.project.code}: {self.title}'
+
+
+class ProjectCheckMark(TimeStampedModel):
+    """Отметка по ежедневному пункту проекта за день."""
+
+    date = models.DateField('Дата', db_index=True)
+    item = models.ForeignKey(
+        ProjectCheckItem, on_delete=models.CASCADE, related_name='marks',
+        verbose_name='Пункт',
+    )
+    is_done = models.BooleanField('Проверено', default=True)
+    note = models.CharField('Что заметил', max_length=255, blank=True)
+    checked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Проверил', null=True, blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Отметка по проекту'
+        verbose_name_plural = 'Ежедневные отметки по проектам'
+        unique_together = [('date', 'item')]
+        ordering = ['-date']
+
+    def __str__(self) -> str:
+        return f'{self.date:%d.%m.%Y} — {self.item.title}'
+
+
+# Одинаковый стартовый набор для каждого проекта
+PROJECT_DEFAULT_ITEMS = [
+    ('Команда на месте', 'Все вышли, никто не пропал без предупреждения'),
+    ('Вчерашнее собрание отмечено', 'ПМ проставил посещаемость в табеле'),
+    ('Задачи двигаются', 'Нет задач, висящих в работе несколько дней'),
+    ('Код залит в репозиторий', 'Вчерашняя работа закоммичена'),
+    ('Сроки этапа не горят', 'До дедлайна текущего этапа есть запас'),
+    ('Клиент на связи', 'Ответы даны, ожиданий без ответа нет'),
+    ('Блокеры сняты', 'Что мешает работать — доступы, задачи, решения'),
+]
+
+
+def ensure_project_items(project) -> None:
+    """Разворачивает стандартный набор пунктов для проекта."""
+    if ProjectCheckItem.objects.filter(project=project).exists():
+        return
+    ProjectCheckItem.objects.bulk_create([
+        ProjectCheckItem(
+            project=project, title=title, hint=hint, order=(index + 1) * 10,
+        )
+        for index, (title, hint) in enumerate(PROJECT_DEFAULT_ITEMS)
+    ])

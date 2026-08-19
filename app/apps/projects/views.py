@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -114,6 +116,22 @@ def project_move_stage(request, pk):
     return HttpResponse(status=204)
 
 
+def _daily_left(project) -> int:
+    """Сколько ежедневных пунктов проекта ещё не отмечено сегодня."""
+    from apps.dailycheck.models import ProjectCheckItem, ProjectCheckMark
+
+    total = ProjectCheckItem.objects.filter(
+        project=project, is_active=True,
+    ).count()
+    if not total:
+        return 0
+    done = ProjectCheckMark.objects.filter(
+        item__project=project, item__is_active=True,
+        date=timezone.localdate(), is_done=True,
+    ).count()
+    return max(total - done, 0)
+
+
 @login_required
 def project_detail(request, pk):
     project = get_object_or_404(
@@ -130,6 +148,7 @@ def project_detail(request, pk):
         'stages': project.stages.all(),
         'history': project.history.select_related('user')[:50],
         'today': timezone.localdate(),
+        'daily_left': _daily_left(project),
     }
     if tab == 'tasks':
         from apps.tasks.models import TaskStatus
@@ -168,6 +187,20 @@ def project_detail(request, pk):
         ]
         context['documents'] = documents
         context['doc_progress'] = doc_services.document_progress(project)
+    elif tab == 'daily':
+        from apps.dailycheck import views as daily_views
+        day = daily_views._day(request)
+        rows = daily_views.project_rows(project, day)
+        done = sum(1 for row in rows if row['is_done'])
+        context.update({
+            'daily_rows': rows,
+            'daily_day': day,
+            'daily_done': done,
+            'daily_all_done': rows and done >= len(rows),
+            'daily_is_today': day == timezone.localdate(),
+            'daily_prev': day - datetime.timedelta(days=1),
+            'daily_next': day + datetime.timedelta(days=1),
+        })
     elif tab == 'overview':
         # Завершение проекта живёт в «Обзоре» — там же его проверки
         from apps.projects import delivery

@@ -1,0 +1,63 @@
+{% comment %}Ежедневная проверка по проекту: одинаковый набор у всех, лишнее убирается.{% endcomment %}
+<div class="panel" style="padding: 0;">
+    <div class="panel-bar">
+        <h2 style="margin:0">Ежедневно — {{ daily_day|date:'d.m.Y, l' }}</h2>
+        <span class="panel-bar__note">
+            {% if daily_all_done %}
+                <span class="badge badge--green">✓ всё проверено</span>
+            {% else %}
+                Проверено {{ daily_done }} из {{ daily_rows|length }}
+            {% endif %}
+        </span>
+    </div>
+    <div style="padding: 0 20px 6px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <a href="?tab=daily&date={{ daily_prev|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">‹ {{ daily_prev|date:'d.m' }}</a>
+        {% if not daily_is_today %}
+            <a href="?tab=daily&date={{ daily_next|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">{{ daily_next|date:'d.m' }} ›</a>
+            <a href="?tab=daily" class="badge badge--yellow">← сегодня</a>
+        {% endif %}
+        <span style="font-size:12px; color: var(--text-muted)">
+            Отметки хранятся по дням — завтра список снова чистый.
+        </span>
+    </div>
+    <div class="check-list" style="padding: 0 20px 16px">
+        {% for row in daily_rows %}
+            {% include 'dailycheck/partials/project_row.html' %}
+        {% empty %}
+            <div class="empty" style="text-align:center; padding: 24px;">
+                Все пункты убраны — добавьте свои ниже.
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="panel" x-data="{ open: false }">
+    <div class="panel-head">
+        <h2>Свой пункт по проекту</h2>
+        <button type="button" class="btn btn--secondary btn--sm" @click="open = !open"
+                x-text="open ? 'Отмена' : '+ Добавить пункт'"></button>
+    </div>
+    <form method="post" action="{% url 'dailycheck:project_item_create' project.pk %}"
+          x-show="open" x-cloak>
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-field">
+                <label for="pcheck-title">Что проверять каждый день</label>
+                <input type="text" id="pcheck-title" name="title" autocomplete="off"
+                       placeholder="Например: очередь заявок в админке пустая">
+            </div>
+            <div class="form-field">
+                <label for="pcheck-hint">Пояснение (необязательно)</label>
+                <input type="text" id="pcheck-hint" name="hint" autocomplete="off"
+                       placeholder="На что именно смотреть">
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">Добавить</button>
+        </div>
+    </form>
+    <div x-show="!open" class="sub" style="color: var(--text-muted); font-size: 12.5px">
+        Набор пунктов у всех проектов одинаковый — лишние убираются крестиком,
+        свои добавляются только в этот проект.
+    </div>
+</div>
