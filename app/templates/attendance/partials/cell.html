@@ -12,4 +12,8 @@
         {% elif cell.status == 'excused' %}У
         {% endif %}
     </button>
+    {% if cell.score is not None %}
+        <div class="att-score att-score--{% if cell.score >= 8 %}high{% elif cell.score >= 5 %}mid{% else %}low{% endif %}"
+             title="Активность за период до {{ cell.meeting.date|date:'d.m.Y' }}">{{ cell.score }}</div>
+    {% endif %}
 </td>

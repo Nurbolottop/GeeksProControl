@@ -1,6 +1,7 @@
 import datetime
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 from apps.common.models import TimeStampedModel
@@ -75,6 +76,32 @@ class GroupMeeting(TimeStampedModel):
         attended = sum(1 for mark in marks if mark.is_attended)
         return round(attended / len(marks) * 100)
 
+    @property
+    def previous(self):
+        """Предыдущее собрание того же вида в этой команде."""
+        return (
+            GroupMeeting.objects
+            .filter(group_id=self.group_id, kind=self.kind, date__lt=self.date)
+            .order_by('-date')
+            .first()
+        )
+
+    @property
+    def period_start(self) -> datetime.date | None:
+        """С какой даты оцениваем работу — с прошлого собрания."""
+        previous = self.previous
+        return previous.date if previous else None
+
+    @property
+    def period_days(self) -> int | None:
+        start = self.period_start
+        return (self.date - start).days if start else None
+
+    @property
+    def average_score(self):
+        scores = [item.score for item in self.scores.all()]
+        return round(sum(scores) / len(scores), 1) if scores else None
+
 
 class Attendance(TimeStampedModel):
     """Отметка посещения конкретного собрания."""
@@ -117,3 +144,42 @@ class Attendance(TimeStampedModel):
     @property
     def is_attended(self) -> bool:
         return self.status in (self.Status.PRESENT, self.Status.LATE)
+
+
+class WorkScore(TimeStampedModel):
+    """Оценка работы человека за период между собраниями: от 0 до 10."""
+
+    MAX = 10
+    SCALE = list(range(MAX + 1))
+
+    meeting = models.ForeignKey(
+        GroupMeeting, on_delete=models.CASCADE, related_name='scores',
+        verbose_name='Собрание',
+    )
+    intern = models.ForeignKey(
+        'interns.Intern', on_delete=models.CASCADE, related_name='work_scores',
+        verbose_name='Человек',
+    )
+    score = models.PositiveSmallIntegerField(
+        'Балл', validators=[MinValueValidator(0), MaxValueValidator(MAX)],
+    )
+    comment = models.CharField('Комментарий', max_length=255, blank=True)
+    marked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Оценил', null=True, blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Оценка работы'
+        verbose_name_plural = 'Оценки работы'
+        unique_together = [('meeting', 'intern')]
+
+    def __str__(self) -> str:
+        return f'{self.intern} — {self.meeting}: {self.score}/{self.MAX}'
+
+    @property
+    def level(self) -> str:
+        """Для подсветки: high / mid / low."""
+        if self.score >= 8:
+            return 'high'
+        return 'mid' if self.score >= 5 else 'low'

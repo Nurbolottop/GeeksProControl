@@ -30,6 +30,10 @@
         <div class="kpi-card__value">{% if average_rate is not None %}{{ average_rate }}%{% else %}—{% endif %}</div>
         <div class="kpi-card__label">Средняя посещаемость</div>
     </div>
+    <div class="kpi-card kpi-card--info">
+        <div class="kpi-card__value">{% if average_activity is not None %}{{ average_activity }}{% else %}—{% endif %}</div>
+        <div class="kpi-card__label">Средняя активность из 10</div>
+    </div>
 </div>
 
 <div class="panel">
@@ -78,6 +82,7 @@
                 <th>Собраний</th>
                 <th>Проведено</th>
                 <th>Посещаемость</th>
+                <th>Активность</th>
                 <th></th>
             </tr>
             </thead>
@@ -101,12 +106,19 @@
                         {% endif %}
                     </td>
                     <td>
+                        {% if row.activity is not None %}
+                            <span class="badge badge--{% if row.activity >= 8 %}green{% elif row.activity >= 5 %}yellow{% else %}red{% endif %}">{{ row.activity }} из 10</span>
+                        {% else %}
+                            <span class="badge badge--gray">нет оценок</span>
+                        {% endif %}
+                    </td>
+                    <td>
                         <a href="{% url 'attendance:group_meetings' row.group.pk %}"
                            class="btn btn--secondary btn--sm">Открыть</a>
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">
+                <tr><td colspan="8" class="empty" style="text-align:center; padding: 24px;">
                     Команд пока нет — создайте группы в потоке.
                 </td></tr>
             {% endfor %}

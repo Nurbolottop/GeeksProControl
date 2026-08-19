@@ -15,6 +15,11 @@
                     Посещаемость: {{ rate }}%
                 </span>
             {% endif %}
+            {% if average_score is not None %}
+                <span class="badge badge--{% if average_score >= 8 %}green{% elif average_score >= 5 %}yellow{% else %}red{% endif %}">
+                    Средний балл: {{ average_score }}
+                </span>
+            {% endif %}
         </div>
     </div>
     <div class="page-actions">
@@ -25,29 +30,82 @@
     </div>
 </div>
 
-<div class="panel" style="padding: 0;">
-    <div style="padding: 18px 24px 0; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-        <h2 style="margin:0">Отметки ({{ marked }} из {{ rows|length }})</h2>
-        <span style="font-size:12.5px; color: var(--text-muted)">Присутствовали: {{ attended }}</span>
+<div x-data="{ tab: '{{ tab }}' }">
+    <div class="tabs">
+        <a href="#" @click.prevent="tab='marks'" :class="tab === 'marks' && 'is-active'">
+            Посещаемость <span class="tab-count">{{ marked }}/{{ rows|length }}</span>
+        </a>
+        <a href="#" @click.prevent="tab='scores'" :class="tab === 'scores' && 'is-active'">
+            Оценка работы <span class="tab-count">{{ scored }}/{{ rows|length }}</span>
+        </a>
     </div>
-    <div class="table-wrap">
-        <table class="data">
-            <thead>
-            <tr>
-                <th>Человек</th>
-                <th>Отметка</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for row in rows %}
-                {% include 'attendance/partials/person_row.html' %}
-            {% empty %}
-                <tr><td colspan="2" class="empty" style="text-align:center; padding: 24px;">
-                    В команде нет людей.
-                </td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
+
+    <div x-show="tab === 'marks'" x-cloak>
+        <div class="panel" style="padding: 0;">
+            <div class="panel-bar">
+                <h2 style="margin:0">Кто был на собрании</h2>
+                <span class="panel-bar__note">Отмечено {{ marked }} из {{ rows|length }} · присутствовали {{ attended }}</span>
+            </div>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                    <tr>
+                        <th>Человек</th>
+                        <th>Отметка</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in rows %}
+                        {% include 'attendance/partials/person_row.html' %}
+                    {% empty %}
+                        <tr><td colspan="2" class="empty" style="text-align:center; padding: 24px;">
+                            В команде нет людей.
+                        </td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="tab === 'scores'" x-cloak>
+        <div class="panel" style="padding: 0;">
+            <div class="panel-bar">
+                <h2 style="margin:0">Как работал за период</h2>
+                <span class="panel-bar__note">
+                    {% if period_start %}
+                        с {{ period_start|date:'d.m.Y' }} по {{ meeting.date|date:'d.m.Y' }} · {{ period_days }} дн.
+                    {% else %}
+                        первое собрание этого вида — с начала работы по {{ meeting.date|date:'d.m.Y' }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="score-hint">
+                Балл от 0 до 10 за работу над проектом с прошлого собрания.
+                <strong>0–4</strong> — не тянет, <strong>5–7</strong> — норма, <strong>8–10</strong> — сильно.
+                Повторный клик по баллу снимает оценку.
+            </div>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                    <tr>
+                        <th>Человек</th>
+                        <th>Балл за период</th>
+                        <th>Комментарий</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in rows %}
+                        {% include 'attendance/partials/score_row.html' %}
+                    {% empty %}
+                        <tr><td colspan="3" class="empty" style="text-align:center; padding: 24px;">
+                            В команде нет людей.
+                        </td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

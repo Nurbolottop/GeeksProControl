@@ -1122,6 +1122,78 @@ a:hover { color: var(--accent-dark); }
 .mark-btn--late.is-on { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
 .mark-btn--excused.is-on { background: var(--blue-bg); border-color: var(--blue-line); color: var(--blue); }
 
+/* ---- Оценка работы за период ---- */
+.panel-bar {
+    padding: 18px 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.panel-bar__note { font-size: 12.5px; color: var(--text-muted); }
+.tab-count {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, .07);
+    font-size: 11px;
+    font-weight: 700;
+}
+.score-hint {
+    margin: 14px 24px 0;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-soft, #f4f5f9);
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    color: var(--text-muted);
+}
+.score-hint strong { color: var(--text); }
+.score-scale { display: flex; gap: 4px; flex-wrap: wrap; }
+.score-btn {
+    width: 32px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .12s ease;
+}
+.score-btn:hover { border-color: var(--accent); color: var(--text); }
+.score-btn--low.is-on { background: var(--red-bg); border-color: var(--red-line); color: var(--red); }
+.score-btn--mid.is-on { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
+.score-btn--high.is-on { background: var(--green-bg); border-color: var(--green-line); color: var(--green); }
+.score-btn.is-on { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.score-note {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    font-family: inherit;
+    font-size: 12.5px;
+    color: var(--text);
+}
+.score-note:focus { outline: none; border-color: var(--accent); }
+.att-score {
+    margin: 4px auto 0;
+    width: 26px;
+    padding: 1px 0;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+}
+.att-score--low { background: var(--red-bg); color: var(--red); }
+.att-score--mid { background: var(--yellow-bg); color: var(--yellow); }
+.att-score--high { background: var(--green-bg); color: var(--green); }
+
 /* ---- Собрания в табеле ---- */
 .today-meeting {
     display: flex;

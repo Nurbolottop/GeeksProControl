@@ -8,7 +8,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.attendance import overview, services
-from apps.attendance.models import Attendance, GroupMeeting, MeetingKind
+from apps.attendance.models import (
+    Attendance, GroupMeeting, MeetingKind, WorkScore,
+)
 from apps.flows.models import Flow, Group
 from apps.interns.models import Intern
 from apps.projects.models import Project
@@ -152,9 +154,14 @@ def toggle(request, pk):
         raise Http404
     intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
     mark = services.toggle_mark(meeting, intern, user=request.user)
+    score = WorkScore.objects.filter(meeting=meeting, intern=intern).first()
     return render(request, 'attendance/partials/cell.html', {
         'intern': intern,
-        'cell': {'meeting': meeting, 'status': mark.status if mark else ''},
+        'cell': {
+            'meeting': meeting,
+            'status': mark.status if mark else '',
+            'score': score.score if score else None,
+        },
     })
 
 
@@ -182,6 +189,7 @@ def dashboard(request):
     total_meetings = sum(row['meetings'] for row in rows)
     total_held = sum(row['held'] for row in rows)
     rates = [row['rate'] for row in rows if row['rate'] is not None]
+    activities = [row['activity'] for row in rows if row['activity'] is not None]
 
     return render(request, 'attendance/dashboard.html', {
         'rows': rows,
@@ -190,6 +198,9 @@ def dashboard(request):
         'total_meetings': total_meetings,
         'total_held': total_held,
         'average_rate': round(sum(rates) / len(rates)) if rates else None,
+        'average_activity': (
+            round(sum(activities) / len(activities), 1) if activities else None
+        ),
         'year': year,
         'month': month,
         'current': current,
@@ -248,7 +259,7 @@ def group_meetings(request, pk):
     )
     meetings = list(
         group.meetings.select_related('host')
-        .prefetch_related('attendance')
+        .prefetch_related('attendance', 'scores')
         .order_by('-date'),
     )
     people = group.members.filter(
@@ -258,6 +269,11 @@ def group_meetings(request, pk):
         marks = list(meeting.attendance.all())
         meeting.marked_count = len(marks)
         meeting.attended_count = sum(1 for mark in marks if mark.is_attended)
+        scores = [item.score for item in meeting.scores.all()]
+        meeting.score_count = len(scores)
+        meeting.avg_score = (
+            round(sum(scores) / len(scores), 1) if scores else None
+        )
     return render(request, 'attendance/group_meetings.html', {
         'group': group,
         'meetings': meetings,
@@ -281,19 +297,26 @@ def meeting_detail(request, pk):
     marks = {
         mark.intern_id: mark for mark in meeting.attendance.all()
     }
+    scores = {
+        score.intern_id: score for score in meeting.scores.all()
+    }
     rows = []
     for member in members:
         mark = marks.get(member.intern_id)
+        score = scores.get(member.intern_id)
         rows.append({
             'member': member,
             'intern': member.intern,
             'status': mark.status if mark else '',
+            'score': score.score if score else None,
+            'score_comment': score.comment if score else '',
         })
     attended = sum(
         1 for row in rows
         if row['status'] in ('present', 'late')
     )
     marked = sum(1 for row in rows if row['status'])
+    given = [row['score'] for row in rows if row['score'] is not None]
     return render(request, 'attendance/meeting_detail.html', {
         'meeting': meeting,
         'group': meeting.group,
@@ -302,6 +325,12 @@ def meeting_detail(request, pk):
         'attended': attended,
         'rate': round(attended / marked * 100) if marked else None,
         'statuses': Attendance.Status.choices,
+        'scale': WorkScore.SCALE,
+        'scored': len(given),
+        'average_score': round(sum(given) / len(given), 1) if given else None,
+        'period_start': meeting.period_start,
+        'period_days': meeting.period_days,
+        'tab': 'scores' if request.GET.get('tab') == 'scores' else 'marks',
     })
 
 
@@ -336,4 +365,52 @@ def mark_person(request, pk):
         'meeting': meeting,
         'row': {'intern': intern, 'status': status,
                 'member': meeting.group.members.filter(intern=intern).first()},
+    })
+
+
+@login_required
+def score_person(request, pk):
+    """AJAX: балл за работу с прошлого собрания (0–10) или комментарий."""
+    meeting = get_object_or_404(GroupMeeting, pk=pk)
+    if request.method != 'POST':
+        raise Http404
+    intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
+    entry = WorkScore.objects.filter(meeting=meeting, intern=intern).first()
+
+    if 'comment' in request.POST:
+        comment = request.POST.get('comment', '').strip()[:255]
+        if entry:
+            entry.comment = comment
+            entry.save(update_fields=['comment', 'marked_by', 'updated_at'])
+        elif comment:
+            entry = WorkScore.objects.create(
+                meeting=meeting, intern=intern, score=0,
+                comment=comment, marked_by=request.user,
+            )
+    else:
+        raw = request.POST.get('score', '')
+        if raw.isdigit() and 0 <= int(raw) <= WorkScore.MAX:
+            value = int(raw)
+            if entry:
+                entry.score = value
+                entry.marked_by = request.user
+                entry.save(update_fields=['score', 'marked_by', 'updated_at'])
+            else:
+                entry = WorkScore.objects.create(
+                    meeting=meeting, intern=intern, score=value,
+                    marked_by=request.user,
+                )
+        elif entry:
+            entry.delete()
+            entry = None
+
+    return render(request, 'attendance/partials/score_row.html', {
+        'meeting': meeting,
+        'scale': WorkScore.SCALE,
+        'row': {
+            'intern': intern,
+            'score': entry.score if entry else None,
+            'score_comment': entry.comment if entry else '',
+            'member': meeting.group.members.filter(intern=intern).first(),
+        },
     })

@@ -3,7 +3,7 @@ import datetime
 
 from django.utils import timezone
 
-from apps.attendance.models import Attendance, GroupMeeting
+from apps.attendance.models import Attendance, GroupMeeting, WorkScore
 from apps.attendance.services import month_bounds
 from apps.flows.models import Group
 
@@ -18,6 +18,7 @@ def groups_summary(year: int, month: int) -> list[dict]:
     )
     meetings = GroupMeeting.objects.filter(date__gte=first, date__lte=last)
     marks = Attendance.objects.filter(meeting__in=meetings).select_related('meeting')
+    scores = WorkScore.objects.filter(meeting__in=meetings).select_related('meeting')
 
     by_group_meetings: dict[int, list] = {}
     for meeting in meetings:
@@ -25,6 +26,9 @@ def groups_summary(year: int, month: int) -> list[dict]:
     by_group_marks: dict[int, list] = {}
     for mark in marks:
         by_group_marks.setdefault(mark.meeting.group_id, []).append(mark)
+    by_group_scores: dict[int, list] = {}
+    for score in scores:
+        by_group_scores.setdefault(score.meeting.group_id, []).append(score.score)
 
     rows = []
     for group in groups:
@@ -35,6 +39,7 @@ def groups_summary(year: int, month: int) -> list[dict]:
             if meeting.status == GroupMeeting.Status.HELD
         )
         attended = sum(1 for mark in group_marks if mark.is_attended)
+        group_scores = by_group_scores.get(group.pk, [])
         rows.append({
             'group': group,
             'people': sum(
@@ -43,6 +48,10 @@ def groups_summary(year: int, month: int) -> list[dict]:
             'meetings': len(group_meetings),
             'held': held,
             'rate': round(attended / len(group_marks) * 100) if group_marks else None,
+            'activity': (
+                round(sum(group_scores) / len(group_scores), 1)
+                if group_scores else None
+            ),
         })
     return rows
 

@@ -9,9 +9,9 @@
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
             <a href="{% url 'attendance:group_meetings' group.pk %}" class="badge badge--gray">← Собрания команды</a>
             {% if group.project %}<a href="{{ group.project.get_absolute_url }}" class="badge badge--gray">{{ group.project.name }}</a>{% endif %}
-            {% if sheet.rate is not None %}
-                <span class="badge badge--{% if sheet.rate >= 80 %}green{% elif sheet.rate >= 60 %}yellow{% else %}red{% endif %}">
-                    Посещаемость: {{ sheet.rate }}%
+            {% if sheet.activity is not None %}
+                <span class="badge badge--{% if sheet.activity >= 8 %}green{% elif sheet.activity >= 5 %}yellow{% else %}red{% endif %}">
+                    Активность: {{ sheet.activity }} из 10
                 </span>
             {% endif %}
         </div>
@@ -59,7 +59,7 @@
                             <div class="att-day__kind">{{ meeting.short_kind }}</div>
                         </th>
                     {% endfor %}
-                    <th class="att-total">%</th>
+                    <th class="att-total">Активность</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -73,8 +73,8 @@
                             {% include 'attendance/partials/cell.html' with intern=row.intern %}
                         {% endfor %}
                         <td class="att-total">
-                            {% if row.rate is not None %}
-                                <span class="badge badge--{% if row.rate >= 80 %}green{% elif row.rate >= 60 %}yellow{% else %}red{% endif %}">{{ row.rate }}%</span>
+                            {% if row.activity is not None %}
+                                <span class="badge badge--{% if row.activity >= 8 %}green{% elif row.activity >= 5 %}yellow{% else %}red{% endif %}">{{ row.activity }}</span>
                             {% else %}—{% endif %}
                         </td>
                     </tr>
@@ -105,6 +105,8 @@
     <div class="sub" style="color: var(--text-muted); font-size: 12.5px">
         Клик по клетке: пусто → был → не был → опоздал → уважительная → пусто.
         Колонки — дни собраний (PM — с PM, ТЛ — с тимлидом, Вн — внутреннее).
+        Цифра под отметкой — балл активности за период до этого собрания;
+        он ставится внутри собрания на вкладке «Оценка работы».
     </div>
 {% else %}
     <div class="panel empty" style="text-align:center; padding: 36px 20px;">

@@ -5,7 +5,9 @@ import datetime
 from django.db import transaction
 from django.utils import timezone
 
-from apps.attendance.models import Attendance, GroupMeeting, MeetingKind
+from apps.attendance.models import (
+    Attendance, GroupMeeting, MeetingKind, WorkScore,
+)
 
 
 def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -55,19 +57,28 @@ def build_sheet(group, year: int, month: int) -> dict:
         (mark.intern_id, mark.meeting_id): mark
         for mark in Attendance.objects.filter(meeting__in=meetings)
     }
+    scores = {
+        (item.intern_id, item.meeting_id): item.score
+        for item in WorkScore.objects.filter(meeting__in=meetings)
+    }
 
     rows = []
     for member in members:
         cells, attended, marked = [], 0, 0
+        person_scores = []
         for meeting in meetings:
             mark = marks.get((member.intern_id, meeting.pk))
             if mark:
                 marked += 1
                 if mark.is_attended:
                     attended += 1
+            score = scores.get((member.intern_id, meeting.pk))
+            if score is not None:
+                person_scores.append(score)
             cells.append({
                 'meeting': meeting,
                 'status': mark.status if mark else '',
+                'score': score,
             })
         rows.append({
             'member': member,
@@ -76,10 +87,16 @@ def build_sheet(group, year: int, month: int) -> dict:
             'marked': marked,
             'attended': attended,
             'rate': round(attended / marked * 100) if marked else None,
+            'scores': person_scores,
+            'activity': (
+                round(sum(person_scores) / len(person_scores), 1)
+                if person_scores else None
+            ),
         })
 
     total_marked = sum(row['marked'] for row in rows)
     total_attended = sum(row['attended'] for row in rows)
+    all_scores = [value for row in rows for value in row['scores']]
 
     # Сводка по видам: сколько собраний всего и сколько уже проведено
     by_kind: dict[str, dict] = {}
@@ -95,6 +112,9 @@ def build_sheet(group, year: int, month: int) -> dict:
         'rows': rows,
         'rate': round(total_attended / total_marked * 100) if total_marked else None,
         'marked': total_marked,
+        'activity': (
+            round(sum(all_scores) / len(all_scores), 1) if all_scores else None
+        ),
         'by_kind': list(by_kind.values()),
     }
 
