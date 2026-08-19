@@ -60,7 +60,8 @@ class ProjectCreateForm(forms.ModelForm):
 
     class Meta:
         model = Project
-        fields = ['name', 'client', 'city', 'project_type', 'description']
+        fields = ['name', 'client', 'flow', 'city', 'project_type',
+                  'description']
         widgets = {
             'name': forms.TextInput(
                 attrs={'placeholder': 'Например: Омур', 'autofocus': True},
@@ -75,6 +76,8 @@ class ProjectCreateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['client'].required = False
         self.fields['client'].empty_label = 'Выберите заказчика'
+        self.fields['flow'].required = False
+        self.fields['flow'].empty_label = 'Выберите поток'
 
 
 class ProjectProgressForm(forms.ModelForm):

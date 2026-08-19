@@ -284,6 +284,35 @@ class ProjectCreationFlowTests(TestCase):
         from apps.projects.forms import ProjectCreateForm
 
         fields = set(ProjectCreateForm().fields)
+        self.assertNotIn("staging_url", fields)
+        self.assertNotIn("planned_end_date", fields)
+        self.assertNotIn("progress", fields)
+
+    def test_new_flow_created_from_project_form(self):
+        from apps.flows.models import Flow
+
+        response = self.client.post(reverse("projects:create"), {
+            "name": "Учкун", "new_flow": "2",
+        })
+        self.assertEqual(response.status_code, 302)
+        flow = Flow.objects.get(number=2)
+        project = Project.objects.get(name="Учкун")
+        self.assertEqual(project.flow, flow)
+        self.assertEqual(project.group.flow, flow)
+
+    def test_existing_flow_reused(self):
+        from apps.flows.models import Flow
+
+        Flow.objects.create(number=3, status=Flow.Status.ACTIVE)
+        self.client.post(reverse("projects:create"), {
+            "name": "Агартуу", "new_flow": "3",
+        })
+        self.assertEqual(Flow.objects.filter(number=3).count(), 1)
+
+    def test_create_form_fields(self):
+        from apps.projects.forms import ProjectCreateForm
+
         self.assertEqual(
-            fields, {"name", "client", "city", "project_type", "description"},
+            set(ProjectCreateForm().fields),
+            {"name", "client", "flow", "city", "project_type", "description"},
         )

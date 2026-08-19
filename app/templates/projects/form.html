@@ -12,26 +12,76 @@
     {% if form.non_field_errors %}
         <div class="message message--error">{{ form.non_field_errors }}</div>
     {% endif %}
-    <div class="form-grid">
-        {% include 'partials/form_fields.html' %}
-    </div>
-    {% if not project %}
-        <div class="new-client" x-data="{ open: false }">
-            <button type="button" class="btn btn--secondary btn--sm" @click="open = !open"
-                    x-text="open ? 'Выбрать из списка' : '+ Заказчика ещё нет в списке'"></button>
-            <div x-show="open" x-cloak style="margin-top: 10px">
-                <div class="form-field">
-                    <label for="new-client">Название организации заказчика</label>
-                    <input type="text" id="new-client" name="new_client" autocomplete="off"
-                           placeholder="Например: ОсОО «Омур»">
-                    <div class="field-hint">
-                        Заказчик создастся вместе с проектом — заполнять карточку
-                        целиком сейчас не нужно, контакты и реквизиты добавите позже.
-                    </div>
+
+    {% if project %}
+        <div class="form-grid">
+            {% include 'partials/form_fields.html' %}
+        </div>
+    {% else %}
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                {{ form.name }}
+                {% if form.name.errors %}<div class="form-errors">{{ form.name.errors.0 }}</div>{% endif %}
+            </div>
+
+            <div class="form-field" x-data="{ newClient: false }">
+                <label for="{{ form.client.id_for_label }}">Заказчик</label>
+                <div x-show="!newClient">
+                    {{ form.client }}
+                    <button type="button" class="link-btn" @click="newClient = true">
+                        нет в списке — добавить
+                    </button>
                 </div>
+                <div x-show="newClient" x-cloak>
+                    <input type="text" name="new_client" autocomplete="off"
+                           placeholder="Например: ОсОО «Омур»">
+                    <button type="button" class="link-btn" @click="newClient = false">
+                        выбрать из списка
+                    </button>
+                </div>
+                {% if form.client.errors %}<div class="form-errors">{{ form.client.errors.0 }}</div>{% endif %}
+            </div>
+
+            <div class="form-field" x-data="{ newFlow: false }">
+                <label for="{{ form.flow.id_for_label }}">Поток</label>
+                <div x-show="!newFlow">
+                    {{ form.flow }}
+                    <button type="button" class="link-btn" @click="newFlow = true">
+                        нет в списке — собрать поток
+                    </button>
+                </div>
+                <div x-show="newFlow" x-cloak>
+                    <input type="number" name="new_flow" min="1" max="99"
+                           autocomplete="off" placeholder="Номер потока, например 2">
+                    <button type="button" class="link-btn" @click="newFlow = false">
+                        выбрать из списка
+                    </button>
+                </div>
+                {% if form.flow.errors %}<div class="form-errors">{{ form.flow.errors.0 }}</div>{% endif %}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.city.id_for_label }}">{{ form.city.label }}</label>
+                {{ form.city }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.project_type.id_for_label }}">{{ form.project_type.label }}</label>
+                {{ form.project_type }}
+            </div>
+
+            <div class="form-field form-field--wide">
+                <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                {{ form.description }}
             </div>
         </div>
+        <div class="sub" style="color: var(--text-muted); font-size: 12.5px; margin-top: 4px">
+            Сроки, ссылки и доступы заполняются потом в «Обзоре» — по мере появления.
+            Команда проекта создаётся сразу, ПМ назначите на следующем шаге.
+        </div>
     {% endif %}
+
     <div class="form-actions">
         <button type="submit" class="btn">Сохранить</button>
         <a href="{% if project %}{{ project.get_absolute_url }}{% else %}{% url 'projects:list' %}{% endif %}"

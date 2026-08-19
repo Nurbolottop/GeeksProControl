@@ -1264,6 +1264,21 @@ a:hover { color: var(--accent-dark); }
 .att-score--mid { background: var(--yellow-bg); color: var(--yellow); }
 .att-score--high { background: var(--green-bg); color: var(--green); }
 
+/* ---- Ссылка-кнопка внутри поля формы ---- */
+.link-btn {
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--primary);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 1px dashed currentColor;
+}
+.link-btn:hover { color: var(--primary-dark); }
+
 /* ---- Ежедневная проверка ---- */
 .check-progress {
     display: flex;

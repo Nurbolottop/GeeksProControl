@@ -220,18 +220,34 @@ def project_create(request):
 
     form = ProjectCreateForm(request.POST or None)
     if request.method == 'POST':
-        new_client = request.POST.get('new_client', '').strip()
+        data = request.POST.copy()
+        changed = False
+
+        # Заказчика и поток можно завести прямо здесь, не уходя с формы
+        new_client = data.get('new_client', '').strip()
         if new_client:
             client, created = Client.objects.get_or_create(
                 organization=new_client,
-                defaults={'city': request.POST.get('city', '').strip()},
+                defaults={'city': data.get('city', '').strip()},
             )
-            # Подставляем нового заказчика в форму до валидации
-            data = request.POST.copy()
             data['client'] = client.pk
-            form = ProjectCreateForm(data)
+            changed = True
             if created:
                 messages.success(request, f'Заказчик «{client}» создан.')
+
+        new_flow = data.get('new_flow', '').strip()
+        if new_flow.isdigit():
+            flow, created = Flow.objects.get_or_create(
+                number=int(new_flow),
+                defaults={'status': Flow.Status.ACTIVE},
+            )
+            data['flow'] = flow.pk
+            changed = True
+            if created:
+                messages.success(request, f'Поток {flow.number} создан.')
+
+        if changed:
+            form = ProjectCreateForm(data)
         if form.is_valid():
             project = form.save(commit=False)
             services.create_project(project, user=request.user)
