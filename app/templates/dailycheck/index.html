@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Ежедневная проверка — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Ежедневная проверка</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--blue">{{ day|date:'d.m.Y, l' }}</span>
+            {% if is_today %}
+                <span class="badge badge--gray">сегодня</span>
+            {% else %}
+                <a href="{% url 'dailycheck:index' %}" class="badge badge--yellow">← вернуться к сегодня</a>
+            {% endif %}
+            {% if all_done %}
+                <span class="badge badge--green">✓ Всё проверено</span>
+            {% else %}
+                <span class="badge badge--yellow">Проверено {{ done }} из {{ total }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="?date={{ prev_day|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">‹ {{ prev_day|date:'d.m' }}</a>
+        {% if not is_today %}
+            <a href="?date={{ next_day|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">{{ next_day|date:'d.m' }} ›</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="check-progress">
+    <div class="check-progress__bar">
+        <div class="check-progress__fill {% if all_done %}is-full{% endif %}" style="width: {{ percent }}%"></div>
+    </div>
+    <div class="check-progress__week">
+        {% for entry in week %}
+            <a href="?date={{ entry.date|date:'Y-m-d' }}"
+               class="check-day {% if entry.full %}is-full{% elif entry.done %}is-part{% endif %} {% if entry.date == day %}is-current{% endif %}"
+               title="{{ entry.date|date:'d.m.Y' }} — проверено {{ entry.done }} из {{ entry.total }}">
+                <span class="check-day__wd">{{ entry.date|date:'D' }}</span>
+                <span class="check-day__num">{{ entry.date|date:'d' }}</span>
+            </a>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="panel">
+    <h2>На что смотреть сегодня</h2>
+    <div class="check-cards">
+        {% for card in cards %}
+            <a href="{{ card.url }}" class="check-card check-card--{{ card.tone }}">
+                <span class="check-card__count">{{ card.count }}</span>
+                <span class="check-card__label">{{ card.label }}</span>
+                {% if card.hint %}<span class="check-card__hint">{{ card.hint }}</span>{% endif %}
+            </a>
+        {% endfor %}
+    </div>
+</div>
+
+{% for block in blocks %}
+    <div class="panel">
+        <div class="panel-head">
+            <h2>{{ block.label }}</h2>
+            <span class="panel-bar__note">{{ block.done }} из {{ block.items|length }}</span>
+        </div>
+        <div class="check-list">
+            {% for row in block.items %}
+                {% include 'dailycheck/partials/row.html' %}
+            {% endfor %}
+        </div>
+    </div>
+{% empty %}
+    <div class="panel empty">Пунктов проверки нет.</div>
+{% endfor %}
+
+<div class="panel" x-data="{ open: false }">
+    <div class="panel-head">
+        <h2>Свой пункт</h2>
+        <button type="button" class="btn btn--secondary btn--sm" @click="open = !open"
+                x-text="open ? 'Отмена' : '+ Добавить пункт'"></button>
+    </div>
+    <form method="post" action="{% url 'dailycheck:item_create' %}" x-show="open" x-cloak>
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-field">
+                <label for="check-title">Что проверять</label>
+                <input type="text" id="check-title" name="title" autocomplete="off"
+                       placeholder="Например: проверить оплату сервера">
+            </div>
+            <div class="form-field">
+                <label for="check-block">Блок</label>
+                <select id="check-block" name="block">
+                    <option value="projects">Проекты</option>
+                    <option value="people">Люди и команды</option>
+                    <option value="meetings">Собрания и табель</option>
+                    <option value="office" selected>Офис и организация</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-field" style="margin-top: 12px">
+            <label for="check-hint">Пояснение (необязательно)</label>
+            <input type="text" id="check-hint" name="hint" autocomplete="off"
+                   placeholder="Зачем и на что именно смотреть">
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">Добавить в проверку</button>
+        </div>
+    </form>
+    <div x-show="!open" class="sub" style="color: var(--text-muted); font-size: 12.5px">
+        Отметки сохраняются по дням — можно открыть вчерашний день и посмотреть, что проверяли.
+    </div>
+</div>
+{% endblock %}

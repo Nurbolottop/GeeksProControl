@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'apps.reports',
     'apps.flows',
     'apps.attendance',
+    'apps.dailycheck',
 ]
 
 # =============================================================================
