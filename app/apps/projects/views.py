@@ -18,7 +18,6 @@ from apps.projects.forms import (
     StageUpdateForm,
 )
 from apps.projects.models import (
-    AccessRequest,
     Project,
     ProjectAccess,
     ProjectStage,
@@ -131,9 +130,6 @@ def project_detail(request, pk):
         'stages': project.stages.all(),
         'history': project.history.select_related('user')[:50],
         'today': timezone.localdate(),
-        'open_access_requests': project.access_requests.filter(
-            status=AccessRequest.Status.PENDING,
-        ).count(),
     }
     if tab == 'tasks':
         from apps.tasks.models import TaskStatus
@@ -151,19 +147,8 @@ def project_detail(request, pk):
         context['team_members'] = members
         context['team_sections'] = team_selectors.group_by_role(members)
     elif tab == 'access':
-        requests_qs = project.access_requests.select_related(
-            'pm', 'requested_by', 'access',
-        )
         context['accesses'] = project.accesses.all()
         context['access_form'] = ProjectAccessForm()
-        context['access_requests'] = [
-            item for item in requests_qs if item.is_open
-        ]
-        context['closed_requests'] = [
-            item for item in requests_qs if not item.is_open
-        ]
-        context['access_presets'] = AccessRequest.PRESETS
-        context['project_pm'] = services.project_pm(project)
     elif tab == 'documents':
         from apps.documents import services as doc_services
         from apps.documents.models import DocumentType
@@ -325,85 +310,6 @@ def access_create(request, pk):
             messages.success(request, f'Доступ «{access.service}» добавлен.')
         else:
             messages.error(request, 'Не удалось сохранить доступ — проверьте поля.')
-    return redirect(f'{project.get_absolute_url()}?tab=access')
-
-
-@login_required
-def access_request_create(request, pk):
-    """Запросить у ПМ доступы: репозиторий, сервер, БД и т.п."""
-    project = get_object_or_404(Project, pk=pk)
-    if request.method == 'POST':
-        wanted = request.POST.getlist('service')
-        custom = request.POST.get('custom', '').strip()
-        if custom:
-            wanted.append(custom)
-        created = services.request_accesses(
-            project, wanted,
-            comment=request.POST.get('comment', '').strip(),
-            user=request.user,
-        )
-        if created:
-            pm = services.project_pm(project)
-            messages.success(request, (
-                f'Запрошено доступов: {len(created)}'
-                f'{" — у ПМ " + pm.full_name if pm else " (ПМ не назначен)"}.'
-            ))
-        elif wanted:
-            messages.info(request, 'Такие доступы уже запрошены.')
-        else:
-            messages.error(request, 'Отметьте, какие доступы нужны.')
-    return redirect(f'{project.get_absolute_url()}?tab=access')
-
-
-@login_required
-def access_request_provide(request, pk):
-    """ПМ выдаёт запрошенный доступ — запись попадает в «Доступы»."""
-    access_request = get_object_or_404(
-        AccessRequest.objects.select_related('project'), pk=pk,
-    )
-    project = access_request.project
-    if request.method == 'POST' and access_request.is_open:
-        services.provide_access(
-            access_request,
-            url=request.POST.get('url', '').strip(),
-            login=request.POST.get('login', '').strip(),
-            password=request.POST.get('password', '').strip(),
-            comment=request.POST.get('comment', '').strip(),
-            user=request.user,
-        )
-        messages.success(
-            request, f'Доступ «{access_request.service}» выдан.',
-        )
-    return redirect(f'{project.get_absolute_url()}?tab=access')
-
-
-@login_required
-def access_request_decline(request, pk):
-    """Отказ по запросу доступа с причиной."""
-    access_request = get_object_or_404(
-        AccessRequest.objects.select_related('project'), pk=pk,
-    )
-    project = access_request.project
-    if request.method == 'POST' and access_request.is_open:
-        services.decline_access(
-            access_request,
-            reason=request.POST.get('reason', '').strip(),
-            user=request.user,
-        )
-        messages.info(request, f'По «{access_request.service}» отказано.')
-    return redirect(f'{project.get_absolute_url()}?tab=access')
-
-
-@login_required
-def access_request_delete(request, pk):
-    """Снять свой запрос доступа."""
-    access_request = get_object_or_404(
-        AccessRequest.objects.select_related('project'), pk=pk,
-    )
-    project = access_request.project
-    if request.method == 'POST':
-        access_request.delete()
-        messages.success(request, 'Запрос снят.')
     return redirect(f'{project.get_absolute_url()}?tab=access')
 
 

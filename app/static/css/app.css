@@ -1253,41 +1253,6 @@ a:hover { color: var(--accent-dark); }
 .att-score--mid { background: var(--yellow-bg); color: var(--yellow); }
 .att-score--high { background: var(--green-bg); color: var(--green); }
 
-/* ---- Запрос доступов у ПМ ---- */
-.access-presets { display: flex; flex-wrap: wrap; gap: 8px; }
-.access-chip { cursor: pointer; }
-.access-chip input { position: absolute; opacity: 0; pointer-events: none; }
-.access-chip span {
-    display: inline-block;
-    padding: 7px 14px;
-    border-radius: 20px;
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    color: var(--text-muted);
-    font-size: 12.5px;
-    font-weight: 600;
-    transition: all .12s ease;
-}
-.access-chip span:hover { border-color: var(--accent); color: var(--text); }
-.access-chip input:checked + span {
-    background: var(--primary);
-    border-color: var(--primary);
-    color: #fff;
-}
-.access-give { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.access-give input[type="text"] {
-    flex: 1 1 130px;
-    min-width: 110px;
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    font-family: inherit;
-    font-size: 12.5px;
-    color: var(--text);
-}
-.access-give input[type="text"]:focus { outline: none; border-color: var(--accent); }
-
 /* ---- Собрания в табеле ---- */
 .today-meeting {
     display: flex;

@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.db import models
 from django.urls import reverse
-from django.utils import timezone
 
 from apps.clients.models import Client
 from apps.common.models import ArchivableModel, TimeStampedModel
@@ -312,74 +311,6 @@ class ProjectAccess(TimeStampedModel):
 
     def __str__(self) -> str:
         return f'{self.project.code}: {self.service}'
-
-
-class AccessRequest(TimeStampedModel):
-    """Запрос доступа у ПМ проекта: репозиторий, сервер, БД и т.п.
-
-    Команда просит доступ, ПМ его выдаёт — заполненный запрос
-    превращается в запись в «Доступах проекта».
-    """
-
-    # Что чаще всего запрашивают — быстрые кнопки в форме
-    PRESETS = [
-        'Репозиторий (GitHub/GitLab)',
-        'Тестовый сервер',
-        'Прод-сервер',
-        'База данных',
-        'Админка сайта',
-        'Домен / DNS',
-        'Почта проекта',
-        'Дизайн-макеты (Figma)',
-        'App Store / Google Play',
-        'Платёжная система',
-    ]
-
-    class Status(models.TextChoices):
-        PENDING = 'pending', 'Ждём от ПМ'
-        PROVIDED = 'provided', 'Выдан'
-        DECLINED = 'declined', 'Отказано'
-
-    project = models.ForeignKey(
-        Project, on_delete=models.CASCADE, related_name='access_requests',
-        verbose_name='Проект',
-    )
-    service = models.CharField('Что нужно', max_length=100)
-    comment = models.TextField('Зачем / уточнение', blank=True)
-    status = models.CharField(
-        'Статус', max_length=10,
-        choices=Status.choices, default=Status.PENDING, db_index=True,
-    )
-    requested_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        related_name='+', verbose_name='Запросил', null=True, blank=True,
-    )
-    pm = models.ForeignKey(
-        'interns.Intern', on_delete=models.SET_NULL, related_name='access_requests',
-        verbose_name='У кого запросили', null=True, blank=True,
-    )
-    access = models.ForeignKey(
-        ProjectAccess, on_delete=models.SET_NULL, related_name='requests',
-        verbose_name='Выданный доступ', null=True, blank=True,
-    )
-    answer = models.CharField('Ответ ПМ', max_length=255, blank=True)
-    resolved_at = models.DateTimeField('Закрыт', null=True, blank=True)
-
-    class Meta:
-        verbose_name = 'Запрос доступа'
-        verbose_name_plural = 'Запросы доступа'
-        ordering = ['status', '-created_at']
-
-    def __str__(self) -> str:
-        return f'{self.project.code}: {self.service}'
-
-    @property
-    def is_open(self) -> bool:
-        return self.status == self.Status.PENDING
-
-    @property
-    def waiting_days(self) -> int:
-        return (timezone.now() - self.created_at).days
 
 
 class ProjectLink(models.Model):

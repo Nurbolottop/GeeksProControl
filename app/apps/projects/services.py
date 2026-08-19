@@ -6,7 +6,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.projects.models import (
-    AccessRequest,
     DeadlineStatus,
     Project,
     ProjectStage,
@@ -213,102 +212,6 @@ def extend_stage_deadline(
     )
     _touch_project(stage.project)
     return stage
-
-
-def project_pm(project: Project):
-    """ПМ проекта: из команды проекта, иначе из группы потока."""
-    member = project.team_members.filter(
-        role='pm', status='active', intern__isnull=False,
-    ).select_related('intern').first()
-    if member:
-        return member.intern
-    group = getattr(project, 'group', None)
-    if group is None:
-        return None
-    member = group.members.filter(
-        role='pm', status='active', intern__isnull=False,
-    ).select_related('intern').first()
-    return member.intern if member else None
-
-
-@transaction.atomic
-def request_accesses(project: Project, services_list, comment: str = '',
-                     user=None) -> list:
-    """Создаёт запросы доступа у ПМ и шлёт уведомление."""
-    from apps.notifications.services import notify
-
-    pm = project_pm(project)
-    created = []
-    for service in services_list:
-        service = service.strip()[:100]
-        if not service:
-            continue
-        if project.access_requests.filter(
-            service=service, status=AccessRequest.Status.PENDING,
-        ).exists():
-            continue
-        created.append(AccessRequest.objects.create(
-            project=project, service=service, comment=comment,
-            requested_by=user, pm=pm,
-        ))
-    if created:
-        names = ', '.join(item.service for item in created)
-        notify(
-            f'Запрос доступа: {project.name}',
-            description=(
-                f'{"ПМ " + pm.full_name if pm else "ПМ не назначен"} — '
-                f'нужно выдать: {names}.'
-            ),
-            url=f'{project.get_absolute_url()}?tab=access',
-            dedup_key=f'access-request-{project.pk}-{names[:100]}',
-        )
-        ProjectStatusHistory.objects.create(
-            project=project, field='Доступы',
-            new_value=f'Запрошено у ПМ: {names}', user=user,
-        )
-        _touch_project(project)
-    return created
-
-
-@transaction.atomic
-def provide_access(access_request, *, url: str = '', login: str = '',
-                   password: str = '', comment: str = '', user=None):
-    """ПМ выдал доступ: создаём запись в доступах и закрываем запрос."""
-    from apps.projects.models import ProjectAccess
-
-    access = ProjectAccess.objects.create(
-        project=access_request.project, service=access_request.service,
-        url=url, login=login, password=password, comment=comment,
-    )
-    access_request.access = access
-    access_request.status = AccessRequest.Status.PROVIDED
-    access_request.resolved_at = timezone.now()
-    access_request.save(update_fields=[
-        'access', 'status', 'resolved_at', 'updated_at',
-    ])
-    ProjectStatusHistory.objects.create(
-        project=access_request.project, field='Доступы',
-        new_value=f'Выдан доступ по запросу: {access_request.service}',
-        user=user,
-    )
-    _touch_project(access_request.project)
-    return access
-
-
-def decline_access(access_request, reason: str = '', user=None):
-    """ПМ не даёт доступ — закрываем запрос с причиной."""
-    access_request.status = AccessRequest.Status.DECLINED
-    access_request.answer = reason[:255]
-    access_request.resolved_at = timezone.now()
-    access_request.save(update_fields=[
-        'status', 'answer', 'resolved_at', 'updated_at',
-    ])
-    ProjectStatusHistory.objects.create(
-        project=access_request.project, field='Доступы',
-        new_value=f'Отказано в доступе: {access_request.service}',
-        reason=reason, user=user,
-    )
-    return access_request
 
 
 def _touch_project(project: Project) -> None:
