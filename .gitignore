@@ -181,3 +181,8 @@ app/staticfiles/
 # Скриншоты из чата
 *.png
 !app/static/**/*.png
+
+# Рабочие файлы в корне
+*.docx
+*.xlsx
+!app/data/*.xlsx
