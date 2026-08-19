@@ -103,3 +103,17 @@ class KPITests(TestCase):
         kpi = calculate_kpi()
         self.assertIsNone(kpi['on_time_delivery_rate'])
         self.assertEqual(kpi['overdue_projects'], 0)
+
+
+class ErrorPagesTests(TestCase):
+    """Несуществующая страница должна отдавать 404, а не 500."""
+
+    def test_missing_page_renders_404(self):
+        from django.template.loader import render_to_string
+        from django.test import RequestFactory
+        from django.contrib.auth.models import AnonymousUser
+
+        request = RequestFactory().get("/no-such-page/")
+        request.user = AnonymousUser()
+        html = render_to_string("404.html", request=request)
+        self.assertIn("Страница не найдена", html)
