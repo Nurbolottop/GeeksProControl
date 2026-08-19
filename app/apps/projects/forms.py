@@ -51,6 +51,32 @@ class ProjectForm(forms.ModelForm):
         return cleaned
 
 
+class ProjectCreateForm(forms.ModelForm):
+    """Новый проект: только то, что известно, когда проект берут в работу.
+
+    Ссылки, домен, staging, прод, сроки и прогресс появляются позже —
+    они заполняются поблочно в «Обзоре».
+    """
+
+    class Meta:
+        model = Project
+        fields = ['name', 'client', 'city', 'project_type', 'description']
+        widgets = {
+            'name': forms.TextInput(
+                attrs={'placeholder': 'Например: Омур', 'autofocus': True},
+            ),
+            'city': forms.TextInput(attrs={'placeholder': 'Бишкек или Ош'}),
+            'description': forms.Textarea(
+                attrs={'rows': 3, 'placeholder': 'Что делаем и для кого'},
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['client'].required = False
+        self.fields['client'].empty_label = 'Выберите заказчика'
+
+
 class ProjectProgressForm(forms.ModelForm):
     """Инлайн-форма: прогресс и текущий этап."""
 

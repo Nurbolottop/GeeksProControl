@@ -6,7 +6,6 @@ app_name = 'attendance'
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
-    path('teams/create/', views.team_create, name='team_create'),
     path('groups/<int:pk>/', views.group_meetings, name='group_meetings'),
     path('groups/<int:pk>/sheet/', views.group_sheet, name='group_sheet'),
     path('meetings/<int:pk>/', views.meeting_detail, name='meeting_detail'),

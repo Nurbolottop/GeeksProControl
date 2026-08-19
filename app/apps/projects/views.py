@@ -11,6 +11,7 @@ from apps.projects.forms import (
     ProjectAboutForm,
     ProjectAccessForm,
     ProjectClientForm,
+    ProjectCreateForm,
     ProjectDatesForm,
     ProjectDetailsForm,
     ProjectForm,
@@ -217,7 +218,7 @@ def project_create(request):
     """Новый проект. Заказчика можно завести здесь же, не уходя с формы."""
     from apps.clients.models import Client
 
-    form = ProjectForm(request.POST or None)
+    form = ProjectCreateForm(request.POST or None)
     if request.method == 'POST':
         new_client = request.POST.get('new_client', '').strip()
         if new_client:
@@ -228,7 +229,7 @@ def project_create(request):
             # Подставляем нового заказчика в форму до валидации
             data = request.POST.copy()
             data['client'] = client.pk
-            form = ProjectForm(data)
+            form = ProjectCreateForm(data)
             if created:
                 messages.success(request, f'Заказчик «{client}» создан.')
         if form.is_valid():

@@ -3,6 +3,7 @@ import datetime
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from apps.projects.models import (
@@ -61,6 +62,43 @@ def calculate_deadline_status(
 
 
 @transaction.atomic
+def ensure_group(project: Project):
+    """Команда проекта создаётся вместе с проектом.
+
+    Отдельной сущности «создать команду» нет: у каждого проекта своя
+    группа в текущем потоке, туда и добавляются ПМ, тимлиды и стажёры.
+    """
+    from apps.flows.models import Flow, Group
+
+    if getattr(project, 'group', None) is not None:
+        return project.group
+
+    flow = project.flow
+    if flow is None:
+        flow = (
+            Flow.objects.filter(status=Flow.Status.ACTIVE)
+            .order_by('-number').first()
+            or Flow.objects.order_by('-number').first()
+        )
+    if flow is None:
+        flow = Flow.objects.create(number=1, status=Flow.Status.ACTIVE)
+
+    number = (flow.groups.aggregate(m=Max('number'))['m'] or 0) + 1
+    group = Group.objects.create(flow=flow, number=number, project=project)
+
+    fields = []
+    if project.flow_id != flow.pk:
+        project.flow = flow
+        fields.append('flow')
+    if not project.number_in_flow:
+        project.number_in_flow = number
+        fields.append('number_in_flow')
+    if fields:
+        project.save(update_fields=[*fields, 'updated_at'])
+    return group
+
+
+@transaction.atomic
 def create_project(project: Project, user=None) -> Project:
     """Сохраняет новый проект и создаёт полный набор этапов жизненного цикла."""
     project.last_activity_at = timezone.now()
@@ -74,6 +112,7 @@ def create_project(project: Project, user=None) -> Project:
         project=project, field='created',
         new_value='Проект создан', user=user,
     )
+    ensure_group(project)
     # Типовой чек-лист нового проекта (ТЗ §10.1)
     from apps.tasks.models import TaskTemplate
     from apps.tasks.services import generate_checklist

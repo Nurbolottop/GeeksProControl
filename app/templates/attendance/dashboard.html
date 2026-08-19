@@ -8,9 +8,6 @@
         <h1>Табель</h1>
         <div class="sub">Собрания и посещаемость по всем командам</div>
     </div>
-    <div class="page-actions">
-        <a href="{% url 'attendance:team_create' %}" class="btn btn--secondary">+ Команда</a>
-    </div>
 </div>
 
 <div class="kpi-grid">
@@ -119,7 +116,7 @@
                 </tr>
             {% empty %}
                 <tr><td colspan="8" class="empty" style="text-align:center; padding: 24px;">
-                    Команд пока нет — создайте группы в потоке.
+                    Команд пока нет — они появляются вместе с проектами.
                 </td></tr>
             {% endfor %}
             </tbody>

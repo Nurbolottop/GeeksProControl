@@ -250,3 +250,40 @@ class ProjectCreationFlowTests(TestCase):
         project = make_project(name="Без ПМ")
         create_project(project)
         self.assertIn(project, selectors.projects_without_pm())
+
+    def test_group_created_together_with_project(self):
+        from apps.flows.models import Flow, Group
+
+        Flow.objects.create(number=1, status=Flow.Status.ACTIVE)
+        project = make_project(name="Новый")
+        create_project(project)
+        group = Group.objects.get(project=project)
+        self.assertEqual(group.flow.number, 1)
+        project.refresh_from_db()
+        self.assertEqual(project.flow, group.flow)
+        self.assertEqual(project.number_in_flow, group.number)
+
+    def test_flow_created_when_none_exists(self):
+        from apps.flows.models import Flow
+
+        self.assertFalse(Flow.objects.exists())
+        project = make_project(name="Первый")
+        create_project(project)
+        self.assertEqual(Flow.objects.count(), 1)
+        self.assertIsNotNone(project.group)
+
+    def test_groups_numbered_sequentially(self):
+        first = make_project(name="Раз")
+        create_project(first)
+        second = make_project(name="Два")
+        create_project(second)
+        self.assertEqual(first.group.number, 1)
+        self.assertEqual(second.group.number, 2)
+
+    def test_create_form_has_no_links_and_dates(self):
+        from apps.projects.forms import ProjectCreateForm
+
+        fields = set(ProjectCreateForm().fields)
+        self.assertEqual(
+            fields, {"name", "client", "city", "project_type", "description"},
+        )
