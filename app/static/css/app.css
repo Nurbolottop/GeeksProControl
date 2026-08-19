@@ -651,6 +651,17 @@ table.data td a:hover { color: var(--primary); }
     color: var(--primary-dark);
     box-shadow: var(--shadow-sm);
 }
+/* Ссылка наружу внутри полосы вкладок — например, в табель команды */
+.tabs a.tabs__link {
+    margin-left: 4px;
+    color: var(--primary);
+    border: 1px dashed var(--border-strong);
+}
+.tabs a.tabs__link:hover {
+    background: var(--surface);
+    border-color: var(--primary);
+    color: var(--primary-dark);
+}
 
 /* ---- Описание (def list) ---- */
 .def-grid {
