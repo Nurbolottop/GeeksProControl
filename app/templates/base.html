@@ -113,7 +113,7 @@
                 <em>скоро</em>
             </span>
             <div class="nav-group">
-                <a href="{% url 'reports:monthly_list' %}"
+                <a href="{% url 'reports:weekly_list' %}"
                    class="nav-item {% if request.resolver_match.namespace == 'reports' %}is-active{% endif %}">
                     <span class="nav-item__label">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
@@ -121,7 +121,7 @@
                     </span>
                 </a>
                 <div class="nav-sub">
-                    <a href="{% url 'reports:monthly_list' %}">Месячный</a>
+                    <a href="{% url 'reports:weekly_list' %}">Недельный</a>
                     <a href="{% url 'reports:kpi' %}">KPI</a>
                 </div>
             </div>

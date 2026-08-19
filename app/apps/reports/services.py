@@ -79,12 +79,14 @@ def weekly_metrics(week_start: datetime.date) -> dict:
 
 
 def generate_weekly_report(date: datetime.date | None = None) -> WeeklyReport:
-    """Формирует отчёт за предыдущую неделю (ТЗ §24.1)."""
+    """Формирует отчёт за прошедшую неделю по форме руководителя."""
+    from apps.reports import weekly_form
+
     today = date or timezone.localdate()
     week_start, _ = week_bounds(today - datetime.timedelta(days=7))
     report, _created = WeeklyReport.objects.update_or_create(
         week_start=week_start,
-        defaults={'data': weekly_metrics(week_start)},
+        defaults={'data': weekly_form.build(week_start)},
     )
     return report
 

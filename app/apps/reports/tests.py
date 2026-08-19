@@ -4,6 +4,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.projects.models import Project, ProjectStatus
+from apps.reports import weekly_form
 from apps.reports.services import (
     calculate_kpi,
     generate_weekly_report,
@@ -31,6 +32,50 @@ class WeeklyReportTests(TestCase):
         start, _ = week_bounds(timezone.localdate())
         metrics = weekly_metrics(start)
         self.assertEqual(metrics['active_projects'], 1)
+
+
+class WeeklyFormTests(TestCase):
+    """Недельный отчёт по форме руководителя: период — Пн–Вс."""
+
+    def test_week_bounds_from_any_weekday(self):
+        start, end = weekly_form.week_bounds(datetime.date(2026, 8, 19))
+        self.assertEqual(start, datetime.date(2026, 8, 17))
+        self.assertEqual(end, datetime.date(2026, 8, 23))
+
+    def test_only_this_week_contracts_counted(self):
+        monday = datetime.date(2026, 8, 17)
+        Project.objects.create(name='На неделе', contract_date=monday)
+        Project.objects.create(
+            name='Раньше', contract_date=monday - datetime.timedelta(days=3),
+        )
+        data = weekly_form.build(monday)
+        self.assertEqual(data['projects']['signed_contracts'], 1)
+
+    def test_sections_cover_all_blocks(self):
+        data = weekly_form.build(datetime.date(2026, 8, 17))
+        sections = weekly_form.as_sections(data)
+        titles = [section['title'] for section in sections]
+        self.assertIn('Проекты в разработке', titles)
+        self.assertIn('Внутренние собрания', titles)
+        self.assertEqual(len(sections), len(weekly_form.SECTIONS))
+
+    def test_page_generates_report_for_week(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+        from apps.reports.models import WeeklyReport
+
+        user = get_user_model().objects.create_user(username='head', password='x')
+        self.client.force_login(user)
+        response = self.client.post(
+            reverse('reports:weekly_generate'), {'week': '2026-08-19'},
+        )
+        self.assertEqual(response.status_code, 302)
+        report = WeeklyReport.objects.get(week_start=datetime.date(2026, 8, 17))
+        self.assertIn('projects', report.data)
+        detail = self.client.get(
+            reverse('reports:weekly_detail', args=[report.pk]),
+        )
+        self.assertContains(detail, 'Проекты в разработке')
 
 
 class KPITests(TestCase):

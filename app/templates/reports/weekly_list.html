@@ -6,25 +6,38 @@
 <div class="page-head">
     <div>
         <h1>Недельные отчёты</h1>
-        <div class="sub">Формируются за предыдущую неделю (ТЗ §24.1)</div>
+        <div class="sub">Цифры считаются автоматически по данным платформы, неделя с понедельника по воскресенье</div>
     </div>
     <div class="page-actions">
-        <a href="{% url 'reports:kpi' %}" class="btn btn--secondary">KPI</a>
-        <form method="post" action="{% url 'reports:weekly_generate' %}">
+        <form method="post" action="{% url 'reports:weekly_generate' %}" style="margin:0">
             {% csrf_token %}
-            <button type="submit" class="btn">Сформировать отчёт</button>
+            <input type="hidden" name="week" value="{{ last_week|date:'Y-m-d' }}">
+            <button type="submit" class="btn btn--secondary">
+                Прошлая неделя ({{ last_week|date:'d.m' }} — {{ last_week_end|date:'d.m' }})
+            </button>
+        </form>
+        <form method="post" action="{% url 'reports:weekly_generate' %}" style="margin:0">
+            {% csrf_token %}
+            <input type="hidden" name="week" value="{{ this_week|date:'Y-m-d' }}">
+            <button type="submit" class="btn">
+                Отчёт за эту неделю ({{ this_week|date:'d.m' }} — {{ this_week_end|date:'d.m' }})
+            </button>
         </form>
     </div>
 </div>
 
 <div class="panel">
     {% for report in reports %}
-        <div style="display:flex; justify-content:space-between; align-items:center; padding: 10px 0; border-bottom: 1px solid var(--border);">
-            <a href="{% url 'reports:weekly_detail' report.pk %}"><strong>{{ report }}</strong></a>
-            <span style="font-size:12px; color:var(--text-muted)">сформирован {{ report.updated_at|date:'d.m.Y H:i' }}</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 12px 0; border-bottom: 1px solid var(--border);">
+            <a href="{% url 'reports:weekly_detail' report.pk %}">
+                <strong>Неделя {{ report.week_start|date:'d.m.Y' }}</strong>
+            </a>
+            <span style="font-size:12px; color: var(--text-muted)">
+                сформирован {{ report.updated_at|date:'d.m.Y H:i' }}
+            </span>
         </div>
     {% empty %}
-        <div class="empty">Отчётов пока нет — нажмите «Сформировать отчёт».</div>
+        <div class="empty">Отчётов пока нет — нажмите «Отчёт за эту неделю».</div>
     {% endfor %}
 </div>
 {% endblock %}

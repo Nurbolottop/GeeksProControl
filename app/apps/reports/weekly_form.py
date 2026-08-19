@@ -1,5 +1,4 @@
-"""Месячный отчёт GeeksPro — по форме рабочей таблицы (лист «отчеты»)."""
-import calendar
+"""Недельный отчёт GeeksPro — по форме рабочей таблицы (лист «отчеты»)."""
 import datetime
 
 from apps.attendance.models import Attendance, GroupMeeting, MeetingKind
@@ -10,14 +9,15 @@ from apps.projects.models import Project, ProjectStatus
 DELIVERY_LIMIT_DAYS = 110
 
 
-def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
-    last_day = calendar.monthrange(year, month)[1]
-    return datetime.date(year, month, 1), datetime.date(year, month, last_day)
+def week_bounds(day: datetime.date) -> tuple[datetime.date, datetime.date]:
+    """Понедельник — воскресенье недели, в которую попадает дата."""
+    start = day - datetime.timedelta(days=day.weekday())
+    return start, start + datetime.timedelta(days=6)
 
 
-def build(year: int, month: int) -> dict:
-    """Считает все показатели месячного отчёта."""
-    first, last = month_bounds(year, month)
+def build(week_start: datetime.date) -> dict:
+    """Считает все показатели недельного отчёта."""
+    first, last = week_bounds(week_start)
     projects = Project.objects.active()
 
     # --- Проекты в разработке ---

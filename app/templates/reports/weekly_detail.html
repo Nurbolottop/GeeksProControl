@@ -1,46 +1,39 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ report }} — GeeksPro Control{% endblock %}
+{% block title %}Отчёт за неделю {{ report.week_start|date:'d.m.Y' }} — GeeksPro Control{% endblock %}
 
 {% block content %}
 <div class="page-head">
     <div>
-        <h1>{{ report }}</h1>
-        {% if previous %}
-            <div class="sub">Сравнение с неделей от {{ previous.week_start|date:'d.m.Y' }}</div>
-        {% endif %}
+        <h1>Отчёт за {{ report.week_start|date:'d.m' }} — {{ week_end|date:'d.m.Y' }}</h1>
+        <div class="sub">Сформирован {{ report.updated_at|date:'d.m.Y H:i' }}</div>
     </div>
     <div class="page-actions">
         <a href="{% url 'reports:weekly_list' %}" class="btn btn--secondary">Все отчёты</a>
+        <form method="post" action="{% url 'reports:weekly_generate' %}" style="margin:0">
+            {% csrf_token %}
+            <input type="hidden" name="week" value="{{ report.week_start|date:'Y-m-d' }}">
+            <button type="submit" class="btn">Пересчитать</button>
+        </form>
     </div>
 </div>
 
-<div class="panel" style="padding: 0;">
-    <div class="table-wrap">
-        <table class="data">
-            <thead>
-            <tr>
-                <th>Показатель</th>
-                <th>Значение</th>
-                <th>Δ к прошлой неделе</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for row in rows %}
-                <tr>
-                    <td>{{ row.label }}</td>
-                    <td><strong>{{ row.value|default_if_none:'—' }}</strong></td>
-                    <td>
-                        {% if row.delta is None %}—
-                        {% elif row.delta > 0 %}<span class="badge badge--blue">+{{ row.delta }}</span>
-                        {% elif row.delta < 0 %}<span class="badge badge--gray">{{ row.delta }}</span>
-                        {% else %}0{% endif %}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div class="report-grid">
+    {% for section in sections %}
+        <div class="panel report-block">
+            <h2>{{ section.title }}</h2>
+            <div class="report-rows">
+                {% for row in section.rows %}
+                    <div class="report-row">
+                        <span>{{ row.label }}</span>
+                        <strong>
+                            {% if row.value is None %}—{% else %}{{ row.value }}{{ row.suffix }}{% endif %}
+                        </strong>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
 </div>
 
 <div class="panel">
@@ -51,7 +44,7 @@
             <textarea name="comment" rows="3">{{ report.comment }}</textarea>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn--secondary">Сохранить комментарий</button>
+            <button type="submit" class="btn btn--secondary">Сохранить</button>
         </div>
     </form>
 </div>
