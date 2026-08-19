@@ -56,8 +56,53 @@ class WeeklyFormTests(TestCase):
         sections = weekly_form.as_sections(data)
         titles = [section['title'] for section in sections]
         self.assertIn('Проекты в разработке', titles)
-        self.assertIn('Внутренние собрания', titles)
+        self.assertIn('Внутренние собрания за неделю', titles)
         self.assertEqual(len(sections), len(weekly_form.SECTIONS))
+
+    def test_missing_source_data_marked_as_no_data(self):
+        """Пустое поле в базе — это прочерк с подсказкой, а не ноль."""
+        data = weekly_form.build(datetime.date(2026, 8, 17))
+        rows = {
+            row['label']: row
+            for section in weekly_form.as_sections(data)
+            for row in section['rows']
+        }
+        new_interns = rows['Вышли на стажировку за неделю']
+        self.assertTrue(new_interns['no_data'])
+        self.assertIn('дата начала стажировки', new_interns['hint'])
+
+    def test_real_zero_stays_zero_when_data_exists(self):
+        Project.objects.create(
+            name='С договором', contract_date=datetime.date(2026, 7, 1),
+        )
+        data = weekly_form.build(datetime.date(2026, 8, 17))
+        rows = {
+            row['label']: row
+            for section in weekly_form.as_sections(data)
+            for row in section['rows']
+        }
+        signed = rows['Подписано договоров за неделю']
+        self.assertFalse(signed['no_data'])
+        self.assertEqual(signed['value'], 0)
+
+    def test_cancelled_counted_by_status_change_in_week(self):
+        from apps.projects.models import ProjectStatusHistory, ProjectStatus
+
+        project = Project.objects.create(name='Стоп')
+        record = ProjectStatusHistory.objects.create(
+            project=project, field='Статус',
+            new_value=ProjectStatus.CANCELLED.label,
+        )
+        ProjectStatusHistory.objects.filter(pk=record.pk).update(
+            created_at=timezone.make_aware(
+                datetime.datetime(2026, 8, 18, 12, 0),
+            ),
+        )
+        data = weekly_form.build(datetime.date(2026, 8, 17))
+        self.assertEqual(data['stopped']['by_us'], 1)
+        # прошлая неделя — событие туда не попадает
+        older = weekly_form.build(datetime.date(2026, 8, 10))
+        self.assertEqual(older['stopped']['by_us'], 0)
 
     def test_page_generates_report_for_week(self):
         from django.contrib.auth import get_user_model

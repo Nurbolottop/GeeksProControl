@@ -1,12 +1,25 @@
-"""Недельный отчёт GeeksPro — по форме рабочей таблицы (лист «отчеты»)."""
+"""Недельный отчёт GeeksPro — по форме рабочей таблицы (лист «отчеты»).
+
+Часть показателей считается «за неделю» (по датам событий), часть —
+«на конец недели» (текущее состояние). В форме это подписано явно,
+чтобы цифры не путались между собой.
+
+Если показатель нельзя посчитать, потому что исходное поле нигде
+не заполнено, вместо нуля показывается прочерк и подсказка, что
+именно надо заполнить — ноль и «нет данных» это разные вещи.
+"""
 import datetime
 
 from apps.attendance.models import Attendance, GroupMeeting, MeetingKind
 from apps.interns.models import Intern, InternStatus, WORKING_STATUSES
-from apps.projects.models import Project, ProjectStatus
+from apps.projects.models import Project, ProjectStatus, ProjectStatusHistory
 
 # Норматив сдачи проекта: 110 дней с даты подписания договора
 DELIVERY_LIMIT_DAYS = 110
+
+# Как статусы проекта выглядят в истории изменений
+CANCELLED_LABEL = ProjectStatus.CANCELLED.label
+REFUSED_LABEL = ProjectStatus.REFUSED.label
 
 
 def week_bounds(day: datetime.date) -> tuple[datetime.date, datetime.date]:
@@ -15,10 +28,19 @@ def week_bounds(day: datetime.date) -> tuple[datetime.date, datetime.date]:
     return start, start + datetime.timedelta(days=6)
 
 
+def _status_changes(first: datetime.date, last: datetime.date, label: str) -> int:
+    """Сколько проектов за неделю перешли в указанный статус."""
+    return ProjectStatusHistory.objects.filter(
+        field='Статус', new_value=label,
+        created_at__date__gte=first, created_at__date__lte=last,
+    ).values('project').distinct().count()
+
+
 def build(week_start: datetime.date) -> dict:
     """Считает все показатели недельного отчёта."""
     first, last = week_bounds(week_start)
     projects = Project.objects.active()
+    interns = Intern.objects.active()
 
     # --- Проекты в разработке ---
     active_projects = projects.filter(status=ProjectStatus.ACTIVE).count()
@@ -26,7 +48,7 @@ def build(week_start: datetime.date) -> dict:
         contract_date__gte=first, contract_date__lte=last,
     ).count()
 
-    # --- Принятые заказчиком ---
+    # --- Принятые заказчиком за неделю ---
     completed = list(
         projects.filter(
             status=ProjectStatus.COMPLETED,
@@ -44,29 +66,28 @@ def build(week_start: datetime.date) -> dict:
         and project.actual_end_date > project.planned_end_date
     )
 
-    # --- Незавершённые ---
-    stopped_by_us = projects.filter(status=ProjectStatus.CANCELLED).count()
-    stopped_by_client = projects.filter(status=ProjectStatus.REFUSED).count()
+    # --- Незавершённые: по факту смены статуса на этой неделе ---
+    stopped_by_us = _status_changes(first, last, CANCELLED_LABEL)
+    stopped_by_client = _status_changes(first, last, REFUSED_LABEL)
 
     # --- Стажёры ---
-    interns = Intern.objects.active()
     active_interns = interns.filter(status__in=WORKING_STATUSES).count()
     new_interns = interns.filter(
         internship_start_date__gte=first, internship_start_date__lte=last,
     ).count()
 
-    # --- Выпускники ---
+    # --- Выпускники (состояние на конец недели) ---
     finished = interns.filter(
         status__in=[InternStatus.EMPLOYABLE, InternStatus.EMPLOYED],
     ).count()
     employed = interns.filter(status=InternStatus.EMPLOYED).count()
     resume_bank_rate = round(employed / finished * 100) if finished else None
 
-    # --- Выбывшие ---
+    # --- Выбывшие (состояние на конец недели) ---
     dropped = interns.filter(status=InternStatus.DROPPED).count()
     paused = interns.filter(status=InternStatus.PAUSED).count()
 
-    # --- Внутренние собрания ---
+    # --- Внутренние собрания за неделю ---
     meetings = GroupMeeting.objects.filter(
         kind=MeetingKind.INTERNAL, date__gte=first, date__lte=last,
     )
@@ -80,6 +101,7 @@ def build(week_start: datetime.date) -> dict:
     absence_rate = 100 - attendance_rate if attendance_rate is not None else None
 
     return {
+        'period': {'start': first.isoformat(), 'end': last.isoformat()},
         'projects': {
             'active': active_projects,
             'signed_contracts': signed_contracts,
@@ -102,7 +124,6 @@ def build(week_start: datetime.date) -> dict:
         },
         'left': {
             'dropped': dropped,
-            'stopped': 0,
             'paused': paused,
         },
         'meetings': {
@@ -112,61 +133,86 @@ def build(week_start: datetime.date) -> dict:
             'attendance_rate': attendance_rate,
             'absence_rate': absence_rate,
         },
+        'gaps': gaps(),
     }
 
 
-# Структура для вывода: блок → строки (подпись, ключ, суффикс)
+def gaps() -> dict:
+    """Показатели, которые нельзя посчитать — исходные поля не заполнены."""
+    result = {}
+    if not Project.objects.active().exclude(contract_date__isnull=True).exists():
+        result['contract_date'] = 'Ни у одного проекта не заполнена дата договора'
+    if not Project.objects.active().exclude(actual_end_date__isnull=True).exists():
+        result['actual_end_date'] = (
+            'Ни один проект ещё не завершён — нет фактической даты сдачи'
+        )
+    if not Intern.objects.active().exclude(
+        internship_start_date__isnull=True,
+    ).exists():
+        result['internship_start'] = (
+            'У стажёров не заполнена дата начала стажировки'
+        )
+    if not Intern.objects.active().filter(
+        status__in=[InternStatus.EMPLOYABLE, InternStatus.EMPLOYED],
+    ).exists():
+        result['graduates'] = 'Никому не проставлен статус выпускника'
+    if not GroupMeeting.objects.filter(kind=MeetingKind.INTERNAL).exists():
+        result['meetings'] = 'Внутренние собрания ещё не создавались в табеле'
+    return result
+
+
+# Блок → строки (подпись, ключ, суффикс, ключ подсказки о нехватке данных)
 SECTIONS = [
     ('Проекты в разработке', 'projects', [
-        ('Количество активных проектов', 'active', ''),
-        ('Количество подписанных договоров на разработку', 'signed_contracts', ''),
+        ('Активных проектов — на конец недели', 'active', '', None),
+        ('Подписано договоров за неделю', 'signed_contracts', '', 'contract_date'),
     ]),
-    ('Проекты, принятые заказчиком', 'accepted', [
-        (f'Принято заказчиком за {DELIVERY_LIMIT_DAYS} дней после договора',
-         'in_time', ''),
-        ('Передано заказчику с просрочкой', 'late', ''),
+    ('Принято заказчиком за неделю', 'accepted', [
+        (f'Принято в срок — до {DELIVERY_LIMIT_DAYS} дней с договора',
+         'in_time', '', 'actual_end_date'),
+        ('Передано с просрочкой', 'late', '', 'actual_end_date'),
     ]),
-    ('Незавершённые проекты', 'stopped', [
-        ('Прекращены по инициативе исполнителя', 'by_us', ''),
-        ('Прекращены по инициативе заказчика', 'by_client', ''),
+    ('Незавершённые проекты за неделю', 'stopped', [
+        ('Прекращены по инициативе исполнителя', 'by_us', '', None),
+        ('Прекращены по инициативе заказчика', 'by_client', '', None),
     ]),
     ('Стажёры', 'interns', [
-        ('Активные стажёры', 'active', ''),
-        ('Новые стажёры', 'new', ''),
+        ('Активных стажёров — на конец недели', 'active', '', None),
+        ('Вышли на стажировку за неделю', 'new', '', 'internship_start'),
     ]),
-    ('Выпускники', 'graduates', [
-        ('Успешно завершившие стажировку', 'finished', ''),
-        ('% добавленных в банк резюме', 'resume_bank_rate', '%'),
+    ('Выпускники — на конец недели', 'graduates', [
+        ('Успешно завершившие стажировку', 'finished', '', 'graduates'),
+        ('% добавленных в банк резюме', 'resume_bank_rate', '%', 'graduates'),
     ]),
-    ('Выбывшие из стажировки', 'left', [
-        ('Отчисленные', 'dropped', ''),
-        ('Прекратившие', 'stopped', ''),
-        ('Приостановившие', 'paused', ''),
+    ('Выбывшие из стажировки — на конец недели', 'left', [
+        ('Отчисленные', 'dropped', '', None),
+        ('Приостановившие', 'paused', '', None),
     ]),
-    ('Внутренние собрания', 'meetings', [
-        ('Запланированные', 'planned', ''),
-        ('Проведённые', 'held', ''),
-        ('Непроведённые', 'missed', ''),
-        ('% посещаемости собраний', 'attendance_rate', '%'),
-        ('% неприсутствия', 'absence_rate', '%'),
+    ('Внутренние собрания за неделю', 'meetings', [
+        ('Запланированные', 'planned', '', 'meetings'),
+        ('Проведённые', 'held', '', 'meetings'),
+        ('Непроведённые', 'missed', '', 'meetings'),
+        ('% посещаемости собраний', 'attendance_rate', '%', 'meetings'),
+        ('% неприсутствия', 'absence_rate', '%', 'meetings'),
     ]),
 ]
 
 
 def as_sections(data: dict) -> list[dict]:
     """Готовит данные отчёта к выводу блоками."""
+    missing = data.get('gaps', {})
     result = []
     for title, group_key, rows in SECTIONS:
         group = data.get(group_key, {})
-        result.append({
-            'title': title,
-            'rows': [
-                {
-                    'label': label,
-                    'value': group.get(key),
-                    'suffix': suffix,
-                }
-                for label, key, suffix in rows
-            ],
-        })
+        prepared = []
+        for label, key, suffix, gap_key in rows:
+            hint = missing.get(gap_key) if gap_key else None
+            prepared.append({
+                'label': label,
+                'value': group.get(key),
+                'suffix': suffix,
+                'hint': hint,
+                'no_data': bool(hint),
+            })
+        result.append({'title': title, 'rows': prepared})
     return result

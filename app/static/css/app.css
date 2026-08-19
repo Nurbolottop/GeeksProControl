@@ -1531,6 +1531,13 @@ a:hover { color: var(--accent-dark); }
 .report-row:last-child { border-bottom: none; }
 .report-row span { color: var(--text-muted); }
 .report-row strong { font-size: 18px; font-weight: 750; flex-shrink: 0; }
+.report-row__hint {
+    display: block;
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--yellow);
+}
+.report-row--empty strong { color: #c2c7d4; }
 
 /* ---- Сводка по направлениям ---- */
 .spec-grid {

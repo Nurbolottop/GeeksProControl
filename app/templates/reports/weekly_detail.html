@@ -24,10 +24,15 @@
             <h2>{{ section.title }}</h2>
             <div class="report-rows">
                 {% for row in section.rows %}
-                    <div class="report-row">
-                        <span>{{ row.label }}</span>
+                    <div class="report-row {% if row.no_data %}report-row--empty{% endif %}">
+                        <span>
+                            {{ row.label }}
+                            {% if row.hint %}
+                                <span class="report-row__hint">нет данных: {{ row.hint }}</span>
+                            {% endif %}
+                        </span>
                         <strong>
-                            {% if row.value is None %}—{% else %}{{ row.value }}{{ row.suffix }}{% endif %}
+                            {% if row.no_data %}—{% elif row.value is None %}—{% else %}{{ row.value }}{{ row.suffix }}{% endif %}
                         </strong>
                     </div>
                 {% endfor %}
