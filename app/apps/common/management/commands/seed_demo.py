@@ -99,7 +99,6 @@ class Command(BaseCommand):
                 current_stage=stage, planned_end_date=deadline,
                 progress=progress, priority=priority,
                 contract_date=contract, start_date=days(-30),
-                project_manager=project_pm, team_lead=project_tl,
                 status=ProjectStatus.ACTIVE,
             )
             create_project(project)
@@ -112,7 +111,6 @@ class Command(BaseCommand):
             planned_end_date=today.replace(day=1),
             actual_end_date=today.replace(day=2),
             progress=100, contract_date=days(-120), start_date=days(-100),
-            project_manager=pm, team_lead=tl,
         )
         create_project(completed)
 

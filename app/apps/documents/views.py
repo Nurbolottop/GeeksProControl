@@ -2,11 +2,12 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from apps.documents import services
 from apps.documents.forms import DocumentForm
 from apps.documents.models import Document, DocumentStatus, DocumentType
-from apps.projects.models import Project
+from apps.projects.models import Project, ProjectStatusHistory
 
 
 @login_required
@@ -66,3 +67,25 @@ def document_update(request, pk):
         request, 'documents/form.html',
         {'form': form, 'title': f'Редактирование: {document.doc_type}'},
     )
+
+
+@login_required
+def document_approve(request, pk):
+    """Утвердить документ: бриф принят, ТЗ согласовано с заказчиком."""
+    document = get_object_or_404(
+        Document.objects.select_related("project", "doc_type"), pk=pk,
+    )
+    if request.method == "POST":
+        document.status = DocumentStatus.SIGNED
+        document.is_signed = True
+        if not document.signed_date:
+            document.signed_date = timezone.localdate()
+        document.save(update_fields=[
+            "status", "is_signed", "signed_date", "updated_at",
+        ])
+        ProjectStatusHistory.objects.create(
+            project=document.project, field="Документы",
+            new_value=f"Утверждён: {document.doc_type}", user=request.user,
+        )
+        messages.success(request, f"«{document.doc_type}» утверждён.")
+    return redirect(f"{document.project.get_absolute_url()}?tab=documents")

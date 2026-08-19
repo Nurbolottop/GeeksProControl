@@ -110,20 +110,16 @@ def attention_items() -> list[dict]:
             'text': f'{project.name} — нет обновлений более 3 дней',
             'url': project.get_absolute_url(),
         })
-    for project in project_selectors.active_projects().filter(
-        project_manager__isnull=True,
-    ):
+    for project in project_selectors.projects_without_pm():
         items.append({
             'level': 'orange',
-            'text': f'{project.name} — не назначен Project Manager',
+            'text': f'{project.name} — не назначен ПМ',
             'url': project.get_absolute_url(),
         })
-    for project in project_selectors.active_projects().filter(
-        team_lead__isnull=True,
-    ):
+    for project in project_selectors.projects_without_leads():
         items.append({
             'level': 'orange',
-            'text': f'{project.name} — не назначен Team Lead',
+            'text': f'{project.name} — не назначены тимлиды',
             'url': project.get_absolute_url(),
         })
 

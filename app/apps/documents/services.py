@@ -9,13 +9,19 @@ from apps.projects.models import Project
 
 
 def ensure_default_types() -> None:
-    """Создаёт базовый справочник типов документов, если он пуст."""
-    if DocumentType.objects.exists():
-        return
-    DocumentType.objects.bulk_create([
+    """Досоздаёт недостающие типы документов.
+
+    Проверяется каждый тип по отдельности, поэтому новые типы
+    (например, бриф) появляются и на уже работающей базе.
+    """
+    existing = set(DocumentType.objects.values_list('code', flat=True))
+    missing = [
         DocumentType(code=code, name=name, required_for_delivery=required)
         for code, name, required in DEFAULT_TYPES
-    ])
+        if code not in existing
+    ]
+    if missing:
+        DocumentType.objects.bulk_create(missing)
 
 
 def document_progress(project: Project) -> dict:

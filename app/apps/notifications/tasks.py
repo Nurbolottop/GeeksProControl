@@ -121,19 +121,17 @@ def check_missing_managers() -> int:
     """Активные проекты без PM или Team Lead (ТЗ §22)."""
     from apps.projects import selectors
     created = 0
-    for project in selectors.active_projects().filter(
-        project_manager__isnull=True,
-    ):
+    for project in selectors.projects_without_pm():
         if notify(
-            f'Нет PM: {project.name}',
+            f'Нет ПМ: {project.name}',
             level=NotificationLevel.WARNING,
             url=project.get_absolute_url(),
             dedup_key=f'no_pm:{project.pk}',
         ):
             created += 1
-    for project in selectors.active_projects().filter(team_lead__isnull=True):
+    for project in selectors.projects_without_leads():
         if notify(
-            f'Нет Team Lead: {project.name}',
+            f'Нет тимлидов: {project.name}',
             level=NotificationLevel.WARNING,
             url=project.get_absolute_url(),
             dedup_key=f'no_tl:{project.pk}',

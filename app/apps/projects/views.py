@@ -136,7 +136,7 @@ def _daily_left(project) -> int:
 def project_detail(request, pk):
     project = get_object_or_404(
         Project.objects.select_related(
-            'client', 'project_type', 'project_manager', 'team_lead',
+            'client', 'project_type',
         ),
         pk=pk,
     )
@@ -214,12 +214,28 @@ def project_detail(request, pk):
 
 @login_required
 def project_create(request):
+    """Новый проект. Заказчика можно завести здесь же, не уходя с формы."""
+    from apps.clients.models import Client
+
     form = ProjectForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        project = form.save(commit=False)
-        services.create_project(project, user=request.user)
-        messages.success(request, f'Проект «{project.name}» создан.')
-        return redirect(project.get_absolute_url())
+    if request.method == 'POST':
+        new_client = request.POST.get('new_client', '').strip()
+        if new_client:
+            client, created = Client.objects.get_or_create(
+                organization=new_client,
+                defaults={'city': request.POST.get('city', '').strip()},
+            )
+            # Подставляем нового заказчика в форму до валидации
+            data = request.POST.copy()
+            data['client'] = client.pk
+            form = ProjectForm(data)
+            if created:
+                messages.success(request, f'Заказчик «{client}» создан.')
+        if form.is_valid():
+            project = form.save(commit=False)
+            services.create_project(project, user=request.user)
+            messages.success(request, f'Проект «{project.name}» создан.')
+            return redirect(f'{project.get_absolute_url()}?tab=team')
     return render(
         request, 'projects/form.html',
         {'form': form, 'title': 'Новый проект'},
@@ -294,7 +310,7 @@ def project_section(request, pk, section):
         raise Http404
     project = get_object_or_404(
         Project.objects.select_related(
-            'client', 'project_type', 'project_manager', 'team_lead',
+            'client', 'project_type',
         ),
         pk=pk,
     )

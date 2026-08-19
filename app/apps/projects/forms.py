@@ -21,7 +21,7 @@ class ProjectForm(forms.ModelForm):
             'name', 'client', 'city', 'flow', 'project_type', 'description',
             'contract_date', 'start_date', 'planned_end_date',
             'status', 'current_stage', 'priority', 'progress',
-            'project_manager', 'team_lead', 'head_comment',
+            'head_comment',
             'github_url', 'figma_url', 'staging_url', 'production_url',
             'domain', 'is_favorite',
         ]
@@ -127,13 +127,16 @@ class ProjectLinksForm(forms.ModelForm):
 
 
 class ProjectDetailsForm(forms.ModelForm):
-    """Инлайн-форма: статус, этап, поток, приоритет, тип, PM и TL."""
+    """Инлайн-форма: статус, этап, поток, приоритет, тип.
+
+    ПМ и тимлиды здесь не редактируются — они назначаются в команде
+    проекта, чтобы человек был один и в табеле, и в карточке.
+    """
 
     class Meta:
         model = Project
         fields = [
-            'status', 'current_stage', 'flow', 'priority',
-            'project_type', 'project_manager', 'team_lead',
+            'status', 'current_stage', 'flow', 'priority', 'project_type',
         ]
 
 

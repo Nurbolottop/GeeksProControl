@@ -152,16 +152,6 @@ class Project(TimeStampedModel, ArchivableModel):
     )
     progress = models.PositiveSmallIntegerField('Процент готовности', default=0)
 
-    project_manager = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        related_name='managed_projects', verbose_name='Project Manager',
-        null=True, blank=True,
-    )
-    team_lead = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        related_name='led_projects', verbose_name='Team Lead',
-        null=True, blank=True,
-    )
     head_comment = models.TextField('Комментарий руководителя', blank=True)
 
     github_url = models.URLField('GitHub', blank=True)
@@ -199,6 +189,29 @@ class Project(TimeStampedModel, ArchivableModel):
 
     def get_absolute_url(self) -> str:
         return reverse('projects:detail', args=[self.pk])
+
+    # --- Команда: единственный источник правды о ПМ и тимлидах ---
+    def _members(self, role: str) -> list:
+        return [
+            member for member in self.team_members.all()
+            if member.role == role and member.status == 'active'
+            and member.intern_id
+        ]
+
+    @property
+    def pm(self):
+        """ПМ проекта — участник команды с ролью PM."""
+        members = self._members('pm')
+        return members[0].intern if members else None
+
+    @property
+    def leads(self) -> list:
+        """Тимлиды направлений проекта."""
+        return [member.intern for member in self._members('team_lead')]
+
+    @property
+    def has_pm(self) -> bool:
+        return self.pm is not None
 
     @property
     def duration_days(self):

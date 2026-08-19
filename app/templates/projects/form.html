@@ -15,6 +15,23 @@
     <div class="form-grid">
         {% include 'partials/form_fields.html' %}
     </div>
+    {% if not project %}
+        <div class="new-client" x-data="{ open: false }">
+            <button type="button" class="btn btn--secondary btn--sm" @click="open = !open"
+                    x-text="open ? 'Выбрать из списка' : '+ Заказчика ещё нет в списке'"></button>
+            <div x-show="open" x-cloak style="margin-top: 10px">
+                <div class="form-field">
+                    <label for="new-client">Название организации заказчика</label>
+                    <input type="text" id="new-client" name="new_client" autocomplete="off"
+                           placeholder="Например: ОсОО «Омур»">
+                    <div class="field-hint">
+                        Заказчик создастся вместе с проектом — заполнять карточку
+                        целиком сейчас не нужно, контакты и реквизиты добавите позже.
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
     <div class="form-actions">
         <button type="submit" class="btn">Сохранить</button>
         <a href="{% if project %}{{ project.get_absolute_url }}{% else %}{% url 'projects:list' %}{% endif %}"

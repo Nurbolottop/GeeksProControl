@@ -18,12 +18,23 @@ from apps.projects.services import (
 def projects_qs() -> QuerySet[Project]:
     return (
         Project.objects.active()
-        .select_related('client', 'project_type', 'project_manager', 'team_lead')
+        .select_related('client', 'project_type')
+        .prefetch_related('team_members__intern')
     )
 
 
 def active_projects() -> QuerySet[Project]:
     return projects_qs().filter(status=ProjectStatus.ACTIVE)
+
+
+def projects_without_pm() -> list[Project]:
+    """Активные проекты, где в команде нет ПМ."""
+    return [p for p in active_projects() if not p.has_pm]
+
+
+def projects_without_leads() -> list[Project]:
+    """Активные проекты без тимлидов направлений."""
+    return [p for p in active_projects() if not p.leads]
 
 
 def overdue_projects(today: datetime.date | None = None) -> QuerySet[Project]:

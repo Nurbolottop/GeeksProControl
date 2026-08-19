@@ -251,6 +251,12 @@
                         {% if item.document.file %}
                             <a href="{{ item.document.file.url }}" target="_blank" rel="noopener" class="btn btn--secondary btn--sm">Открыть</a>
                         {% endif %}
+                        {% if not item.document.is_signed %}
+                            <form method="post" action="{% url 'documents:approve' item.document.pk %}" style="display:inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn--sm">Утвердить</button>
+                            </form>
+                        {% endif %}
                         <a href="{% url 'documents:update' item.document.pk %}" class="btn btn--secondary btn--sm">Изменить</a>
                     {% else %}
                         <a href="{% url 'documents:create' %}?project={{ project.pk }}&type={{ item.type.pk }}" class="btn btn--sm">Загрузить</a>

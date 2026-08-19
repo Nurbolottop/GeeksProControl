@@ -21,8 +21,14 @@
         <div class="meta-row"><span>Номер в потоке</span><div>{{ project.display_code }}</div></div>
         <div class="meta-row"><span>Приоритет</span><div>{{ project.get_priority_display }}</div></div>
         <div class="meta-row"><span>Тип проекта</span><div>{{ project.project_type|default:'—' }}</div></div>
-        <div class="meta-row"><span>Project Manager</span><div>{{ project.project_manager.display_name|default:'—' }}</div></div>
-        <div class="meta-row"><span>Team Lead</span><div>{{ project.team_lead.display_name|default:'—' }}</div></div>
+        <div class="meta-row">
+            <span>ПМ проекта</span>
+            <div>{% if project.pm %}<a href="{{ project.pm.get_absolute_url }}">{{ project.pm.full_name }}</a>{% else %}<a href="?tab=team" class="badge badge--yellow">назначить</a>{% endif %}</div>
+        </div>
+        <div class="meta-row">
+            <span>Тимлиды</span>
+            <div>{% for lead in project.leads %}<a href="{{ lead.get_absolute_url }}">{{ lead.full_name }}</a>{% if not forloop.last %}, {% endif %}{% empty %}<a href="?tab=team" class="badge badge--yellow">назначить</a>{% endfor %}</div>
+        </div>
         <div class="meta-row">
             <span>Команда</span>
             <div><a href="?tab=team">{{ project.team_members.count }} чел. →</a></div>

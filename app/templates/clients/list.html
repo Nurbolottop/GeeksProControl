@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
 
-{% block title %}Клиенты — GeeksPro Control{% endblock %}
+{% block title %}Заказчики — GeeksPro Control{% endblock %}
 
 {% block content %}
 <div class="page-head">
     <div>
-        <h1>Клиенты</h1>
+        <h1>Заказчики</h1>
         <div class="sub">Всего: {{ page.paginator.count }}</div>
     </div>
     <div class="page-actions">
-        <a href="{% url 'clients:create' %}" class="btn">+ Новый клиент</a>
+        <a href="{% url 'clients:create' %}" class="btn">+ Новый заказчик</a>
     </div>
 </div>
 
@@ -49,7 +49,7 @@
                     <td>{{ client.project_count }}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Клиентов не найдено.</td></tr>
+                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Заказчиков не найдено.</td></tr>
             {% endfor %}
             </tbody>
         </table>

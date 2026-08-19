@@ -191,3 +191,62 @@ class ClientProjectsTests(TestCase):
             project = make_project(name=f'P{index}', client=client_obj)
             create_project(project)
         self.assertEqual(client_obj.projects.count(), 2)
+
+
+class ProjectCreationFlowTests(TestCase):
+    """Порядок работы: заказчик заводится вместе с проектом, ПМ — в команде."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+
+    def test_new_client_created_from_project_form(self):
+        response = self.client.post(reverse("projects:create"), {
+            "name": "Туризм", "new_client": "ОсОО Туризм",
+            "status": "active", "current_stage": "new",
+            "priority": "medium", "progress": 0,
+        })
+        self.assertEqual(response.status_code, 302)
+        client_obj = Client.objects.get(organization="ОсОО Туризм")
+        project = Project.objects.get(name="Туризм")
+        self.assertEqual(project.client, client_obj)
+        # После создания сразу зовём назначать команду
+        self.assertTrue(response.url.endswith("?tab=team"))
+
+    def test_existing_client_not_duplicated(self):
+        Client.objects.create(organization="ОсОО Омур")
+        self.client.post(reverse("projects:create"), {
+            "name": "Омур", "new_client": "ОсОО Омур",
+            "status": "active", "current_stage": "new",
+            "priority": "medium", "progress": 0,
+        })
+        self.assertEqual(Client.objects.filter(organization="ОсОО Омур").count(), 1)
+
+    def test_pm_and_leads_come_from_team(self):
+        from apps.interns.models import Intern
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = make_project(name="Омур")
+        create_project(project)
+        self.assertIsNone(project.pm)
+        self.assertEqual(project.leads, [])
+
+        pm = Intern.objects.create(full_name="Алтынай")
+        lead = Intern.objects.create(full_name="Бексултан")
+        TeamMember.objects.create(
+            project=project, intern=pm, role=TeamRole.PROJECT_MANAGER, workload=50,
+        )
+        TeamMember.objects.create(
+            project=project, intern=lead, role=TeamRole.TEAM_LEAD, workload=50,
+        )
+        project.refresh_from_db()
+        self.assertEqual(project.pm, pm)
+        self.assertEqual(project.leads, [lead])
+        self.assertTrue(project.has_pm)
+
+    def test_projects_without_pm_selector(self):
+        from apps.projects import selectors
+
+        project = make_project(name="Без ПМ")
+        create_project(project)
+        self.assertIn(project, selectors.projects_without_pm())

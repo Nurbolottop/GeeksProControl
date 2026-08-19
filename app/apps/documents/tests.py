@@ -2,6 +2,7 @@ from django.test import TestCase
 
 from apps.documents import services
 from apps.documents.models import (
+    BRIEF,
     CONTRACT,
     FINAL_ACT,
     Document,
@@ -29,13 +30,14 @@ class DocumentProgressTests(TestCase):
     def test_progress_counts_required_documents(self):
         progress = services.document_progress(self.project)
         self.assertEqual(progress['done'], 0)
-        self.assertEqual(progress['total'], 3)  # договор, ТЗ, финальный акт
+        # бриф, договор, ТЗ, финальный акт
+        self.assertEqual(progress['total'], 4)
 
         self._add(CONTRACT)
         progress = services.document_progress(self.project)
         self.assertEqual(progress['done'], 1)
         missing_codes = {t.code for t in progress['missing']}
-        self.assertEqual(missing_codes, {REQUIREMENTS, FINAL_ACT})
+        self.assertEqual(missing_codes, {BRIEF, REQUIREMENTS, FINAL_ACT})
 
     def test_cancelled_document_not_counted(self):
         self._add(CONTRACT, status=DocumentStatus.CANCELLED)

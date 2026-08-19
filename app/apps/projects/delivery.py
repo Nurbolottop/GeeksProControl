@@ -20,7 +20,7 @@ from apps.projects.models import (
 def delivery_checks(project: Project) -> list[dict]:
     """Список проверок готовности к сдаче: [{label, ok, hint}]."""
     from apps.documents import services as doc_services
-    from apps.documents.models import CONTRACT, FINAL_ACT, REQUIREMENTS
+    from apps.documents.models import BRIEF, CONTRACT, FINAL_ACT, REQUIREMENTS
     from apps.tasks.models import TaskPriority, TaskStatus
 
     open_statuses = (TaskStatus.NEW, TaskStatus.IN_PROGRESS, TaskStatus.REVIEW)
@@ -62,6 +62,12 @@ def delivery_checks(project: Project) -> list[dict]:
         },
         {
             'group': 'Документы',
+            'label': 'Бриф заказчика загружен',
+            'ok': doc_services.has_document(project, BRIEF),
+            'hint': 'Загрузите бриф во вкладке «Документы»',
+        },
+        {
+            'group': 'Документы',
             'label': 'Договор имеется',
             'ok': doc_services.has_document(project, CONTRACT),
             'hint': 'Загрузите договор во вкладке «Документы»',
@@ -71,6 +77,12 @@ def delivery_checks(project: Project) -> list[dict]:
             'label': 'ТЗ имеется',
             'ok': doc_services.has_document(project, REQUIREMENTS),
             'hint': 'Загрузите ТЗ во вкладке «Документы»',
+        },
+        {
+            'group': 'Документы',
+            'label': 'ТЗ утверждено',
+            'ok': doc_services.has_signed_document(project, REQUIREMENTS),
+            'hint': 'Нажмите «Утвердить» у ТЗ во вкладке «Документы»',
         },
         {
             'group': 'Документы',

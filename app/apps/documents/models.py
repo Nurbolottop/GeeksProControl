@@ -27,12 +27,14 @@ class DocumentType(models.Model):
 
 
 # Коды базовых типов — используются в проверках delivery
+BRIEF = 'brief'
 CONTRACT = 'contract'
 REQUIREMENTS = 'requirements'
 FINAL_ACT = 'final_act'
 
 DEFAULT_TYPES = [
     # (code, name, required_for_delivery)
+    (BRIEF, 'Бриф заказчика', True),
     (CONTRACT, 'Договор', True),
     (REQUIREMENTS, 'ТЗ', True),
     ('annex', 'Приложение', False),

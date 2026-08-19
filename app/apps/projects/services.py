@@ -30,8 +30,6 @@ TRACKED_FIELDS = {
     'planned_end_date': 'Плановая дата завершения',
     'progress': 'Прогресс',
     'priority': 'Приоритет',
-    'project_manager': 'Project Manager',
-    'team_lead': 'Team Lead',
 }
 
 
