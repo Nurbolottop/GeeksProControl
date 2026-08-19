@@ -24,7 +24,9 @@
     <a href="?tab=tasks" class="{% if tab == 'tasks' %}is-active{% endif %}">Задачи</a>
     <a href="?tab=team" class="{% if tab == 'team' %}is-active{% endif %}">Команда</a>
     <a href="?tab=documents" class="{% if tab == 'documents' %}is-active{% endif %}">Документы</a>
-    <a href="?tab=access" class="{% if tab == 'access' %}is-active{% endif %}">Доступы</a>
+    <a href="?tab=access" class="{% if tab == 'access' %}is-active{% endif %}">
+        Доступы{% if open_access_requests %}<span class="tab-count">{{ open_access_requests }}</span>{% endif %}
+    </a>
     <a href="?tab=delivery" class="{% if tab == 'delivery' %}is-active{% endif %}">Сдача</a>
     <a href="?tab=history" class="{% if tab == 'history' %}is-active{% endif %}">История</a>
 </div>
@@ -119,6 +121,144 @@
         <div class="panel empty">Команда не сформирована.</div>
     {% endfor %}
 {% elif tab == 'access' %}
+    <div class="panel" style="padding: 0;">
+        <div class="panel-bar">
+            <h2 style="margin:0">Запросы у ПМ ({{ access_requests|length }})</h2>
+            <span class="panel-bar__note">
+                {% if project_pm %}
+                    ПМ проекта — <strong>{{ project_pm.full_name }}</strong>
+                {% else %}
+                    ПМ проекта не назначен — назначьте его во вкладке «Команда»
+                {% endif %}
+            </span>
+        </div>
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Что нужно</th>
+                    <th>Запросил</th>
+                    <th>Ждём</th>
+                    <th style="width: 46%">Выдать</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in access_requests %}
+                    <tr x-data="{ open: false, decline: false }">
+                        <td>
+                            <strong>{{ item.service }}</strong>
+                            {% if item.comment %}
+                                <div style="font-size:11.5px; color: var(--text-muted)">{{ item.comment }}</div>
+                            {% endif %}
+                        </td>
+                        <td style="font-size:12.5px">
+                            {% if item.requested_by %}{{ item.requested_by.get_full_name|default:item.requested_by.username }}{% else %}—{% endif %}
+                            <div style="font-size:11.5px; color: var(--text-muted)">{{ item.created_at|date:'d.m.Y' }}</div>
+                        </td>
+                        <td>
+                            <span class="badge badge--{% if item.waiting_days >= 3 %}red{% else %}yellow{% endif %}">
+                                {{ item.waiting_days }} дн.
+                            </span>
+                        </td>
+                        <td>
+                            <div x-show="!open && !decline" style="display:flex; gap:6px; flex-wrap:wrap">
+                                <button type="button" class="btn btn--sm" @click="open = true">Выдать доступ</button>
+                                <button type="button" class="btn btn--secondary btn--sm" @click="decline = true">Не даю</button>
+                                <form method="post" action="{% url 'projects:access_request_delete' item.pk %}" style="display:inline"
+                                      onsubmit="return confirm('Снять запрос «{{ item.service|escapejs }}»?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn--secondary btn--sm" title="Снять запрос">✕</button>
+                                </form>
+                            </div>
+                            <form method="post" action="{% url 'projects:access_request_provide' item.pk %}"
+                                  x-show="open" x-cloak class="access-give">
+                                {% csrf_token %}
+                                <input type="text" name="url" placeholder="Адрес / URL" autocomplete="off">
+                                <input type="text" name="login" placeholder="Логин" autocomplete="off">
+                                <input type="text" name="password" placeholder="Пароль" autocomplete="off">
+                                <input type="text" name="comment" placeholder="Комментарий" autocomplete="off">
+                                <div style="display:flex; gap:6px">
+                                    <button type="submit" class="btn btn--sm">Сохранить</button>
+                                    <button type="button" class="btn btn--secondary btn--sm" @click="open = false">Отмена</button>
+                                </div>
+                            </form>
+                            <form method="post" action="{% url 'projects:access_request_decline' item.pk %}"
+                                  x-show="decline" x-cloak class="access-give">
+                                {% csrf_token %}
+                                <input type="text" name="reason" placeholder="Почему не даёте доступ" autocomplete="off">
+                                <div style="display:flex; gap:6px">
+                                    <button type="submit" class="btn btn--sm">Отправить отказ</button>
+                                    <button type="button" class="btn btn--secondary btn--sm" @click="decline = false">Отмена</button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="empty" style="text-align:center; padding: 22px;">
+                        Открытых запросов нет — отметьте ниже, какие доступы нужны от ПМ.
+                    </td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Запросить доступ у ПМ</h2>
+        <form method="post" action="{% url 'projects:access_request_create' project.pk %}">
+            {% csrf_token %}
+            <div class="access-presets">
+                {% for preset in access_presets %}
+                    <label class="access-chip">
+                        <input type="checkbox" name="service" value="{{ preset }}">
+                        <span>{{ preset }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+            <div class="form-row" style="margin-top: 14px">
+                <div class="form-field">
+                    <label for="custom-access">Другое (своими словами)</label>
+                    <input type="text" id="custom-access" name="custom" autocomplete="off"
+                           placeholder="Например: доступ к SMS-шлюзу">
+                </div>
+                <div class="form-field">
+                    <label for="access-comment">Зачем нужен</label>
+                    <input type="text" id="access-comment" name="comment" autocomplete="off"
+                           placeholder="Например: подключить оплату на тесте">
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">Запросить у ПМ</button>
+            </div>
+        </form>
+    </div>
+
+    {% if closed_requests %}
+        <div class="panel" style="padding: 0;">
+            <div class="panel-bar"><h2 style="margin:0">Закрытые запросы</h2></div>
+            <div class="table-wrap">
+                <table class="data">
+                    <tbody>
+                    {% for item in closed_requests %}
+                        <tr>
+                            <td><strong>{{ item.service }}</strong></td>
+                            <td>
+                                {% if item.status == 'provided' %}
+                                    <span class="badge badge--green">✓ Выдан</span>
+                                {% else %}
+                                    <span class="badge badge--red">Отказано</span>
+                                    {% if item.answer %}<span style="font-size:12px; color: var(--text-muted)"> — {{ item.answer }}</span>{% endif %}
+                                {% endif %}
+                            </td>
+                            <td style="font-size:12px; color: var(--text-muted)">{{ item.resolved_at|date:'d.m.Y' }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="panel" style="padding: 0;">
         <h2 style="padding: 16px 20px 0">Доступы проекта ({{ accesses|length }})</h2>
         <div class="table-wrap">
