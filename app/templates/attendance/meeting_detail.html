@@ -81,24 +81,25 @@
                 </span>
             </div>
             <div class="score-hint">
-                Балл от 0 до 10 за работу над проектом с прошлого собрания.
+                Кликните по шкале — балл выставится сразу.
                 <strong>0–4</strong> — не тянет, <strong>5–7</strong> — норма, <strong>8–10</strong> — сильно.
-                Повторный клик по баллу снимает оценку.
+                Неоценённые идут первыми; ✕ снимает балл.
             </div>
             <div class="table-wrap">
                 <table class="data">
                     <thead>
                     <tr>
                         <th>Человек</th>
-                        <th>Балл за период</th>
+                        <th>Активность за период</th>
+                        <th>Прошлый раз</th>
                         <th>Комментарий</th>
                     </tr>
                     </thead>
                     <tbody>
-                    {% for row in rows %}
+                    {% for row in score_rows %}
                         {% include 'attendance/partials/score_row.html' %}
                     {% empty %}
-                        <tr><td colspan="3" class="empty" style="text-align:center; padding: 24px;">
+                        <tr><td colspan="4" class="empty" style="text-align:center; padding: 24px;">
                             В команде нет людей.
                         </td></tr>
                     {% endfor %}

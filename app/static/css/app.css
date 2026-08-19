@@ -1151,25 +1151,84 @@ a:hover { color: var(--accent-dark); }
     color: var(--text-muted);
 }
 .score-hint strong { color: var(--text); }
-.score-scale { display: flex; gap: 4px; flex-wrap: wrap; }
-.score-btn {
-    width: 32px;
-    height: 30px;
+.score-line--empty { background: #fcfcfe; }
+.score-line__bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+}
+.score-zero {
+    width: 26px;
+    height: 28px;
+    flex: none;
     border-radius: 8px;
     border: 1px solid var(--border-strong);
     background: var(--surface);
     color: var(--text-muted);
     font-family: inherit;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     transition: all .12s ease;
 }
-.score-btn:hover { border-color: var(--accent); color: var(--text); }
-.score-btn--low.is-on { background: var(--red-bg); border-color: var(--red-line); color: var(--red); }
-.score-btn--mid.is-on { background: var(--yellow-bg); border-color: var(--yellow-line); color: var(--yellow); }
-.score-btn--high.is-on { background: var(--green-bg); border-color: var(--green-line); color: var(--green); }
-.score-btn.is-on { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.score-zero:hover { border-color: var(--red-line); color: var(--red); }
+.score-zero.is-on { background: var(--red-bg); border-color: var(--red-line); color: var(--red); }
+
+.score-bar {
+    display: flex;
+    gap: 3px;
+    padding: 3px;
+    border-radius: 10px;
+    background: #eef0f6;
+    border: 1px solid var(--border);
+}
+.score-seg {
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 5px;
+    background: var(--surface);
+    color: #b4b9c8;
+    font-family: inherit;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .1s ease, color .1s ease, transform .1s ease;
+}
+.score-seg span { pointer-events: none; }
+.score-seg:hover { transform: translateY(-1px); color: var(--text); }
+.score-bar--low .score-seg.is-on { background: var(--red); color: #fff; }
+.score-bar--mid .score-seg.is-on { background: var(--yellow); color: #fff; }
+.score-bar--high .score-seg.is-on { background: var(--green); color: #fff; }
+
+.score-value { font-size: 12.5px; color: var(--text-muted); min-width: 74px; }
+.score-value strong { font-size: 17px; }
+.score-value--low strong { color: var(--red); }
+.score-value--mid strong { color: var(--yellow); }
+.score-value--high strong { color: var(--green); }
+.score-value__none { font-size: 12px; color: #a8adbd; }
+.score-clear {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+}
+.score-clear:hover { border-color: var(--red-line); color: var(--red); }
+
+.score-prev { white-space: nowrap; font-size: 12px; }
+.score-prev__was { color: var(--text-muted); }
+.score-prev__none { color: #b4b9c8; }
+.score-delta { margin-left: 6px; font-weight: 700; }
+.score-delta--up { color: var(--green); }
+.score-delta--down { color: var(--red); }
+.score-delta--same { color: var(--text-muted); font-weight: 600; }
 .score-note {
     width: 100%;
     padding: 6px 10px;

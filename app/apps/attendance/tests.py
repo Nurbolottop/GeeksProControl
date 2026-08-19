@@ -82,6 +82,32 @@ class MeetingScoreTests(TestCase):
         self.client.post(url, {'intern': self.person.pk, 'score': '15'})
         self.assertFalse(WorkScore.objects.filter(meeting=self.meeting).exists())
 
+    def test_previous_score_and_delta_shown(self):
+        WorkScore.objects.create(
+            meeting=self.previous, intern=self.person, score=4,
+        )
+        url = reverse('attendance:score_person', args=[self.meeting.pk])
+        response = self.client.post(
+            url, {'intern': self.person.pk, 'score': '7'},
+        )
+        self.assertContains(response, 'было 4')
+        self.assertContains(response, '+3')
+
+    def test_unscored_people_listed_first(self):
+        other = Intern.objects.create(full_name='Алтынай')
+        TeamMember.objects.create(
+            group=self.group, project=self.group.project, intern=other,
+            role=TeamRole.PROJECT_MANAGER, workload=50,
+        )
+        WorkScore.objects.create(
+            meeting=self.meeting, intern=self.person, score=9,
+        )
+        response = self.client.get(
+            reverse('attendance:meeting_detail', args=[self.meeting.pk]),
+        )
+        order = [row['intern'] for row in response.context['score_rows']]
+        self.assertEqual(order, [other, self.person])
+
     def test_detail_page_shows_both_sections(self):
         response = self.client.get(
             reverse('attendance:meeting_detail', args=[self.meeting.pk]),

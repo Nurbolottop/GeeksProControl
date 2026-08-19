@@ -119,6 +119,52 @@ def build_sheet(group, year: int, month: int) -> dict:
     }
 
 
+def previous_scores(meeting) -> dict[int, int]:
+    """Баллы, выставленные на прошлом собрании того же вида."""
+    previous = meeting.previous
+    if previous is None:
+        return {}
+    return {
+        item.intern_id: item.score
+        for item in WorkScore.objects.filter(meeting=previous)
+    }
+
+
+def score_row(meeting, intern, score=None, comment: str = '',
+              previous: int | None = None) -> dict:
+    """Данные одной строки оценки: балл, прошлый балл и изменение."""
+    delta = None
+    if score is not None and previous is not None:
+        delta = score - previous
+    return {
+        'intern': intern,
+        'member': meeting.group.members.filter(intern=intern).first(),
+        'score': score,
+        'score_comment': comment,
+        'previous': previous,
+        'delta': delta,
+        'segments': score_segments(score),
+        'level': score_level(score),
+    }
+
+
+def score_level(score) -> str:
+    """Уровень балла для подсветки: high / mid / low / empty."""
+    if score is None:
+        return 'empty'
+    if score >= 8:
+        return 'high'
+    return 'mid' if score >= 5 else 'low'
+
+
+def score_segments(score) -> list[dict]:
+    """Полоса шкалы: 10 делений, залиты до выставленного балла."""
+    return [
+        {'value': value, 'on': score is not None and value <= score}
+        for value in range(1, WorkScore.MAX + 1)
+    ]
+
+
 def toggle_mark(meeting, intern, user=None) -> Attendance | None:
     """Переключает отметку: Был → Не был → Опоздал → Уважительная → пусто."""
     mark = Attendance.objects.filter(meeting=meeting, intern=intern).first()

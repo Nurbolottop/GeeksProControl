@@ -300,17 +300,26 @@ def meeting_detail(request, pk):
     scores = {
         score.intern_id: score for score in meeting.scores.all()
     }
+    previous = services.previous_scores(meeting)
     rows = []
     for member in members:
         mark = marks.get(member.intern_id)
         score = scores.get(member.intern_id)
+        was = previous.get(member.intern_id)
+        value = score.score if score else None
         rows.append({
             'member': member,
             'intern': member.intern,
             'status': mark.status if mark else '',
-            'score': score.score if score else None,
+            'score': value,
             'score_comment': score.comment if score else '',
+            'previous': was,
+            'delta': (value - was) if value is not None and was is not None else None,
+            'segments': services.score_segments(value),
+            'level': services.score_level(value),
         })
+    # В оценке сначала показываем тех, кому балл ещё не поставили
+    score_rows = sorted(rows, key=lambda row: row['score'] is not None)
     attended = sum(
         1 for row in rows
         if row['status'] in ('present', 'late')
@@ -325,6 +334,7 @@ def meeting_detail(request, pk):
         'attended': attended,
         'rate': round(attended / marked * 100) if marked else None,
         'statuses': Attendance.Status.choices,
+        'score_rows': score_rows,
         'scale': WorkScore.SCALE,
         'scored': len(given),
         'average_score': round(sum(given) / len(given), 1) if given else None,
@@ -407,10 +417,10 @@ def score_person(request, pk):
     return render(request, 'attendance/partials/score_row.html', {
         'meeting': meeting,
         'scale': WorkScore.SCALE,
-        'row': {
-            'intern': intern,
-            'score': entry.score if entry else None,
-            'score_comment': entry.comment if entry else '',
-            'member': meeting.group.members.filter(intern=intern).first(),
-        },
+        'row': services.score_row(
+            meeting, intern,
+            score=entry.score if entry else None,
+            comment=entry.comment if entry else '',
+            previous=services.previous_scores(meeting).get(intern.pk),
+        ),
     })
