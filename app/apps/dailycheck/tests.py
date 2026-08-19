@@ -102,34 +102,21 @@ class ProjectDailyTests(TestCase):
         self.project = create_project(Project(name="Туризм"))
         self.today = timezone.localdate()
 
-    def test_default_items_created_per_project(self):
+    def test_tab_opens_with_empty_list(self):
         from apps.dailycheck.models import ProjectCheckItem
 
         response = self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
         self.assertEqual(response.status_code, 200)
-        items = ProjectCheckItem.objects.filter(project=self.project)
-        self.assertTrue(items.exists())
-        self.assertContains(response, "Команда на месте")
-
-    def test_same_default_set_for_another_project(self):
-        from apps.dailycheck.models import ProjectCheckItem
-        from apps.projects.models import Project
-        from apps.projects.services import create_project
-
-        other = create_project(Project(name="Учкун"))
-        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
-        self.client.get(f"{other.get_absolute_url()}?tab=daily")
-        first = set(ProjectCheckItem.objects.filter(
-            project=self.project).values_list("title", flat=True))
-        second = set(ProjectCheckItem.objects.filter(
-            project=other).values_list("title", flat=True))
-        self.assertEqual(first, second)
+        self.assertFalse(
+            ProjectCheckItem.objects.filter(project=self.project).exists(),
+        )
+        self.assertContains(response, "добавьте свои")
 
     def test_toggle_and_untoggle(self):
         from apps.dailycheck.models import ProjectCheckItem, ProjectCheckMark
 
-        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
-        item = ProjectCheckItem.objects.filter(project=self.project).first()
+        item = ProjectCheckItem.objects.create(
+            project=self.project, title="Свой пункт")
         url = reverse("dailycheck:project_toggle", args=[item.pk])
         self.client.post(url, {"date": self.today.isoformat()})
         self.assertTrue(ProjectCheckMark.objects.filter(item=item).exists())
@@ -142,9 +129,9 @@ class ProjectDailyTests(TestCase):
         from apps.projects.services import create_project
 
         other = create_project(Project(name="Учкун"))
-        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
-        self.client.get(f"{other.get_absolute_url()}?tab=daily")
-        item = ProjectCheckItem.objects.filter(project=self.project).first()
+        item = ProjectCheckItem.objects.create(
+            project=self.project, title="Общий пункт")
+        ProjectCheckItem.objects.create(project=other, title="Общий пункт")
         self.client.post(reverse("dailycheck:project_item_delete", args=[item.pk]))
         item.refresh_from_db()
         self.assertFalse(item.is_active)
@@ -164,9 +151,10 @@ class ProjectDailyTests(TestCase):
     def test_tab_badge_counts_unchecked(self):
         from apps.dailycheck.models import ProjectCheckItem
 
-        self.client.get(f"{self.project.get_absolute_url()}?tab=daily")
+        item = ProjectCheckItem.objects.create(
+            project=self.project, title="Раз")
+        ProjectCheckItem.objects.create(project=self.project, title="Два")
         total = ProjectCheckItem.objects.filter(project=self.project).count()
-        item = ProjectCheckItem.objects.filter(project=self.project).first()
         self.client.post(
             reverse("dailycheck:project_toggle", args=[item.pk]),
             {"date": self.today.isoformat()},
