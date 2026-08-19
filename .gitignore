@@ -177,3 +177,7 @@ cython_debug/
 app/staticfiles/
 .DS_Store
 .env.prod
+
+# Скриншоты из чата
+*.png
+!app/static/**/*.png
