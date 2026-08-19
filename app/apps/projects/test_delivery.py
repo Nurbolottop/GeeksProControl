@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.documents import services as doc_services
@@ -87,3 +88,33 @@ class DeliveryTests(TestCase):
         ).first()
         self.assertIsNotNone(record)
         self.assertEqual(record.reason, 'Клиент принял без акта')
+
+
+class DeliveryOnOverviewTests(TestCase):
+    """Завершение проекта живёт во вкладке «Обзор», отдельной «Сдачи» нет."""
+
+    def setUp(self):
+        doc_services.ensure_default_types()
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Омур", progress=40))
+
+    def test_overview_shows_completion_block_with_open_checks(self):
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Завершение проекта")
+        self.assertContains(response, "Завершить проект")
+        self.assertTrue(response.context["delivery_failed"])
+        self.assertFalse(response.context["delivery_ready"])
+
+    def test_delivery_tab_is_gone(self):
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertNotContains(response, "?tab=delivery")
+
+    def test_complete_returns_to_overview(self):
+        response = self.client.post(
+            reverse("projects:complete", args=[self.project.pk]),
+        )
+        self.assertTrue(response.url.endswith("?tab=overview"))
+        self.project.refresh_from_db()
+        self.assertNotEqual(self.project.status, ProjectStatus.COMPLETED)

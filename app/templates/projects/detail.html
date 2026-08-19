@@ -25,7 +25,6 @@
     <a href="?tab=team" class="{% if tab == 'team' %}is-active{% endif %}">Команда</a>
     <a href="?tab=documents" class="{% if tab == 'documents' %}is-active{% endif %}">Документы</a>
     <a href="?tab=access" class="{% if tab == 'access' %}is-active{% endif %}">Доступы</a>
-    <a href="?tab=delivery" class="{% if tab == 'delivery' %}is-active{% endif %}">Сдача</a>
     <a href="?tab=history" class="{% if tab == 'history' %}is-active{% endif %}">История</a>
 </div>
 
@@ -248,65 +247,6 @@
             </div>
         {% endfor %}
     </div>
-{% elif tab == 'delivery' %}
-    <div class="panel">
-        <h2>Delivery Checklist</h2>
-        {% regroup delivery_checks by group as check_groups %}
-        {% for group in check_groups %}
-            <h2 style="margin-top:14px; font-size: 13px; color: var(--text-muted)">{{ group.grouper }}</h2>
-            <ul class="attention-list">
-                {% for check in group.list %}
-                    <li>
-                        {% if check.ok %}
-                            <span class="badge badge--green">✓</span> {{ check.label }}
-                        {% else %}
-                            <span class="badge badge--red">✗</span> {{ check.label }}
-                            <span style="color:var(--text-muted); font-size:12px">— {{ check.hint }}</span>
-                        {% endif %}
-                    </li>
-                {% endfor %}
-            </ul>
-        {% endfor %}
-    </div>
-    {% if project.status != 'completed' %}
-        <div class="panel">
-            <h2>Завершение проекта</h2>
-            {% if delivery_ready %}
-                <div class="message message--success">Все условия выполнены — проект готов к завершению.</div>
-            {% else %}
-                <div class="message message--warning">Есть невыполненные условия. Завершение будет заблокировано.</div>
-            {% endif %}
-            <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
-                <form method="post" action="{% url 'projects:complete' project.pk %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn">Завершить проект</button>
-                </form>
-                <form method="post" action="{% url 'projects:complete' project.pk %}"
-                      style="display:flex; gap:8px; align-items:flex-start;">
-                    {% csrf_token %}
-                    <input type="hidden" name="force" value="1">
-                    <div class="form-field" style="min-width: 280px">
-                        <label>Причина принудительного завершения (обязательно)</label>
-                        <input type="text" name="reason" placeholder="Например: клиент принял работу без акта">
-                    </div>
-                    <button type="submit" class="btn btn--secondary"
-                            onclick="return confirm('Завершить проект принудительно, минуя проверки?')">
-                        Принудительно
-                    </button>
-                </form>
-            </div>
-        </div>
-    {% else %}
-        <div class="panel">
-            <div class="message message--success" style="margin:0">
-                Проект завершён {{ project.actual_end_date|date:'d.m.Y' }}.
-                {% if project.delay_days is not None %}
-                    {% if project.delay_days > 0 %}Задержка: {{ project.delay_days }} дн.
-                    {% else %}Сдан в срок.{% endif %}
-                {% endif %}
-            </div>
-        </div>
-    {% endif %}
 {% elif tab == 'history' %}
     <div class="panel">
         <h2>История изменений</h2>
@@ -332,6 +272,7 @@
         {% include 'projects/partials/section_client.html' %}
         {% include 'projects/partials/section_links.html' %}
         {% include 'projects/partials/section_about.html' %}
+        {% include 'projects/partials/section_delivery.html' %}
     </div>
 
     <div class="detail-grid__side">

@@ -168,10 +168,14 @@ def project_detail(request, pk):
         ]
         context['documents'] = documents
         context['doc_progress'] = doc_services.document_progress(project)
-    elif tab == 'delivery':
+    elif tab == 'overview':
+        # Завершение проекта живёт в «Обзоре» — там же его проверки
         from apps.projects import delivery
-        context['delivery_checks'] = delivery.delivery_checks(project)
-        context['delivery_ready'] = not delivery.failed_checks(project)
+        checks = delivery.delivery_checks(project)
+        failed = [check for check in checks if not check['ok']]
+        context['delivery_checks'] = checks
+        context['delivery_failed'] = failed
+        context['delivery_ready'] = not failed
     return render(request, 'projects/detail.html', context)
 
 
@@ -216,14 +220,14 @@ def project_complete(request, pk):
     from apps.projects import delivery
     project = get_object_or_404(Project, pk=pk)
     if request.method != 'POST':
-        return redirect(f'{project.get_absolute_url()}?tab=delivery')
+        return redirect(f'{project.get_absolute_url()}?tab=overview')
     force = request.POST.get('force') == '1'
     reason = request.POST.get('reason', '').strip()
     if force and not reason:
         messages.error(
             request, 'Принудительное завершение требует указания причины.',
         )
-        return redirect(f'{project.get_absolute_url()}?tab=delivery')
+        return redirect(f'{project.get_absolute_url()}?tab=overview')
     success, failed = delivery.complete_project(
         project, user=request.user, force=force, reason=reason,
     )
@@ -232,7 +236,7 @@ def project_complete(request, pk):
     else:
         details = '; '.join(check['label'] for check in failed)
         messages.error(request, f'Нельзя завершить проект. Не выполнено: {details}.')
-    return redirect(f'{project.get_absolute_url()}?tab=delivery')
+    return redirect(f'{project.get_absolute_url()}?tab=overview')
 
 
 # Инлайн-редактирование панелей карточки проекта (AJAX через HTMX)
