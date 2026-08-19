@@ -14,6 +14,9 @@
         </div>
     </div>
     <div class="page-actions">
+        {% if project.group %}
+            <a href="{% url 'attendance:group_meetings' project.group.pk %}" class="btn btn--secondary">Табель</a>
+        {% endif %}
         <a href="{% url 'projects:update' project.pk %}" class="btn btn--secondary">Редактировать</a>
     </div>
 </div>
@@ -86,7 +89,13 @@
                 — <a href="{{ project.group.get_absolute_url }}">группа {{ project.group.code }} потока {{ project.group.flow.number }} →</a>
             {% endif %}
         </h2>
-        <a href="{% url 'teams:member_add' project.pk %}" class="btn btn--sm">+ Участник</a>
+        <div style="display:flex; gap:8px">
+            {% if project.group %}
+                <a href="{% url 'attendance:group_meetings' project.group.pk %}"
+                   class="btn btn--secondary btn--sm">Табель команды →</a>
+            {% endif %}
+            <a href="{% url 'teams:member_add' project.pk %}" class="btn btn--sm">+ Участник</a>
+        </div>
     </div>
     {% for section in team_sections %}
         <div class="panel team-section">
