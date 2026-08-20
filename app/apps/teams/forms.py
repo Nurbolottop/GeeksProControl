@@ -32,8 +32,8 @@ class TeamMemberForm(forms.ModelForm):
 
     class Meta:
         model = TeamMember
-        fields = ['intern', 'workload', 'comment']
-        labels = {'intern': 'Участник', 'workload': 'Загрузка, %'}
+        fields = ['intern', 'comment']
+        labels = {'intern': 'Участник'}
         widgets = {
             'comment': forms.Textarea(attrs={'rows': 2}),
         }
@@ -71,17 +71,20 @@ class TeamMemberForm(forms.ModelForm):
         pass
 
     def overload_warning(self) -> str | None:
-        """Текст предупреждения о перегрузе после валидации формы."""
+        """Сколько ещё проектов у человека — предупреждение при распылении."""
         if not self.is_valid():
             return None
         intern = self.cleaned_data.get('intern')
         if not intern:
             return None
-        total = services.person_workload(
-            intern=intern, exclude_pk=self.instance.pk,
-        ) + self.cleaned_data.get('workload', 0)
-        if total > 100:
-            return f'Внимание: суммарная загрузка {intern.full_name} составит {total}%.'
+        others = TeamMember.objects.filter(
+            intern=intern, status=TeamMember.Status.ACTIVE,
+        ).exclude(pk=self.instance.pk).count()
+        if others >= 2:
+            return (
+                f'{intern.full_name} уже занят(а) на {others} проектах — '
+                f'этот будет третьим.'
+            )
         return None
 
 
@@ -120,7 +123,7 @@ class TeamMemberEditForm(TeamMemberForm):
 
     class Meta(TeamMemberForm.Meta):
         fields = [
-            'intern', 'workload', 'joined_at', 'left_at', 'status', 'comment',
+            'intern', 'joined_at', 'left_at', 'status', 'comment',
         ]
         widgets = {
             'joined_at': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),

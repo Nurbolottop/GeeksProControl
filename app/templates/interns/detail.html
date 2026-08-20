@@ -42,7 +42,7 @@
     {% for member in active_memberships %}
         <div style="padding: 6px 0; border-bottom: 1px solid var(--border);">
             <a href="{{ member.project.get_absolute_url }}">{{ member.project.name }}</a>
-            — {{ member.get_role_display }}, загрузка {{ member.workload }}%
+            — {{ member.get_role_display }}
         </div>
     {% empty %}
         <div class="empty">Сейчас не назначен(а) на проекты.</div>

@@ -117,7 +117,7 @@
                                 <span class="member__name">{{ member.person_name }}</span>
                             {% endif %}
                             <div class="member__meta">
-                                {{ member.intern.specialization|default:'—' }} · загрузка {{ member.workload }}%
+                                {{ member.intern.specialization|default:'—' }}
                                 {% if member.status != 'active' %} · вышел{% endif %}
                             </div>
                         </div>

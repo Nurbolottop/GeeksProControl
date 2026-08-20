@@ -45,25 +45,19 @@ class WorkloadTests(TestCase):
         self.assertEqual(services.workload_band(95)[0], 'high')
         self.assertEqual(services.workload_band(120)[0], 'overload')
 
-    def test_form_warns_on_overload(self):
-        TeamMember.objects.create(
-            project=self.project_a, intern=self.person,
-            role=TeamRole.BACKEND, workload=80,
-        )
-        form = TeamMemberForm({
-            'intern': self.person.pk, 'role': TeamRole.BACKEND,
-            'workload': 40, 'status': TeamMember.Status.ACTIVE,
-        })
+    def test_form_warns_when_person_on_many_projects(self):
+        for project in (self.project_a, self.project_b):
+            TeamMember.objects.create(
+                project=project, intern=self.person, role=TeamRole.BACKEND,
+            )
+        form = TeamMemberForm({'intern': self.person.pk})
         self.assertTrue(form.is_valid(), form.errors)
         warning = form.overload_warning()
         self.assertIsNotNone(warning)
-        self.assertIn('120%', warning)
+        self.assertIn('2 проектах', warning)
 
-    def test_form_no_warning_under_limit(self):
-        form = TeamMemberForm({
-            'intern': self.person.pk, 'role': TeamRole.BACKEND,
-            'workload': 40, 'status': TeamMember.Status.ACTIVE,
-        })
+    def test_form_no_warning_for_first_project(self):
+        form = TeamMemberForm({'intern': self.person.pk})
         self.assertTrue(form.is_valid(), form.errors)
         self.assertIsNone(form.overload_warning())
 

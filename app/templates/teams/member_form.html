@@ -38,11 +38,6 @@
         </label>
 
         <div class="form-row" style="margin-top: 18px">
-            <div class="form-field">
-                <label for="{{ form.workload.id_for_label }}">Загрузка, %</label>
-                {{ form.workload }}
-                {% if form.workload.errors %}<div class="form-errors">{{ form.workload.errors.0 }}</div>{% endif %}
-            </div>
             {% if form.status %}
                 <div class="form-field">
                     <label for="{{ form.status.id_for_label }}">Статус</label>
