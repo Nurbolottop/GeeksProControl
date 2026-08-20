@@ -3,11 +3,20 @@
 {% block title %}Собрания команды {{ group.code }} — GeeksPro Control{% endblock %}
 
 {% block content %}
+<nav class="crumbs">
+    <a href="{% url 'attendance:dashboard' %}">Табель</a>
+    {% if group.project %}
+        <span class="crumbs__sep">›</span>
+        <a href="{{ group.project.get_absolute_url }}">{{ group.project.name }}</a>
+    {% endif %}
+    <span class="crumbs__sep">›</span>
+    <span class="crumbs__current">Команда {{ group.code }}</span>
+</nav>
+
 <div class="page-head">
     <div>
         <h1>{% if group.project %}{{ group.project.name }}{% else %}Команда {{ group.code }}{% endif %}</h1>
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
-            <a href="{% url 'attendance:dashboard' %}" class="badge badge--gray">← Табель</a>
             <span class="badge badge--blue">Команда {{ group.code }}</span>
             <span class="badge badge--gray">{{ people }} человек</span>
         </div>

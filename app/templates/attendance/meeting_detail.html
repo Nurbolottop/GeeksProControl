@@ -3,11 +3,22 @@
 {% block title %}Собрание {{ meeting.date|date:'d.m.Y' }} — GeeksPro Control{% endblock %}
 
 {% block content %}
+<nav class="crumbs">
+    <a href="{% url 'attendance:dashboard' %}">Табель</a>
+    {% if group.project %}
+        <span class="crumbs__sep">›</span>
+        <a href="{{ group.project.get_absolute_url }}">{{ group.project.name }}</a>
+    {% endif %}
+    <span class="crumbs__sep">›</span>
+    <a href="{% url 'attendance:group_meetings' group.pk %}">Собрания команды</a>
+    <span class="crumbs__sep">›</span>
+    <span class="crumbs__current">{{ meeting.date|date:'d.m.Y' }}</span>
+</nav>
+
 <div class="page-head">
     <div>
         <h1>{{ meeting.get_kind_display }} · {{ meeting.date|date:'d.m.Y' }}</h1>
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
-            <a href="{% url 'attendance:group_meetings' group.pk %}" class="badge badge--gray">← Собрания команды</a>
             {% if group.project %}<span class="badge badge--blue">{{ group.project.name }}</span>{% endif %}
             {% if meeting.host %}<span class="badge badge--gray">ведёт {{ meeting.host.full_name }}</span>{% endif %}
             {% if rate is not None %}

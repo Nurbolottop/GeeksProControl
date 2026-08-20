@@ -1264,6 +1264,38 @@ a:hover { color: var(--accent-dark); }
 .att-score--mid { background: var(--yellow-bg); color: var(--yellow); }
 .att-score--high { background: var(--green-bg); color: var(--green); }
 
+/* ---- Хлебные крошки ---- */
+.crumbs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+}
+.crumbs a {
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-weight: 600;
+    text-decoration: none;
+    transition: all .12s ease;
+}
+.crumbs a:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.crumbs__sep { color: #c2c7d4; }
+.crumbs__current {
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #e8eaf1;
+    color: var(--text);
+    font-weight: 700;
+}
+
 /* ---- Поле с кнопкой «создать на месте» ---- */
 .input-add { display: flex; gap: 8px; align-items: stretch; }
 .input-add > select,

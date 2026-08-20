@@ -3,11 +3,22 @@
 {% block title %}Табель группы {{ group.code }} — GeeksPro Control{% endblock %}
 
 {% block content %}
+<nav class="crumbs">
+    <a href="{% url 'attendance:dashboard' %}">Табель</a>
+    {% if group.project %}
+        <span class="crumbs__sep">›</span>
+        <a href="{{ group.project.get_absolute_url }}">{{ group.project.name }}</a>
+    {% endif %}
+    <span class="crumbs__sep">›</span>
+    <a href="{% url 'attendance:group_meetings' group.pk %}">Собрания команды</a>
+    <span class="crumbs__sep">›</span>
+    <span class="crumbs__current">Табель за месяц</span>
+</nav>
+
 <div class="page-head">
     <div>
         <h1>Табель группы {{ group.code }}</h1>
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
-            <a href="{% url 'attendance:group_meetings' group.pk %}" class="badge badge--gray">← Собрания команды</a>
             {% if group.project %}<a href="{{ group.project.get_absolute_url }}" class="badge badge--gray">{{ group.project.name }}</a>{% endif %}
             {% if sheet.activity is not None %}
                 <span class="badge badge--{% if sheet.activity >= 8 %}green{% elif sheet.activity >= 5 %}yellow{% else %}red{% endif %}">

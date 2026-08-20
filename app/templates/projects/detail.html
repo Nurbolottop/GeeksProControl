@@ -3,6 +3,20 @@
 {% block title %}{{ project.name }} — GeeksPro Control{% endblock %}
 
 {% block content %}
+<nav class="crumbs">
+    <a href="{% url 'projects:list' %}">Проекты</a>
+    {% if project.flow %}
+        <span class="crumbs__sep">›</span>
+        <a href="{{ project.flow.get_absolute_url }}">Поток {{ project.flow.number }}</a>
+    {% endif %}
+    {% if project.group %}
+        <span class="crumbs__sep">›</span>
+        <a href="{% url 'attendance:group_meetings' project.group.pk %}">Команда {{ project.group.code }}</a>
+    {% endif %}
+    <span class="crumbs__sep">›</span>
+    <span class="crumbs__current">{{ project.name }}</span>
+</nav>
+
 <div class="page-head">
     <div>
         <h1>{{ project.display_code }} · {{ project.name }} {% if project.is_favorite %}★{% endif %}</h1>
