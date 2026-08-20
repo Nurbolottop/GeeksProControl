@@ -9,6 +9,7 @@ from apps.projects.models import Project
 from apps.teams import services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
+from apps.training.models import Specialization
 
 
 def people_options(form):
@@ -31,12 +32,41 @@ def team_overview(request):
     return redirect('resources:forecast')
 
 
+def _with_new_person(request):
+    """Если человека нет в базе — заводим его прямо из формы команды."""
+    from apps.interns.models import InternStatus
+
+    data = request.POST.copy()
+    name = data.get('new_person', '').strip()
+    if not name:
+        return data, None
+
+    spec = None
+    raw_spec = data.get('new_spec', '')
+    if raw_spec.isdigit():
+        spec = Specialization.objects.filter(pk=int(raw_spec)).first()
+
+    intern, created = Intern.objects.get_or_create(
+        full_name=name,
+        defaults={'specialization': spec, 'status': InternStatus.ACTIVE},
+    )
+    if created and spec and not intern.specialization_id:
+        intern.specialization = spec
+        intern.save(update_fields=['specialization', 'updated_at'])
+    data['intern'] = intern.pk
+    return data, (intern if created else None)
+
+
 @login_required
 def member_add(request, project_pk):
     """Добавление участника через карточку проекта (команда = группа проекта)."""
     project = get_object_or_404(Project, pk=project_pk)
     group = getattr(project, 'group', None)
     form = TeamMemberForm(request.POST or None)
+    created_person = None
+    if request.method == 'POST':
+        data, created_person = _with_new_person(request)
+        form = TeamMemberForm(data)
     if request.method == 'POST' and form.is_valid():
         member = form.save(commit=False)
         member.project = project
@@ -45,12 +75,15 @@ def member_add(request, project_pk):
         warning = form.overload_warning()
         if warning:
             messages.warning(request, warning)
+        if created_person:
+            messages.success(request, f'{created_person} заведён(а) в базе.')
         messages.success(request, f'{member.person_name} добавлен(а) в команду.')
         return redirect(f'{project.get_absolute_url()}?tab=team')
     return render(
         request, 'teams/member_form.html',
         {'form': form, 'project': project, 'group': group,
          'people': people_options(form),
+         'specializations': Specialization.objects.order_by('name'),
          'title': 'Добавить участника'},
     )
 
@@ -62,6 +95,10 @@ def member_add_to_group(request, group_pk):
         Group.objects.select_related('project', 'flow'), pk=group_pk,
     )
     form = TeamMemberForm(request.POST or None)
+    created_person = None
+    if request.method == 'POST':
+        data, created_person = _with_new_person(request)
+        form = TeamMemberForm(data)
     if request.method == 'POST' and form.is_valid():
         member = form.save(commit=False)
         member.group = group
@@ -70,12 +107,15 @@ def member_add_to_group(request, group_pk):
         warning = form.overload_warning()
         if warning:
             messages.warning(request, warning)
+        if created_person:
+            messages.success(request, f'{created_person} заведён(а) в базе.')
         messages.success(request, f'{member.person_name} добавлен(а) в группу.')
         return redirect(group.get_absolute_url())
     return render(
         request, 'teams/member_form.html',
         {'form': form, 'group': group, 'project': group.project,
          'people': people_options(form),
+         'specializations': Specialization.objects.order_by('name'),
          'title': f'Добавить участника в группу {group.code}'},
     )
 
@@ -100,6 +140,8 @@ def member_edit(request, pk):
         {
             'form': form, 'project': member.project, 'group': member.group,
             'people': people_options(form),
+            'specializations': Specialization.objects.order_by('name'),
+         'specializations': Specialization.objects.order_by('name'),
             'selected_id': member.intern_id,
             'selected_name': member.person_name,
             'title': f'Редактирование: {member.person_name}',

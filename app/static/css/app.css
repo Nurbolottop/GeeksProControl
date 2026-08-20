@@ -1264,20 +1264,34 @@ a:hover { color: var(--accent-dark); }
 .att-score--mid { background: var(--yellow-bg); color: var(--yellow); }
 .att-score--high { background: var(--green-bg); color: var(--green); }
 
-/* ---- Ссылка-кнопка внутри поля формы ---- */
-.link-btn {
-    margin-top: 6px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--primary);
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 600;
+/* ---- Поле с кнопкой «создать на месте» ---- */
+.input-add { display: flex; gap: 8px; align-items: stretch; }
+.input-add > select,
+.input-add > input { flex: 1 1 auto; min-width: 0; }
+.input-add__btn {
+    flex: none;
+    width: 38px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 1;
     cursor: pointer;
-    border-bottom: 1px dashed currentColor;
+    transition: all .13s ease;
 }
-.link-btn:hover { color: var(--primary-dark); }
+.input-add__btn:hover {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+.input-add__btn--cancel { font-size: 15px; }
+.input-add__btn--cancel:hover {
+    border-color: var(--red-line);
+    background: var(--red-bg);
+    color: var(--red);
+}
 
 /* ---- Ежедневная проверка ---- */
 .check-progress {

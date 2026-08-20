@@ -27,36 +27,48 @@
 
             <div class="form-field" x-data="{ newClient: false }">
                 <label for="{{ form.client.id_for_label }}">Заказчик</label>
-                <div x-show="!newClient">
-                    {{ form.client }}
-                    <button type="button" class="link-btn" @click="newClient = true">
-                        нет в списке — добавить
-                    </button>
-                </div>
-                <div x-show="newClient" x-cloak>
-                    <input type="text" name="new_client" autocomplete="off"
-                           placeholder="Например: ОсОО «Омур»">
-                    <button type="button" class="link-btn" @click="newClient = false">
-                        выбрать из списка
-                    </button>
+                <div class="input-add">
+                    <template x-if="!newClient">
+                        <select name="client" id="{{ form.client.id_for_label }}">
+                            <option value="">Выберите заказчика</option>
+                            {% for value, label in form.fields.client.choices %}
+                                {% if value %}<option value="{{ value }}">{{ label }}</option>{% endif %}
+                            {% endfor %}
+                        </select>
+                    </template>
+                    <template x-if="newClient">
+                        <input type="text" name="new_client" autocomplete="off"
+                               placeholder="Название организации заказчика">
+                    </template>
+                    <button type="button"
+                            class="input-add__btn" :class="newClient && 'input-add__btn--cancel'"
+                            @click="newClient = !newClient"
+                            :title="newClient ? 'Выбрать из списка' : 'Добавить нового заказчика'"
+                            x-text="newClient ? '✕' : '+'"></button>
                 </div>
                 {% if form.client.errors %}<div class="form-errors">{{ form.client.errors.0 }}</div>{% endif %}
             </div>
 
             <div class="form-field" x-data="{ newFlow: false }">
                 <label for="{{ form.flow.id_for_label }}">Поток</label>
-                <div x-show="!newFlow">
-                    {{ form.flow }}
-                    <button type="button" class="link-btn" @click="newFlow = true">
-                        нет в списке — собрать поток
-                    </button>
-                </div>
-                <div x-show="newFlow" x-cloak>
-                    <input type="number" name="new_flow" min="1" max="99"
-                           autocomplete="off" placeholder="Номер потока, например 2">
-                    <button type="button" class="link-btn" @click="newFlow = false">
-                        выбрать из списка
-                    </button>
+                <div class="input-add">
+                    <template x-if="!newFlow">
+                        <select name="flow" id="{{ form.flow.id_for_label }}">
+                            <option value="">Выберите поток</option>
+                            {% for value, label in form.fields.flow.choices %}
+                                {% if value %}<option value="{{ value }}">{{ label }}</option>{% endif %}
+                            {% endfor %}
+                        </select>
+                    </template>
+                    <template x-if="newFlow">
+                        <input type="number" name="new_flow" min="1" max="99"
+                               autocomplete="off" placeholder="Номер нового потока">
+                    </template>
+                    <button type="button"
+                            class="input-add__btn" :class="newFlow && 'input-add__btn--cancel'"
+                            @click="newFlow = !newFlow"
+                            :title="newFlow ? 'Выбрать из списка' : 'Собрать новый поток'"
+                            x-text="newFlow ? '✕' : '+'"></button>
                 </div>
                 {% if form.flow.errors %}<div class="form-errors">{{ form.flow.errors.0 }}</div>{% endif %}
             </div>

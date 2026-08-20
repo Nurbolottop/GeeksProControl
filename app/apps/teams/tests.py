@@ -1,5 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 
 from apps.interns.models import Intern
 from apps.projects.models import Project
@@ -73,3 +74,45 @@ class WorkloadTests(TestCase):
         })
         self.assertFalse(form.is_valid())
         self.assertIn('intern', form.errors)
+
+
+class AddNewPersonTests(TestCase):
+    """Человека, которого нет в базе, можно завести прямо из формы команды."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(username="pm", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Омур"))
+        self.spec = Specialization.objects.create(name="Backend")
+
+    def test_new_person_created_and_added_to_team(self):
+        response = self.client.post(
+            reverse("teams:member_add", args=[self.project.pk]),
+            {"new_person": "Асанов Азамат", "new_spec": self.spec.pk,
+             "workload": 50},
+        )
+        self.assertEqual(response.status_code, 302)
+        intern = Intern.objects.get(full_name="Асанов Азамат")
+        self.assertEqual(intern.specialization, self.spec)
+        self.assertTrue(
+            TeamMember.objects.filter(project=self.project, intern=intern).exists(),
+        )
+
+    def test_existing_person_not_duplicated(self):
+        Intern.objects.create(full_name="Асанов Азамат")
+        self.client.post(
+            reverse("teams:member_add", args=[self.project.pk]),
+            {"new_person": "Асанов Азамат", "workload": 50},
+        )
+        self.assertEqual(Intern.objects.filter(full_name="Асанов Азамат").count(), 1)
+
+    def test_form_page_lists_specializations(self):
+        response = self.client.get(
+            reverse("teams:member_add", args=[self.project.pk]),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Backend")
+        self.assertContains(response, "new_person")
