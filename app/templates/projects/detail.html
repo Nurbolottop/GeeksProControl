@@ -86,13 +86,14 @@
                     <th>Приоритет</th>
                     <th>Deadline</th>
                     <th>Статус</th>
+                    <th></th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for task in tasks %}
                     {% include 'tasks/partials/task_row.html' with statuses=task_statuses %}
                 {% empty %}
-                    <tr><td colspan="4" class="empty" style="text-align:center; padding: 24px;">Задач нет.</td></tr>
+                    <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Задач нет.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

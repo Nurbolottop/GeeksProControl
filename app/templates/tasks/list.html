@@ -55,13 +55,14 @@
                 <th>Приоритет</th>
                 <th>Deadline</th>
                 <th>Статус</th>
+                <th></th>
             </tr>
             </thead>
             <tbody>
             {% for task in page.object_list %}
                 {% include 'tasks/partials/task_row.html' %}
             {% empty %}
-                <tr><td colspan="4" class="empty" style="text-align:center; padding: 24px;">Задач не найдено.</td></tr>
+                <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Задач не найдено.</td></tr>
             {% endfor %}
             </tbody>
         </table>

@@ -129,3 +129,17 @@ def task_set_status(request, pk):
              'today': timezone.localdate()},
         )
     return redirect(request.META.get('HTTP_REFERER', task.get_absolute_url()))
+
+
+@login_required
+def task_delete(request, pk):
+    """Удаление задачи. Возврат туда, откуда пришли."""
+    task = get_object_or_404(Task, pk=pk)
+    project = task.project
+    if request.method == "POST":
+        title = task.title
+        task.delete()
+        messages.success(request, f"Задача «{title}» удалена.")
+    if project:
+        return redirect(f"{project.get_absolute_url()}?tab=tasks")
+    return redirect("tasks:list")

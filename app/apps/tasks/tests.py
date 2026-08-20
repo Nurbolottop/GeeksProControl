@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.urls import reverse
 
 from apps.projects.models import Project, ProjectStageKey
 from apps.projects.services import create_project, move_project_to_stage
@@ -52,3 +53,41 @@ class TaskStatusTests(TestCase):
         set_task_status(task, TaskStatus.DONE)
         set_task_status(task, TaskStatus.IN_PROGRESS)
         self.assertIsNone(task.completed_at)
+
+
+class TaskEditDeleteTests(TestCase):
+    """Задачу можно отредактировать и удалить из карточки проекта."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+        from apps.projects.services import create_project
+
+        self.user = get_user_model().objects.create_user(username="pm", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="ОБА"))
+        self.task = Task.objects.create(
+            project=self.project, title="Устроить созвон с тимлид",
+        )
+
+    def test_row_has_edit_and_delete(self):
+        response = self.client.get(f"{self.project.get_absolute_url()}?tab=tasks")
+        self.assertContains(response, reverse("tasks:update", args=[self.task.pk]))
+        self.assertContains(response, reverse("tasks:delete", args=[self.task.pk]))
+
+    def test_delete_removes_task_and_returns_to_project(self):
+        response = self.client.post(reverse("tasks:delete", args=[self.task.pk]))
+        self.assertFalse(Task.objects.filter(pk=self.task.pk).exists())
+        self.assertTrue(response.url.endswith("?tab=tasks"))
+
+    def test_get_does_not_delete(self):
+        self.client.get(reverse("tasks:delete", args=[self.task.pk]))
+        self.assertTrue(Task.objects.filter(pk=self.task.pk).exists())
+
+    def test_edit_saves_new_title(self):
+        self.client.post(reverse("tasks:update", args=[self.task.pk]), {
+            "title": "Созвон с тимлидом", "project": self.project.pk,
+            "priority": "medium", "status": "new",
+        })
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.title, "Созвон с тимлидом")

@@ -33,4 +33,12 @@
             </select>
         </form>
     </td>
+    <td style="white-space: nowrap; text-align: right">
+        <a href="{% url 'tasks:update' task.pk %}" class="btn btn--secondary btn--sm">Изменить</a>
+        <form method="post" action="{% url 'tasks:delete' task.pk %}" style="display:inline"
+              onsubmit="return confirm('Удалить задачу «{{ task.title|escapejs }}»?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--secondary btn--sm" title="Удалить">✕</button>
+        </form>
+    </td>
 </tr>
