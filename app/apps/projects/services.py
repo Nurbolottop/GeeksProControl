@@ -113,10 +113,7 @@ def create_project(project: Project, user=None) -> Project:
         new_value='Проект создан', user=user,
     )
     ensure_group(project)
-    # Типовой чек-лист нового проекта (ТЗ §10.1)
-    from apps.tasks.models import TaskTemplate
-    from apps.tasks.services import generate_checklist
-    generate_checklist(project, TaskTemplate.Kind.PROJECT_NEW, user=user)
+    # Автоматические чек-листы задач отключены: задачи заводятся руками
     return project
 
 
@@ -175,11 +172,6 @@ def move_project_to_stage(project: Project, stage_key: str, user=None) -> Projec
         new_value=dict(ProjectStageKey.choices).get(stage_key, stage_key),
         user=user,
     )
-    # При переходе в Delivery — автоматический чек-лист сдачи (ТЗ §10.1)
-    if stage_key == ProjectStageKey.DELIVERY:
-        from apps.tasks.models import TaskTemplate
-        from apps.tasks.services import generate_checklist
-        generate_checklist(project, TaskTemplate.Kind.DELIVERY, user=user)
     return project
 
 

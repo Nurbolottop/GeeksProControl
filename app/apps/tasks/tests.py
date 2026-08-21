@@ -8,38 +8,34 @@ from apps.tasks.services import DEFAULT_TEMPLATES, generate_checklist, set_task_
 
 
 class ChecklistTests(TestCase):
-    """Автоматические чек-листы задач (ТЗ §10.1)."""
+    """Задачи заводятся руками — автоматических чек-листов больше нет."""
 
-    def test_new_project_gets_default_checklist(self):
+    def test_new_project_has_no_tasks(self):
         project = Project(name='Test')
         create_project(project)
+        self.assertEqual(project.tasks.count(), 0)
+
+    def test_move_to_delivery_does_not_create_tasks(self):
+        project = Project(name='Test')
+        create_project(project)
+        move_project_to_stage(project, ProjectStageKey.DELIVERY)
+        self.assertEqual(project.tasks.count(), 0)
+
+    def test_checklist_can_still_be_generated_manually(self):
+        project = Project(name='Test')
+        create_project(project)
+        generate_checklist(project, TaskTemplate.Kind.PROJECT_NEW)
         expected = DEFAULT_TEMPLATES[TaskTemplate.Kind.PROJECT_NEW]
         titles = set(project.tasks.values_list('title', flat=True))
         self.assertTrue(set(expected).issubset(titles))
 
-    def test_move_to_delivery_creates_delivery_checklist(self):
+    def test_manual_checklist_not_duplicated(self):
         project = Project(name='Test')
         create_project(project)
-        move_project_to_stage(project, ProjectStageKey.DELIVERY)
-        titles = set(project.tasks.values_list('title', flat=True))
-        for expected_title in DEFAULT_TEMPLATES[TaskTemplate.Kind.DELIVERY]:
-            self.assertIn(expected_title, titles)
-
-    def test_checklist_not_duplicated(self):
-        project = Project(name='Test')
-        create_project(project)
+        generate_checklist(project, TaskTemplate.Kind.PROJECT_NEW)
         count_before = project.tasks.count()
         generate_checklist(project, TaskTemplate.Kind.PROJECT_NEW)
         self.assertEqual(project.tasks.count(), count_before)
-
-    def test_custom_templates_override_defaults(self):
-        TaskTemplate.objects.create(
-            kind=TaskTemplate.Kind.PROJECT_NEW, title='Своя задача', order=1,
-        )
-        project = Project(name='Test')
-        create_project(project)
-        titles = list(project.tasks.values_list('title', flat=True))
-        self.assertEqual(titles, ['Своя задача'])
 
 
 class TaskStatusTests(TestCase):
