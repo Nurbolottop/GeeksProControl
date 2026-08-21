@@ -165,63 +165,20 @@ class ErrorPagesTests(TestCase):
         self.assertIn("Страница не найдена", html)
 
 
-class WeeklyWrittenReportTests(TestCase):
-    """Недельный отчёт можно написать руками, а не только посчитать."""
+class WeeklyReportDeleteTests(TestCase):
+    """Недельный отчёт можно удалить."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
         from apps.reports.models import WeeklyReport
 
-        self.user = get_user_model().objects.create_user(username="head", password="x")
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
         self.client.force_login(self.user)
         self.report = WeeklyReport.objects.create(
             week_start=datetime.date(2026, 8, 17), data={},
         )
-
-    def test_text_parts_saved(self):
-        response = self.client.post(
-            reverse("reports:weekly_detail", args=[self.report.pk]),
-            {
-                "done": "ОБА закрыли, Омур на сдаче",
-                "next_steps": "Презентация ОБА заказчику",
-                "issues": "Не хватает доступов к прод-серверу",
-                "comment": "Разобрать с Дастаном",
-            },
-        )
-        self.assertEqual(response.status_code, 302)
-        self.report.refresh_from_db()
-        self.assertEqual(self.report.done, "ОБА закрыли, Омур на сдаче")
-        self.assertEqual(self.report.next_steps, "Презентация ОБА заказчику")
-        self.assertIn("доступов", self.report.issues)
-        self.assertTrue(self.report.is_written)
-
-    def test_empty_report_is_not_written(self):
-        self.assertFalse(self.report.is_written)
-
-    def test_page_shows_writing_fields(self):
-        response = self.client.get(
-            reverse("reports:weekly_detail", args=[self.report.pk]),
-        )
-        self.assertContains(response, "Что сделано за неделю")
-        self.assertContains(response, "Что предстоит")
-        self.assertContains(response, "Проблемы и решения")
-
-    def test_list_marks_written_reports(self):
-        response = self.client.get(reverse("reports:weekly_list"))
-        self.assertContains(response, "не написан")
-        self.report.done = "текст"
-        self.report.save(update_fields=["done"])
-        response = self.client.get(reverse("reports:weekly_list"))
-        self.assertContains(response, "Отчёт написан")
-
-    def test_recalculating_keeps_written_text(self):
-        self.report.done = "не потерять"
-        self.report.save(update_fields=["done"])
-        self.client.post(
-            reverse("reports:weekly_generate"), {"week": "2026-08-19"},
-        )
-        self.report.refresh_from_db()
-        self.assertEqual(self.report.done, "не потерять")
 
     def test_report_can_be_deleted(self):
         from apps.reports.models import WeeklyReport

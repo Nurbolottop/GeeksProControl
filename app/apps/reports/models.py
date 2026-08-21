@@ -9,10 +9,6 @@ class WeeklyReport(TimeStampedModel):
     week_start = models.DateField('Начало недели', unique=True)
     data = models.JSONField('Показатели', default=dict)
 
-    # Написанная руками часть отчёта — цифры её не заменяют
-    done = models.TextField('Что сделано за неделю', blank=True)
-    next_steps = models.TextField('Что предстоит', blank=True)
-    issues = models.TextField('Проблемы и решения', blank=True)
     comment = models.TextField('Комментарий руководителя', blank=True)
 
     class Meta:
@@ -22,11 +18,6 @@ class WeeklyReport(TimeStampedModel):
 
     def __str__(self) -> str:
         return f'Неделя с {self.week_start:%d.%m.%Y}'
-
-    @property
-    def is_written(self) -> bool:
-        """Отчёт написан, если заполнена хотя бы одна текстовая часть."""
-        return any([self.done, self.next_steps, self.issues, self.comment])
 
 
 class MonthlyReport(TimeStampedModel):

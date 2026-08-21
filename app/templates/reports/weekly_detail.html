@@ -18,45 +18,15 @@
         <form method="post" action="{% url 'reports:weekly_generate' %}" style="margin:0">
             {% csrf_token %}
             <input type="hidden" name="week" value="{{ report.week_start|date:'Y-m-d' }}">
-            <button type="submit" class="btn btn--secondary">Пересчитать цифры</button>
+            <button type="submit" class="btn btn--secondary">Пересчитать</button>
         </form>
         <form method="post" action="{% url 'reports:weekly_delete' report.pk %}" style="margin:0"
-              onsubmit="return confirm('Удалить отчёт за эту неделю? Написанный текст пропадёт.')">
+              onsubmit="return confirm('Удалить отчёт за эту неделю?')">
             {% csrf_token %}
-            <button type="submit" class="btn btn--secondary">Удалить отчёт</button>
+            <button type="submit" class="btn btn--secondary">Удалить</button>
         </form>
     </div>
 </div>
-
-<form method="post" class="panel">
-    {% csrf_token %}
-    <div class="panel-head">
-        <h2>Отчёт за неделю</h2>
-        <span class="panel-bar__note">Пишется руками — цифры ниже считаются сами</span>
-    </div>
-    <div class="form-field">
-        <label for="done">Что сделано за неделю</label>
-        <textarea id="done" name="done" rows="5"
-                  placeholder="По проектам: что закрыли, что сдали, что запустили">{{ report.done }}</textarea>
-    </div>
-    <div class="form-field" style="margin-top: 14px">
-        <label for="next_steps">Что предстоит</label>
-        <textarea id="next_steps" name="next_steps" rows="4"
-                  placeholder="Задачи на следующую неделю, сдачи, презентации">{{ report.next_steps }}</textarea>
-    </div>
-    <div class="form-field" style="margin-top: 14px">
-        <label for="issues">Проблемы и решения</label>
-        <textarea id="issues" name="issues" rows="4"
-                  placeholder="Что мешало, кто тормозит, что с этим делаем">{{ report.issues }}</textarea>
-    </div>
-    <div class="form-field" style="margin-top: 14px">
-        <label for="comment">Комментарий руководителя</label>
-        <textarea id="comment" name="comment" rows="2">{{ report.comment }}</textarea>
-    </div>
-    <div class="form-actions">
-        <button type="submit" class="btn">Сохранить отчёт</button>
-    </div>
-</form>
 
 <div class="report-grid">
     {% for section in sections %}
