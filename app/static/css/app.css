@@ -1264,6 +1264,45 @@ a:hover { color: var(--accent-dark); }
 .att-score--mid { background: var(--yellow-bg); color: var(--yellow); }
 .att-score--high { background: var(--green-bg); color: var(--green); }
 
+/* ---- Строка задачи: выполненная видна сразу ---- */
+.task-status {
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+}
+.task-status--done {
+    background: var(--green);
+    border-color: var(--green);
+    color: #fff;
+}
+.task-status--in_progress { border-color: var(--blue-line); color: var(--blue); }
+.task-status--review { border-color: var(--yellow-line); color: var(--yellow); }
+.task-status--cancelled { color: var(--text-muted); text-decoration: line-through; }
+
+.task-done-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--green);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+}
+.task-row--done { background: var(--green-bg); }
+.task-row--done td:first-child { box-shadow: inset 3px 0 0 var(--green); }
+.task-row--done strong { color: var(--text-muted); text-decoration: line-through; }
+.task-row--cancelled { opacity: .55; }
+
 /* ---- Хлебные крошки ---- */
 .crumbs {
     display: flex;

@@ -1,4 +1,4 @@
-<tr id="task-{{ task.pk }}">
+<tr id="task-{{ task.pk }}" class="task-row task-row--{{ task.status }}">
     <td>
         <a href="{{ task.get_absolute_url }}"><strong>{{ task.title }}</strong></a>
         {% if task.project %}
@@ -24,9 +24,10 @@
     <td>
         <form hx-post="{% url 'tasks:set_status' task.pk %}"
               hx-target="#task-{{ task.pk }}" hx-swap="outerHTML"
-              style="margin:0">
+              style="margin:0; display:flex; align-items:center; gap:8px">
+            {% if task.status == 'done' %}<span class="task-done-mark">✓</span>{% endif %}
             <select name="status" onchange="this.form.requestSubmit()"
-                    style="padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;">
+                    class="task-status task-status--{{ task.status }}">
                 {% for value, label in statuses %}
                     <option value="{{ value }}" {% if task.status == value %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
