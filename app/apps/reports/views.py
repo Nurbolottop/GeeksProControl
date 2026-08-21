@@ -51,9 +51,14 @@ def weekly_generate(request):
 def weekly_detail(request, pk):
     report = get_object_or_404(WeeklyReport, pk=pk)
     if request.method == 'POST':
-        report.comment = request.POST.get('comment', '')
-        report.save(update_fields=['comment', 'updated_at'])
-        messages.success(request, 'Комментарий сохранён.')
+        report.done = request.POST.get('done', '').strip()
+        report.next_steps = request.POST.get('next_steps', '').strip()
+        report.issues = request.POST.get('issues', '').strip()
+        report.comment = request.POST.get('comment', '').strip()
+        report.save(update_fields=[
+            'done', 'next_steps', 'issues', 'comment', 'updated_at',
+        ])
+        messages.success(request, 'Отчёт сохранён.')
         return redirect('reports:weekly_detail', pk=report.pk)
     return render(request, 'reports/weekly_detail.html', {
         'report': report,
