@@ -222,3 +222,24 @@ class WeeklyWrittenReportTests(TestCase):
         )
         self.report.refresh_from_db()
         self.assertEqual(self.report.done, "не потерять")
+
+    def test_report_can_be_deleted(self):
+        from apps.reports.models import WeeklyReport
+
+        response = self.client.post(
+            reverse("reports:weekly_delete", args=[self.report.pk]),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(WeeklyReport.objects.filter(pk=self.report.pk).exists())
+
+    def test_get_does_not_delete_report(self):
+        from apps.reports.models import WeeklyReport
+
+        self.client.get(reverse("reports:weekly_delete", args=[self.report.pk]))
+        self.assertTrue(WeeklyReport.objects.filter(pk=self.report.pk).exists())
+
+    def test_list_has_delete_button(self):
+        response = self.client.get(reverse("reports:weekly_list"))
+        self.assertContains(
+            response, reverse("reports:weekly_delete", args=[self.report.pk]),
+        )

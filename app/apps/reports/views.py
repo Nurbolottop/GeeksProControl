@@ -88,3 +88,14 @@ def kpi_view(request):
         'cards': cards, 'snapshots': snapshots,
         'kpi_labels': services.KPI_LABELS,
     })
+
+
+@login_required
+def weekly_delete(request, pk):
+    """Удаление недельного отчёта вместе с написанным текстом."""
+    report = get_object_or_404(WeeklyReport, pk=pk)
+    if request.method == "POST":
+        week = report.week_start
+        report.delete()
+        messages.success(request, f"Отчёт за неделю {week:%d.%m.%Y} удалён.")
+    return redirect("reports:weekly_list")
