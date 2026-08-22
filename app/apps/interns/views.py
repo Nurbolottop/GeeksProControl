@@ -12,9 +12,21 @@ from apps.training.models import Specialization, TrainingGroup
 
 
 @login_required
+def lead_ids() -> set:
+    """Тимлиды — сотрудники на зарплате, в списке стажёров их нет."""
+    from apps.teams.models import TeamRole
+
+    return set(
+        TeamMember.objects.filter(role=TeamRole.TEAM_LEAD)
+        .exclude(intern__isnull=True)
+        .values_list('intern_id', flat=True),
+    )
+
+
 def intern_list(request):
     qs = (
         Intern.objects.active()
+        .exclude(pk__in=lead_ids())
         .select_related('specialization', 'training_group', 'team_lead')
     )
     params = request.GET

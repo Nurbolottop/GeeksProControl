@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from django.urls import reverse
 
 from apps.interns.models import Intern, InternEvaluation
 from apps.interns.services import add_evaluation
@@ -31,3 +32,37 @@ class InternRatingTests(TestCase):
         ))
         intern.refresh_from_db()
         self.assertEqual(intern.rating, Decimal('4.00'))
+
+
+class LeadsHiddenFromInternListTests(TestCase):
+    """Тимлиды — сотрудники, в списке стажёров их не показываем."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+        self.project = Project.objects.create(name="Балажан")
+        self.lead = Intern.objects.create(full_name="Болотбеков Алишер")
+        self.dev = Intern.objects.create(full_name="Капаров Улар")
+        TeamMember.objects.create(
+            project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.dev, role=TeamRole.BACKEND,
+        )
+
+    def test_lead_not_in_list(self):
+        response = self.client.get(reverse("interns:list"))
+        names = [p.full_name for p in response.context["page"].object_list]
+        self.assertIn("Капаров Улар", names)
+        self.assertNotIn("Болотбеков Алишер", names)
+
+    def test_lead_card_still_opens(self):
+        response = self.client.get(self.lead.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Болотбеков Алишер")
