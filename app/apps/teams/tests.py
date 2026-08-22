@@ -128,7 +128,8 @@ class RoleSectionAddTests(TestCase):
         self.dev = Intern.objects.create(full_name="Капаров Улар", specialization=self.back_spec)
 
     def _url(self, role):
-        return f"{reverse(teams:member_add, args=[self.project.pk])}?role={role}"
+        base = reverse("teams:member_add", args=[self.project.pk])
+        return f"{base}?role={role}"
 
     def test_pm_section_lists_only_pms(self):
         response = self.client.get(self._url("pm"))
