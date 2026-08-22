@@ -11,7 +11,6 @@ from apps.teams.models import TeamMember
 from apps.training.models import Specialization, TrainingGroup
 
 
-@login_required
 def lead_ids() -> set:
     """Тимлиды — сотрудники на зарплате, в списке стажёров их нет."""
     from apps.teams.models import TeamRole
@@ -23,6 +22,7 @@ def lead_ids() -> set:
     )
 
 
+@login_required
 def intern_list(request):
     qs = (
         Intern.objects.active()
