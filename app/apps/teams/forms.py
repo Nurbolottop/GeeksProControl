@@ -5,6 +5,16 @@ from apps.teams import services
 from apps.teams.models import TeamMember, TeamRole
 
 
+# Роль в команде → направление человека (обратная сторона)
+SPECIALIZATION_BY_ROLE = {
+    TeamRole.BACKEND: 'Backend',
+    TeamRole.FRONTEND: 'Frontend',
+    TeamRole.UXUI: 'UX/UI',
+    TeamRole.MOBILE: 'Mobile',
+    TeamRole.QA: 'Testing/QA',
+    TeamRole.PROJECT_MANAGER: 'PM',
+}
+
 # Направление человека → его роль в команде
 ROLE_BY_SPECIALIZATION = {
     'Backend': TeamRole.BACKEND,
@@ -38,8 +48,9 @@ class TeamMemberForm(forms.ModelForm):
             'comment': forms.Textarea(attrs={'rows': 2}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, role=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.role = role
         field = self.fields['intern']
         field.required = True
         field.queryset = (
@@ -47,6 +58,20 @@ class TeamMemberForm(forms.ModelForm):
             .select_related('specialization').order_by('full_name')
         )
         field.empty_label = 'Выберите человека'
+
+        # Добавляют в конкретное направление — показываем только его людей
+        spec_name = SPECIALIZATION_BY_ROLE.get(role)
+        if spec_name:
+            field.queryset = field.queryset.filter(
+                specialization__name=spec_name,
+            )
+            field.help_text = f'Показаны только: {spec_name}'
+        elif role == TeamRole.TEAM_LEAD:
+            field.help_text = 'Тимлид направления — выберите человека'
+
+        if role == TeamRole.TEAM_LEAD:
+            self.fields['is_lead'].initial = True
+
         if self.instance.pk:
             self.fields['is_lead'].initial = (
                 self.instance.role == TeamRole.TEAM_LEAD
@@ -54,8 +79,11 @@ class TeamMemberForm(forms.ModelForm):
 
     def save(self, commit=True):
         member = super().save(commit=False)
-        if self.cleaned_data.get('is_lead'):
+        role = getattr(self, 'role', None)
+        if self.cleaned_data.get('is_lead') or role == TeamRole.TEAM_LEAD:
             member.role = TeamRole.TEAM_LEAD
+        elif role:
+            member.role = role
         else:
             spec = member.intern.specialization if member.intern else None
             member.role = ROLE_BY_SPECIALIZATION.get(

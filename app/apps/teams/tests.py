@@ -110,3 +110,53 @@ class AddNewPersonTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Backend")
         self.assertContains(response, "new_person")
+
+
+class RoleSectionAddTests(TestCase):
+    """В каждое направление добавляют отдельно, список фильтруется."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Балажан"))
+        self.pm_spec = Specialization.objects.create(name="PM")
+        self.back_spec = Specialization.objects.create(name="Backend")
+        self.pm = Intern.objects.create(full_name="Айдана", specialization=self.pm_spec)
+        self.dev = Intern.objects.create(full_name="Капаров Улар", specialization=self.back_spec)
+
+    def _url(self, role):
+        return f"{reverse(teams:member_add, args=[self.project.pk])}?role={role}"
+
+    def test_pm_section_lists_only_pms(self):
+        response = self.client.get(self._url("pm"))
+        self.assertEqual(response.status_code, 200)
+        people = [p["name"] for p in response.context["people"]]
+        self.assertIn("Айдана", people)
+        self.assertNotIn("Капаров Улар", people)
+
+    def test_backend_section_lists_only_backend(self):
+        response = self.client.get(self._url("backend"))
+        people = [p["name"] for p in response.context["people"]]
+        self.assertEqual(people, ["Капаров Улар"])
+
+    def test_role_applied_on_save(self):
+        self.client.post(self._url("pm"), {"intern": self.pm.pk, "role": "pm"})
+        member = TeamMember.objects.get(project=self.project, intern=self.pm)
+        self.assertEqual(member.role, TeamRole.PROJECT_MANAGER)
+
+    def test_team_lead_section_sets_lead_role(self):
+        self.client.post(
+            self._url("team_lead"),
+            {"intern": self.dev.pk, "role": "team_lead"},
+        )
+        member = TeamMember.objects.get(project=self.project, intern=self.dev)
+        self.assertEqual(member.role, TeamRole.TEAM_LEAD)
+
+    def test_empty_sections_shown_on_team_tab(self):
+        response = self.client.get(f"{self.project.get_absolute_url()}?tab=team")
+        roles = [s["role"] for s in response.context["team_sections"]]
+        for role in ("pm", "team_lead", "uxui", "backend", "frontend", "qa"):
+            self.assertIn(role, roles)

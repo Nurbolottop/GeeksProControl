@@ -28,10 +28,22 @@ ROLE_TONE = {
 ROLE_LABELS = dict(TeamRole.choices)
 
 
+# Направления, которые показываем всегда — даже когда там пусто
+ALWAYS_SHOWN = [
+    TeamRole.PROJECT_MANAGER,
+    TeamRole.TEAM_LEAD,
+    TeamRole.UXUI,
+    TeamRole.BACKEND,
+    TeamRole.FRONTEND,
+    TeamRole.QA,
+]
+
+
 def group_by_role(members) -> list[dict]:
     """Разбивает состав команды на секции по направлениям.
 
-    Возвращает только непустые направления, в порядке ROLE_ORDER.
+    Пустые направления из ALWAYS_SHOWN тоже возвращаются — в каждую
+    секцию добавляют людей отдельной кнопкой.
     """
     buckets: dict[str, list[TeamMember]] = {}
     for member in members:
@@ -40,7 +52,7 @@ def group_by_role(members) -> list[dict]:
     sections = []
     for role in ROLE_ORDER:
         people = buckets.pop(role, [])
-        if people:
+        if people or role in ALWAYS_SHOWN:
             sections.append({
                 'role': role,
                 'label': ROLE_LABELS.get(role, role),

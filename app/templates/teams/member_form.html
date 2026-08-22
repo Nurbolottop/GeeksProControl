@@ -16,6 +16,7 @@
 
     <form method="post" class="panel">
         {% csrf_token %}
+        {% if role %}<input type="hidden" name="role" value="{{ role }}">{% endif %}
         {% if form.non_field_errors %}
             <div class="message message--error">{{ form.non_field_errors }}</div>
         {% endif %}
@@ -29,13 +30,15 @@
             {% if form.intern.errors %}<div class="form-errors">{{ form.intern.errors.0 }}</div>{% endif %}
         </div>
 
-        <label class="checkbox-field">
-            {{ form.is_lead }}
-            <span>
-                <strong>Тимлид направления</strong>
-                <span>Отметьте, если человек ведёт своё направление в этой команде</span>
-            </span>
-        </label>
+        {% if role != 'team_lead' and role != 'pm' %}
+            <label class="checkbox-field">
+                {{ form.is_lead }}
+                <span>
+                    <strong>Тимлид направления</strong>
+                    <span>Отметьте, если человек ведёт своё направление в этой команде</span>
+                </span>
+            </label>
+        {% endif %}
 
         <div class="form-row" style="margin-top: 18px">
             {% if form.status %}

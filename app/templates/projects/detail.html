@@ -119,7 +119,11 @@
         <div class="panel team-section">
             <div class="team-section__head">
                 <h2><span class="badge badge--{{ section.tone }}">{{ section.label }}</span></h2>
-                <span class="team-section__count">{{ section.count }} чел.</span>
+                <div style="display:flex; gap:10px; align-items:center">
+                    <span class="team-section__count">{{ section.count }} чел.</span>
+                    <a href="{% url 'teams:member_add' project.pk %}?role={{ section.role }}"
+                       class="btn btn--secondary btn--sm">+ Добавить</a>
+                </div>
             </div>
             <div class="member-list">
                 {% for member in section.members %}
@@ -137,6 +141,10 @@
                             </div>
                         </div>
                         <a href="{% url 'teams:member_edit' member.pk %}" class="btn-edit">✎</a>
+                    </div>
+                {% empty %}
+                    <div class="empty" style="padding: 6px 2px; font-size: 13px">
+                        Пока никого — нажмите «+ Добавить».
                     </div>
                 {% endfor %}
             </div>

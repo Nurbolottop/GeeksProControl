@@ -8,7 +8,7 @@ from apps.interns.models import Intern
 from apps.projects.models import Project
 from apps.teams import services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
-from apps.teams.models import TeamMember
+from apps.teams.models import TeamMember, TeamRole
 from apps.training.models import Specialization
 
 
@@ -32,9 +32,26 @@ def team_overview(request):
     return redirect('resources:forecast')
 
 
-def _with_new_person(request):
+def _role_from(request):
+    """В какое направление добавляют — из ссылки секции команды."""
+    role = request.GET.get('role') or request.POST.get('role') or ''
+    return role if role in TeamRole.values else None
+
+
+def _title_for(role) -> str:
+    if role == TeamRole.PROJECT_MANAGER:
+        return 'Добавить ПМ'
+    if role == TeamRole.TEAM_LEAD:
+        return 'Добавить тимлида'
+    if role:
+        return f'Добавить: {dict(TeamRole.choices)[role]}'
+    return 'Добавить участника'
+
+
+def _with_new_person(request, role=None):
     """Если человека нет в базе — заводим его прямо из формы команды."""
     from apps.interns.models import InternStatus
+    from apps.teams.forms import SPECIALIZATION_BY_ROLE
 
     data = request.POST.copy()
     name = data.get('new_person', '').strip()
@@ -45,6 +62,10 @@ def _with_new_person(request):
     raw_spec = data.get('new_spec', '')
     if raw_spec.isdigit():
         spec = Specialization.objects.filter(pk=int(raw_spec)).first()
+    if spec is None and role:
+        spec = Specialization.objects.filter(
+            name=SPECIALIZATION_BY_ROLE.get(role, ''),
+        ).first()
 
     intern, created = Intern.objects.get_or_create(
         full_name=name,
@@ -62,11 +83,12 @@ def member_add(request, project_pk):
     """Добавление участника через карточку проекта (команда = группа проекта)."""
     project = get_object_or_404(Project, pk=project_pk)
     group = getattr(project, 'group', None)
-    form = TeamMemberForm(request.POST or None)
+    role = _role_from(request)
+    form = TeamMemberForm(request.POST or None, role=role)
     created_person = None
     if request.method == 'POST':
-        data, created_person = _with_new_person(request)
-        form = TeamMemberForm(data)
+        data, created_person = _with_new_person(request, role=role)
+        form = TeamMemberForm(data, role=role)
     if request.method == 'POST' and form.is_valid():
         member = form.save(commit=False)
         member.project = project
@@ -84,7 +106,8 @@ def member_add(request, project_pk):
         {'form': form, 'project': project, 'group': group,
          'people': people_options(form),
          'specializations': Specialization.objects.order_by('name'),
-         'title': 'Добавить участника'},
+         'role': role,
+         'title': _title_for(role)},
     )
 
 
@@ -94,11 +117,12 @@ def member_add_to_group(request, group_pk):
     group = get_object_or_404(
         Group.objects.select_related('project', 'flow'), pk=group_pk,
     )
-    form = TeamMemberForm(request.POST or None)
+    role = _role_from(request)
+    form = TeamMemberForm(request.POST or None, role=role)
     created_person = None
     if request.method == 'POST':
-        data, created_person = _with_new_person(request)
-        form = TeamMemberForm(data)
+        data, created_person = _with_new_person(request, role=role)
+        form = TeamMemberForm(data, role=role)
     if request.method == 'POST' and form.is_valid():
         member = form.save(commit=False)
         member.group = group
