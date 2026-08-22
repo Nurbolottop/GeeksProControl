@@ -78,7 +78,7 @@
 
             <div class="nav-label">Люди</div>
             <div class="nav-group"
-                 x-data="{ open: {% if request.resolver_match.namespace == 'interns' or request.resolver_match.namespace == 'resources' %}true{% else %}false{% endif %} }">
+                 x-data="{ open: {% if request.resolver_match.namespace == 'interns' or request.resolver_match.namespace == 'resources' or request.resolver_match.url_name == 'lead_list' %}true{% else %}false{% endif %} }">
                 <button type="button" @click="open = !open"
                         class="nav-item {% if request.resolver_match.namespace == 'interns' or request.resolver_match.namespace == 'resources' %}is-active{% endif %}">
                     <span class="nav-item__label">
@@ -92,6 +92,8 @@
                        class="{% if request.resolver_match.url_name == 'forecast' %}is-active{% endif %}">По направлениям</a>
                     <a href="{% url 'interns:list' %}"
                        class="{% if request.resolver_match.namespace == 'interns' %}is-active{% endif %}">Все стажёры</a>
+                    <a href="{% url 'teams:lead_list' %}"
+                       class="{% if request.resolver_match.url_name == 'lead_list' %}is-active{% endif %}">Тимлиды</a>
                     <a href="{% url 'resources:graduations' %}"
                        class="{% if request.resolver_match.url_name == 'graduations' %}is-active{% endif %}">Выпуски</a>
                 </div>

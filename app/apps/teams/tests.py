@@ -161,3 +161,91 @@ class RoleSectionAddTests(TestCase):
         roles = [s["role"] for s in response.context["team_sections"]]
         for role in ("pm", "team_lead", "uxui", "backend", "frontend", "qa"):
             self.assertIn(role, roles)
+
+
+class LeadSectionTests(TestCase):
+    """Раздел «Тимлиды»: назначить, снять, посмотреть по проектам."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Балажан"))
+        self.spec = Specialization.objects.create(name="Backend")
+        self.person = Intern.objects.create(
+            full_name="Болотбеков Алишер", specialization=self.spec,
+        )
+
+    def test_page_lists_leads(self):
+        TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.TEAM_LEAD,
+        )
+        response = self.client.get(reverse("teams:lead_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Болотбеков Алишер")
+        self.assertEqual(response.context["total"], 1)
+
+    def test_assign_lead(self):
+        self.client.post(reverse("teams:lead_add"), {
+            "intern": self.person.pk, "project": self.project.pk,
+        })
+        member = TeamMember.objects.get(project=self.project, intern=self.person)
+        self.assertEqual(member.role, TeamRole.TEAM_LEAD)
+
+    def test_existing_member_becomes_lead(self):
+        member = TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.BACKEND,
+        )
+        self.client.post(reverse("teams:lead_add"), {
+            "intern": self.person.pk, "project": self.project.pk,
+        })
+        member.refresh_from_db()
+        self.assertEqual(member.role, TeamRole.TEAM_LEAD)
+
+    def test_remove_lead_keeps_person(self):
+        member = TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.TEAM_LEAD,
+        )
+        self.client.post(reverse("teams:lead_remove", args=[member.pk]))
+        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        self.assertTrue(Intern.objects.filter(pk=self.person.pk).exists())
+
+    def test_new_person_can_be_assigned_lead(self):
+        self.client.post(reverse("teams:lead_add"), {
+            "new_person": "Саидахмат Каримов", "project": self.project.pk,
+        })
+        intern = Intern.objects.get(full_name="Саидахмат Каримов")
+        member = TeamMember.objects.get(intern=intern)
+        self.assertEqual(member.role, TeamRole.TEAM_LEAD)
+
+
+class InternDeleteTests(TestCase):
+    """Стажёра можно удалить из базы."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.person = Intern.objects.create(full_name="Тестовый Человек")
+
+    def test_delete_removes_person(self):
+        response = self.client.post(
+            reverse("interns:delete", args=[self.person.pk]),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Intern.objects.filter(pk=self.person.pk).exists())
+
+    def test_get_does_not_delete(self):
+        self.client.get(reverse("interns:delete", args=[self.person.pk]))
+        self.assertTrue(Intern.objects.filter(pk=self.person.pk).exists())
+
+    def test_delete_removes_team_memberships(self):
+        from apps.projects.services import create_project
+
+        project = create_project(Project(name="Омур"))
+        TeamMember.objects.create(
+            project=project, intern=self.person, role=TeamRole.BACKEND,
+        )
+        self.client.post(reverse("interns:delete", args=[self.person.pk]))
+        self.assertEqual(project.team_members.count(), 0)

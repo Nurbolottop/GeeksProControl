@@ -131,3 +131,17 @@ def evaluation_add(request, pk):
         request, 'interns/evaluation_form.html',
         {'form': form, 'intern': intern, 'title': f'Оценка: {intern.full_name}'},
     )
+
+
+@login_required
+def intern_delete(request, pk):
+    """Удаление человека из базы вместе с участием в командах."""
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == "POST":
+        name = intern.full_name
+        teams = intern.team_memberships.count()
+        intern.delete()
+        note = f" и снят(а) с проектов: {teams}" if teams else ""
+        messages.success(request, f"{name} удалён(а) из базы{note}.")
+        return redirect("interns:list")
+    return redirect(intern.get_absolute_url())
