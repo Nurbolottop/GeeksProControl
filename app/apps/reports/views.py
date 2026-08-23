@@ -109,10 +109,15 @@ def written_list(request):
         return redirect('reports:written_list')
 
     notes = list(WrittenNote.objects.select_related('author'))
+    titles = {
+        WrittenNote.Kind.ACHIEVEMENT: 'Достижения',
+        WrittenNote.Kind.PROBLEM: 'Проблемы',
+        WrittenNote.Kind.QUESTION: 'Вопросы',
+    }
     sections = [
         {
             'key': kind,
-            'label': label,
+            'label': titles.get(kind, label),
             'notes': [note for note in notes if note.kind == kind],
         }
         for kind, label in WrittenNote.Kind.choices
