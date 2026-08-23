@@ -1,38 +1,14 @@
-{% comment %}Отчёты по проекту: пишутся руками по итогам недели или собрания.{% endcomment %}
-<div class="panel" x-data="{ open: {% if not reports %}true{% else %}false{% endif %} }">
+{% comment %}Отчёты по проекту: одно текстовое поле, дата ставится сама.{% endcomment %}
+<div class="panel">
     <div class="panel-head">
         <h2>Отчёты по проекту ({{ reports|length }})</h2>
-        <button type="button" class="btn btn--sm" @click="open = !open"
-                x-text="open ? 'Свернуть' : '+ Написать отчёт'"></button>
+        <span class="panel-bar__note">Дата проставится сама — {{ today|date:'d.m.Y' }}</span>
     </div>
-    <form method="post" action="{% url 'projects:report_create' project.pk %}"
-          x-show="open" x-cloak>
+    <form method="post" action="{% url 'projects:report_create' project.pk %}">
         {% csrf_token %}
-        <div class="form-row">
-            <div class="form-field">
-                <label for="report-date">Дата отчёта</label>
-                <input type="date" id="report-date" name="date" value="{{ today|date:'Y-m-d' }}">
-            </div>
-            <div class="form-field">
-                <label for="report-status">Текущее положение</label>
-                <input type="text" id="report-status" name="status" autocomplete="off"
-                       placeholder="Например: стадия завершения, идёт финальное тестирование">
-            </div>
-        </div>
-        <div class="form-field" style="margin-top: 14px">
-            <label for="report-done">Выполнено</label>
-            <textarea id="report-done" name="done" rows="4"
-                      placeholder="Что закрыли за период"></textarea>
-        </div>
-        <div class="form-field" style="margin-top: 14px">
-            <label for="report-next">Предстоит</label>
-            <textarea id="report-next" name="next_steps" rows="3"
-                      placeholder="Что осталось до сдачи"></textarea>
-        </div>
-        <div class="form-field" style="margin-top: 14px">
-            <label for="report-notes">Проблемы и заметки</label>
-            <textarea id="report-notes" name="notes" rows="3"
-                      placeholder="Что мешает, что решить с заказчиком или командой"></textarea>
+        <div class="form-field">
+            <textarea name="text" rows="10"
+                      placeholder="Пишите отчёт как в документе: текущее положение, что сделали, что предстоит, проблемы"></textarea>
         </div>
         <div class="form-actions">
             <button type="submit" class="btn">Сохранить отчёт</button>
@@ -60,54 +36,13 @@
             </div>
         </div>
 
-        <div x-show="!edit">
-            {% if report.status %}
-                <div class="report-status">{{ report.status }}</div>
-            {% endif %}
-            {% if report.done %}
-                <div class="report-part">
-                    <div class="report-part__title">Выполнено</div>
-                    <div class="report-part__text">{{ report.done|linebreaksbr }}</div>
-                </div>
-            {% endif %}
-            {% if report.next_steps %}
-                <div class="report-part">
-                    <div class="report-part__title">Предстоит</div>
-                    <div class="report-part__text">{{ report.next_steps|linebreaksbr }}</div>
-                </div>
-            {% endif %}
-            {% if report.notes %}
-                <div class="report-part">
-                    <div class="report-part__title">Проблемы и заметки</div>
-                    <div class="report-part__text">{{ report.notes|linebreaksbr }}</div>
-                </div>
-            {% endif %}
-        </div>
+        <div class="report-part__text" x-show="!edit">{{ report.text|linebreaksbr }}</div>
 
         <form method="post" action="{% url 'projects:report_update' report.pk %}"
               x-show="edit" x-cloak>
             {% csrf_token %}
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Дата отчёта</label>
-                    <input type="date" name="date" value="{{ report.date|date:'Y-m-d' }}">
-                </div>
-                <div class="form-field">
-                    <label>Текущее положение</label>
-                    <input type="text" name="status" value="{{ report.status }}" autocomplete="off">
-                </div>
-            </div>
-            <div class="form-field" style="margin-top: 14px">
-                <label>Выполнено</label>
-                <textarea name="done" rows="4">{{ report.done }}</textarea>
-            </div>
-            <div class="form-field" style="margin-top: 14px">
-                <label>Предстоит</label>
-                <textarea name="next_steps" rows="3">{{ report.next_steps }}</textarea>
-            </div>
-            <div class="form-field" style="margin-top: 14px">
-                <label>Проблемы и заметки</label>
-                <textarea name="notes" rows="3">{{ report.notes }}</textarea>
+            <div class="form-field">
+                <textarea name="text" rows="10">{{ report.text }}</textarea>
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn">Сохранить</button>

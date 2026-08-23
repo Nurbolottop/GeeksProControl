@@ -319,7 +319,7 @@ class ProjectCreationFlowTests(TestCase):
 
 
 class ProjectReportTests(TestCase):
-    """Отчёт по проекту пишется руками, правится и удаляется."""
+    """Отчёт по проекту: одно текстовое поле, дата ставится сама."""
 
     def setUp(self):
         from apps.projects.models import ProjectReport
@@ -330,60 +330,41 @@ class ProjectReportTests(TestCase):
         create_project(self.project)
         self.model = ProjectReport
 
-    def test_report_created_with_all_parts(self):
+    def test_report_created_with_todays_date(self):
+        from django.utils import timezone
+
         response = self.client.post(
             reverse("projects:report_create", args=[self.project.pk]),
-            {
-                "date": "2026-08-17",
-                "status": "Стадия завершения",
-                "done": "Исправили баги регрессивного тестирования",
-                "next_steps": "Финальное тестирование, презентация",
-                "notes": "CRM — отдельный проект, согласовать с Дастаном",
-            },
+            {"text": "Стадия завершения. Исправили баги, впереди презентация."},
         )
         self.assertEqual(response.status_code, 302)
         report = self.model.objects.get(project=self.project)
-        self.assertEqual(str(report.date), "2026-08-17")
-        self.assertEqual(report.status, "Стадия завершения")
-        self.assertIn("Финальное", report.next_steps)
+        self.assertEqual(report.date, timezone.localdate())
+        self.assertIn("Стадия завершения", report.text)
         self.assertEqual(report.author, self.user)
 
-    def test_report_visible_on_tab(self):
-        self.model.objects.create(
-            project=self.project, date=datetime.date(2026, 8, 17),
-            status="Стадия завершения",
+    def test_empty_report_not_saved(self):
+        self.client.post(
+            reverse("projects:report_create", args=[self.project.pk]),
+            {"text": "   "},
         )
+        self.assertEqual(self.model.objects.count(), 0)
+
+    def test_report_visible_on_tab(self):
+        self.model.objects.create(project=self.project, text="Идёт тестирование")
         response = self.client.get(f"{self.project.get_absolute_url()}?tab=report")
-        self.assertContains(response, "Стадия завершения")
-        self.assertContains(response, "17.08.2026")
+        self.assertContains(response, "Идёт тестирование")
 
     def test_report_updated(self):
-        report = self.model.objects.create(
-            project=self.project, date=datetime.date(2026, 8, 17), done="старое",
-        )
+        report = self.model.objects.create(project=self.project, text="старое")
         self.client.post(
             reverse("projects:report_update", args=[report.pk]),
-            {"date": "2026-08-18", "status": "", "done": "новое",
-             "next_steps": "", "notes": ""},
+            {"text": "новое"},
         )
         report.refresh_from_db()
-        self.assertEqual(report.done, "новое")
-        self.assertEqual(str(report.date), "2026-08-18")
+        self.assertEqual(report.text, "новое")
 
     def test_report_deleted(self):
-        report = self.model.objects.create(
-            project=self.project, date=datetime.date(2026, 8, 17),
-        )
+        report = self.model.objects.create(project=self.project, text="текст")
         self.client.post(reverse("projects:report_delete", args=[report.pk]))
         self.assertFalse(self.model.objects.filter(pk=report.pk).exists())
-
-    def test_reports_sorted_newest_first(self):
-        old = self.model.objects.create(
-            project=self.project, date=datetime.date(2026, 8, 10),
-        )
-        new = self.model.objects.create(
-            project=self.project, date=datetime.date(2026, 8, 17),
-        )
-        response = self.client.get(f"{self.project.get_absolute_url()}?tab=report")
-        reports = list(response.context["reports"])
-        self.assertEqual(reports, [new, old])

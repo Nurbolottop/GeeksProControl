@@ -505,18 +505,12 @@ def report_create(request, pk):
     """Новый отчёт по проекту."""
     project = get_object_or_404(Project, pk=pk)
     if request.method == 'POST':
-        raw_date = request.POST.get('date', '')
-        try:
-            date = datetime.date.fromisoformat(raw_date)
-        except ValueError:
-            date = timezone.localdate()
+        text = request.POST.get('text', '').strip()
+        if not text:
+            messages.error(request, 'Отчёт пустой — напишите текст.')
+            return redirect(f'{project.get_absolute_url()}?tab=report')
         report = ProjectReport.objects.create(
-            project=project, date=date,
-            status=request.POST.get('status', '').strip()[:255],
-            done=request.POST.get('done', '').strip(),
-            next_steps=request.POST.get('next_steps', '').strip(),
-            notes=request.POST.get('notes', '').strip(),
-            author=request.user,
+            project=project, text=text, author=request.user,
         )
         ProjectStatusHistory.objects.create(
             project=project, field='Отчёт',
@@ -534,17 +528,13 @@ def report_update(request, pk):
     )
     project = report.project
     if request.method == 'POST':
-        raw_date = request.POST.get('date', '')
-        try:
-            report.date = datetime.date.fromisoformat(raw_date)
-        except ValueError:
-            pass
-        report.status = request.POST.get('status', '').strip()[:255]
-        report.done = request.POST.get('done', '').strip()
-        report.next_steps = request.POST.get('next_steps', '').strip()
-        report.notes = request.POST.get('notes', '').strip()
-        report.save()
-        messages.success(request, 'Отчёт обновлён.')
+        text = request.POST.get('text', '').strip()
+        if text:
+            report.text = text
+            report.save(update_fields=['text', 'updated_at'])
+            messages.success(request, 'Отчёт обновлён.')
+        else:
+            messages.error(request, 'Отчёт пустой — текст не сохранён.')
     return redirect(f'{project.get_absolute_url()}?tab=report')
 
 

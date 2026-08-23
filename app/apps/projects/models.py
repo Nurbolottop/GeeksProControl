@@ -336,14 +336,8 @@ class ProjectReport(TimeStampedModel):
         Project, on_delete=models.CASCADE, related_name='reports',
         verbose_name='Проект',
     )
-    date = models.DateField('Дата отчёта', db_index=True)
-    status = models.CharField(
-        'Текущее положение', max_length=255, blank=True,
-        help_text='Например: стадия завершения, идёт финальное тестирование',
-    )
-    done = models.TextField('Выполнено', blank=True)
-    next_steps = models.TextField('Предстоит', blank=True)
-    notes = models.TextField('Проблемы и заметки', blank=True)
+    date = models.DateField('Дата отчёта', auto_now_add=True, db_index=True)
+    text = models.TextField('Отчёт')
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='+', verbose_name='Автор', null=True, blank=True,
