@@ -113,8 +113,14 @@ class LeadsNotCountedAsInternsTests(TestCase):
 
         self.spec = Specialization.objects.create(name="Backend")
         project = Project.objects.create(name="Омур")
-        self.dev = Intern.objects.create(full_name="Стажёр", specialization=self.spec)
-        self.lead = Intern.objects.create(full_name="Тимлид", specialization=self.spec)
+        self.dev = Intern.objects.create(
+            full_name="Стажёр", specialization=self.spec,
+            status=InternStatus.ACTIVE,
+        )
+        self.lead = Intern.objects.create(
+            full_name="Тимлид", specialization=self.spec,
+            status=InternStatus.ACTIVE,
+        )
         TeamMember.objects.create(
             project=project, intern=self.dev, role=TeamRole.BACKEND,
         )
