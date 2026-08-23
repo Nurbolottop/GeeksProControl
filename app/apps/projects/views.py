@@ -22,6 +22,7 @@ from apps.projects.forms import (
 )
 from apps.projects.models import (
     Project,
+    ProjectReport,
     ProjectAccess,
     ProjectStage,
     ProjectStageKey,
@@ -188,6 +189,8 @@ def project_detail(request, pk):
         ]
         context['documents'] = documents
         context['doc_progress'] = doc_services.document_progress(project)
+    elif tab == 'report':
+        context['reports'] = project.reports.select_related('author')
     elif tab == 'daily':
         from apps.dailycheck import views as daily_views
         day = daily_views._day(request)
@@ -495,3 +498,65 @@ def _stage_row(request, stage):
         {'stage': stage, 'project': stage.project,
          'today': timezone.localdate()},
     )
+
+
+@login_required
+def report_create(request, pk):
+    """Новый отчёт по проекту."""
+    project = get_object_or_404(Project, pk=pk)
+    if request.method == 'POST':
+        raw_date = request.POST.get('date', '')
+        try:
+            date = datetime.date.fromisoformat(raw_date)
+        except ValueError:
+            date = timezone.localdate()
+        report = ProjectReport.objects.create(
+            project=project, date=date,
+            status=request.POST.get('status', '').strip()[:255],
+            done=request.POST.get('done', '').strip(),
+            next_steps=request.POST.get('next_steps', '').strip(),
+            notes=request.POST.get('notes', '').strip(),
+            author=request.user,
+        )
+        ProjectStatusHistory.objects.create(
+            project=project, field='Отчёт',
+            new_value=f'Отчёт от {report.date:%d.%m.%Y}', user=request.user,
+        )
+        messages.success(request, f'Отчёт от {report.date:%d.%m.%Y} сохранён.')
+    return redirect(f'{project.get_absolute_url()}?tab=report')
+
+
+@login_required
+def report_update(request, pk):
+    """Правка отчёта по проекту."""
+    report = get_object_or_404(
+        ProjectReport.objects.select_related('project'), pk=pk,
+    )
+    project = report.project
+    if request.method == 'POST':
+        raw_date = request.POST.get('date', '')
+        try:
+            report.date = datetime.date.fromisoformat(raw_date)
+        except ValueError:
+            pass
+        report.status = request.POST.get('status', '').strip()[:255]
+        report.done = request.POST.get('done', '').strip()
+        report.next_steps = request.POST.get('next_steps', '').strip()
+        report.notes = request.POST.get('notes', '').strip()
+        report.save()
+        messages.success(request, 'Отчёт обновлён.')
+    return redirect(f'{project.get_absolute_url()}?tab=report')
+
+
+@login_required
+def report_delete(request, pk):
+    """Удаление отчёта."""
+    report = get_object_or_404(
+        ProjectReport.objects.select_related('project'), pk=pk,
+    )
+    project = report.project
+    if request.method == 'POST':
+        date = report.date
+        report.delete()
+        messages.success(request, f'Отчёт от {date:%d.%m.%Y} удалён.')
+    return redirect(f'{project.get_absolute_url()}?tab=report')

@@ -1,0 +1,121 @@
+{% comment %}Отчёты по проекту: пишутся руками по итогам недели или собрания.{% endcomment %}
+<div class="panel" x-data="{ open: {% if not reports %}true{% else %}false{% endif %} }">
+    <div class="panel-head">
+        <h2>Отчёты по проекту ({{ reports|length }})</h2>
+        <button type="button" class="btn btn--sm" @click="open = !open"
+                x-text="open ? 'Свернуть' : '+ Написать отчёт'"></button>
+    </div>
+    <form method="post" action="{% url 'projects:report_create' project.pk %}"
+          x-show="open" x-cloak>
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-field">
+                <label for="report-date">Дата отчёта</label>
+                <input type="date" id="report-date" name="date" value="{{ today|date:'Y-m-d' }}">
+            </div>
+            <div class="form-field">
+                <label for="report-status">Текущее положение</label>
+                <input type="text" id="report-status" name="status" autocomplete="off"
+                       placeholder="Например: стадия завершения, идёт финальное тестирование">
+            </div>
+        </div>
+        <div class="form-field" style="margin-top: 14px">
+            <label for="report-done">Выполнено</label>
+            <textarea id="report-done" name="done" rows="4"
+                      placeholder="Что закрыли за период"></textarea>
+        </div>
+        <div class="form-field" style="margin-top: 14px">
+            <label for="report-next">Предстоит</label>
+            <textarea id="report-next" name="next_steps" rows="3"
+                      placeholder="Что осталось до сдачи"></textarea>
+        </div>
+        <div class="form-field" style="margin-top: 14px">
+            <label for="report-notes">Проблемы и заметки</label>
+            <textarea id="report-notes" name="notes" rows="3"
+                      placeholder="Что мешает, что решить с заказчиком или командой"></textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">Сохранить отчёт</button>
+        </div>
+    </form>
+</div>
+
+{% for report in reports %}
+    <div class="panel" x-data="{ edit: false }">
+        <div class="panel-head">
+            <h2>Отчёт от {{ report.date|date:'d.m.Y' }}</h2>
+            <div style="display:flex; gap:8px; align-items:center">
+                {% if report.author %}
+                    <span style="font-size:12px; color: var(--text-muted)">
+                        {{ report.author.display_name|default:report.author.username }}
+                    </span>
+                {% endif %}
+                <button type="button" class="btn btn--secondary btn--sm" @click="edit = !edit"
+                        x-text="edit ? 'Отмена' : 'Изменить'"></button>
+                <form method="post" action="{% url 'projects:report_delete' report.pk %}" style="margin:0"
+                      onsubmit="return confirm('Удалить отчёт от {{ report.date|date:'d.m.Y' }}?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--secondary btn--sm" title="Удалить">✕</button>
+                </form>
+            </div>
+        </div>
+
+        <div x-show="!edit">
+            {% if report.status %}
+                <div class="report-status">{{ report.status }}</div>
+            {% endif %}
+            {% if report.done %}
+                <div class="report-part">
+                    <div class="report-part__title">Выполнено</div>
+                    <div class="report-part__text">{{ report.done|linebreaksbr }}</div>
+                </div>
+            {% endif %}
+            {% if report.next_steps %}
+                <div class="report-part">
+                    <div class="report-part__title">Предстоит</div>
+                    <div class="report-part__text">{{ report.next_steps|linebreaksbr }}</div>
+                </div>
+            {% endif %}
+            {% if report.notes %}
+                <div class="report-part">
+                    <div class="report-part__title">Проблемы и заметки</div>
+                    <div class="report-part__text">{{ report.notes|linebreaksbr }}</div>
+                </div>
+            {% endif %}
+        </div>
+
+        <form method="post" action="{% url 'projects:report_update' report.pk %}"
+              x-show="edit" x-cloak>
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Дата отчёта</label>
+                    <input type="date" name="date" value="{{ report.date|date:'Y-m-d' }}">
+                </div>
+                <div class="form-field">
+                    <label>Текущее положение</label>
+                    <input type="text" name="status" value="{{ report.status }}" autocomplete="off">
+                </div>
+            </div>
+            <div class="form-field" style="margin-top: 14px">
+                <label>Выполнено</label>
+                <textarea name="done" rows="4">{{ report.done }}</textarea>
+            </div>
+            <div class="form-field" style="margin-top: 14px">
+                <label>Предстоит</label>
+                <textarea name="next_steps" rows="3">{{ report.next_steps }}</textarea>
+            </div>
+            <div class="form-field" style="margin-top: 14px">
+                <label>Проблемы и заметки</label>
+                <textarea name="notes" rows="3">{{ report.notes }}</textarea>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">Сохранить</button>
+            </div>
+        </form>
+    </div>
+{% empty %}
+    <div class="panel empty" style="text-align:center; padding: 26px 20px;">
+        Отчётов пока нет — напишите первый выше.
+    </div>
+{% endfor %}

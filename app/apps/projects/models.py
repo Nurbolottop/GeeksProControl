@@ -326,6 +326,38 @@ class ProjectAccess(TimeStampedModel):
         return f'{self.project.code}: {self.service}'
 
 
+class ProjectReport(TimeStampedModel):
+    """Отчёт по проекту: текущее положение, что сделано и что впереди.
+
+    Пишется руками — по итогам недели, собрания или перед сдачей.
+    """
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name='reports',
+        verbose_name='Проект',
+    )
+    date = models.DateField('Дата отчёта', db_index=True)
+    status = models.CharField(
+        'Текущее положение', max_length=255, blank=True,
+        help_text='Например: стадия завершения, идёт финальное тестирование',
+    )
+    done = models.TextField('Выполнено', blank=True)
+    next_steps = models.TextField('Предстоит', blank=True)
+    notes = models.TextField('Проблемы и заметки', blank=True)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Автор', null=True, blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Отчёт по проекту'
+        verbose_name_plural = 'Отчёты по проектам'
+        ordering = ['-date', '-created_at']
+
+    def __str__(self) -> str:
+        return f'{self.project.name} — отчёт от {self.date:%d.%m.%Y}'
+
+
 class ProjectLink(models.Model):
     """Дополнительная ссылка проекта (ТЗ §6.1)."""
 
