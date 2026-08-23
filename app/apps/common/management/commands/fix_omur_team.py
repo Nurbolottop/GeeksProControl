@@ -21,7 +21,7 @@ ROSTER = [
     ('Бексултан', 'Backend', TeamRole.TEAM_LEAD, 'тимлид Backend'),
     ('Ислам', 'Frontend', TeamRole.TEAM_LEAD, 'тимлид Frontend'),
     ('Жумабек', 'UX/UI', TeamRole.TEAM_LEAD, 'тимлид UX/UI'),
-    ('Айжаз', 'UX/UI', TeamRole.UXUI, 'младший тимлид UX/UI'),
+    ('Макамбаева Айжаз', 'UX/UI', TeamRole.UXUI, 'младший тимлид UX/UI'),
     ('Мамасаков Артур', 'Backend', TeamRole.BACKEND, ''),
     ('Зуев Мирослав', 'Backend', TeamRole.BACKEND, 'младший тимлид Backend'),
     ('Аяна', 'Backend', TeamRole.BACKEND, ''),
