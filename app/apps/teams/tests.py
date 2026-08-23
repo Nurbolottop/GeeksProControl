@@ -249,3 +249,50 @@ class InternDeleteTests(TestCase):
         )
         self.client.post(reverse("interns:delete", args=[self.person.pk]))
         self.assertEqual(project.team_members.count(), 0)
+
+
+class MemberDeleteTests(TestCase):
+    """Участника можно убрать из команды, команду — расформировать."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Биклин"))
+        self.person = Intern.objects.create(full_name="Алтынай")
+        self.member = TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.PROJECT_MANAGER,
+        )
+
+    def test_member_removed_person_stays(self):
+        response = self.client.post(
+            reverse("teams:member_delete", args=[self.member.pk]),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(TeamMember.objects.filter(pk=self.member.pk).exists())
+        self.assertTrue(Intern.objects.filter(pk=self.person.pk).exists())
+
+    def test_get_does_not_remove_member(self):
+        self.client.get(reverse("teams:member_delete", args=[self.member.pk]))
+        self.assertTrue(TeamMember.objects.filter(pk=self.member.pk).exists())
+
+    def test_team_cleared(self):
+        other = Intern.objects.create(full_name="Бекназар")
+        TeamMember.objects.create(
+            project=self.project, intern=other, role=TeamRole.BACKEND,
+        )
+        self.client.post(reverse("teams:team_clear", args=[self.project.pk]))
+        self.assertEqual(self.project.team_members.count(), 0)
+        self.assertEqual(Intern.objects.count(), 2)
+
+    def test_duplicate_membership_removed_by_command(self):
+        from django.core.management import call_command
+
+        TeamMember.objects.create(
+            project=self.project, intern=self.person,
+            role=TeamRole.PROJECT_MANAGER,
+        )
+        self.assertEqual(self.project.team_members.count(), 2)
+        call_command("dedupe_members", verbosity=0)
+        self.assertEqual(self.project.team_members.count(), 1)

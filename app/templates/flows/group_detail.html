@@ -46,7 +46,14 @@
                                     {% if member.status != 'active' %} · вышел{% endif %}
                                 </div>
                             </div>
-                            <a href="{% url 'teams:member_edit' member.pk %}" class="btn-edit">✎</a>
+                            <div class="member__actions">
+                                <a href="{% url 'teams:member_edit' member.pk %}" class="btn-edit" title="Изменить">✎</a>
+                                <form method="post" action="{% url 'teams:member_delete' member.pk %}" style="margin:0"
+                                      onsubmit="return confirm('Убрать {{ member.person_name|escapejs }} из команды?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-edit btn-edit--danger" title="Убрать из команды">✕</button>
+                                </form>
+                            </div>
                         </div>
                     {% endfor %}
                 </div>

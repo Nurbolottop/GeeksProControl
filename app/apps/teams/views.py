@@ -260,3 +260,34 @@ def lead_remove(request, pk):
         member.delete()
         messages.success(request, f'{name} больше не тимлид в «{project}».')
     return redirect('teams:lead_list')
+
+
+@login_required
+def member_delete(request, pk):
+    """Убрать участника из команды. Человек остаётся в базе."""
+    member = get_object_or_404(
+        TeamMember.objects.select_related('project', 'group'), pk=pk,
+    )
+    project, group = member.project, member.group
+    if request.method == 'POST':
+        name = member.person_name
+        member.delete()
+        messages.success(request, f'{name} убран(а) из команды.')
+    if project:
+        return redirect(f'{project.get_absolute_url()}?tab=team')
+    if group:
+        return redirect(group.get_absolute_url())
+    return redirect('interns:list')
+
+
+@login_required
+def team_clear(request, project_pk):
+    """Расформировать команду проекта: снять всех участников."""
+    project = get_object_or_404(Project, pk=project_pk)
+    if request.method == 'POST':
+        removed = project.team_members.count()
+        project.team_members.all().delete()
+        messages.success(
+            request, f'Команда расформирована, снято участников: {removed}.',
+        )
+    return redirect(f'{project.get_absolute_url()}?tab=team')

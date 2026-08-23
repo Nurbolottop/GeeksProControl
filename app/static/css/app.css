@@ -1303,6 +1303,10 @@ a:hover { color: var(--accent-dark); }
 .task-row--done strong { color: var(--text-muted); text-decoration: line-through; }
 .task-row--cancelled { opacity: .55; }
 
+.member__actions { display: flex; gap: 4px; align-items: center; }
+.btn-edit--danger { color: #c2c7d4; }
+.btn-edit--danger:hover { color: var(--red); border-color: var(--red-line); }
+
 /* ---- Отчёт по проекту ---- */
 .report-status {
     display: inline-block;
