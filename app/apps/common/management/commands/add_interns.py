@@ -17,6 +17,7 @@ from apps.training.models import Specialization
 ALIASES = {
     'садик': 'Балажан',
     'школа': 'БилимОрдо',
+    'умай': 'Umai',
 }
 
 # (проект, направление, роль, [ФИО])
@@ -41,6 +42,10 @@ ROSTER = [
     ('школа', 'Frontend', TeamRole.FRONTEND, [
         'Чериикулов Элмирбек',
         'Азимова Каниет',
+    ]),
+    ('умай', 'Mobile', TeamRole.MOBILE, [
+        'Илья',
+        'Азамат',
     ]),
     ('школа', 'Backend', TeamRole.BACKEND, [
         'Суранбаев Нурсеит',
