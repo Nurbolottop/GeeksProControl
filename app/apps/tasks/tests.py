@@ -87,3 +87,35 @@ class TaskEditDeleteTests(TestCase):
         })
         self.task.refresh_from_db()
         self.assertEqual(self.task.title, "Созвон с тимлидом")
+
+
+class TaskWithoutProjectTests(TestCase):
+    """Задачу можно завести без проекта — как личную."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+
+    def test_task_saved_without_project(self):
+        response = self.client.post(reverse("tasks:create"), {
+            "title": "Позвонить в банк", "priority": "medium",
+        })
+        self.assertEqual(response.status_code, 302)
+        task = Task.objects.get(title="Позвонить в банк")
+        self.assertIsNone(task.project)
+
+    def test_form_marks_project_optional(self):
+        from apps.tasks.forms import TaskForm
+
+        form = TaskForm()
+        self.assertFalse(form.fields["project"].required)
+        self.assertIn("Без проекта", str(form["project"]))
+
+    def test_list_shows_without_project_label(self):
+        Task.objects.create(title="Личная задача")
+        response = self.client.get(reverse("tasks:list"))
+        self.assertContains(response, "Без проекта")

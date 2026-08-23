@@ -26,6 +26,13 @@ class TaskForm(forms.ModelForm):
             'deadline': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Задача может быть личной — без проекта
+        field = self.fields['project']
+        field.required = False
+        field.empty_label = 'Без проекта — личная задача'
+
 
 class TaskCommentForm(forms.ModelForm):
     class Meta:

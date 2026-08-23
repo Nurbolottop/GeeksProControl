@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from apps.common.models import TimeStampedModel
@@ -57,3 +58,27 @@ class KPISnapshot(TimeStampedModel):
 
     def __str__(self) -> str:
         return f'{self.get_period_type_display()} с {self.period_start:%d.%m.%Y}'
+
+
+class WrittenReport(TimeStampedModel):
+    """Письменный отчёт руководителя: проблемы и достижения.
+
+    Пишется руками, отдельно от цифр недельного отчёта.
+    Дата ставится автоматически днём написания.
+    """
+
+    date = models.DateField('Дата', auto_now_add=True, db_index=True)
+    problems = models.TextField('Проблемы', blank=True)
+    achievements = models.TextField('Достижения', blank=True)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Автор', null=True, blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Письменный отчёт'
+        verbose_name_plural = 'Письменные отчёты'
+        ordering = ['-date', '-created_at']
+
+    def __str__(self) -> str:
+        return f'Письменный отчёт от {self.date:%d.%m.%Y}'

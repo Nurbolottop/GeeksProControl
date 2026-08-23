@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.reports import services, weekly_form
-from apps.reports.models import KPISnapshot, WeeklyReport
+from apps.reports.models import KPISnapshot, WeeklyReport, WrittenReport
 
 
 @login_required
@@ -89,3 +89,48 @@ def weekly_delete(request, pk):
         report.delete()
         messages.success(request, f"Отчёт за неделю {week:%d.%m.%Y} удалён.")
     return redirect("reports:weekly_list")
+
+
+@login_required
+def written_list(request):
+    """Письменные отчёты: проблемы и достижения."""
+    if request.method == 'POST':
+        problems = request.POST.get('problems', '').strip()
+        achievements = request.POST.get('achievements', '').strip()
+        if not problems and not achievements:
+            messages.error(request, 'Отчёт пустой — заполните хотя бы один раздел.')
+        else:
+            report = WrittenReport.objects.create(
+                problems=problems, achievements=achievements,
+                author=request.user,
+            )
+            messages.success(
+                request, f'Отчёт от {report.date:%d.%m.%Y} сохранён.',
+            )
+        return redirect('reports:written_list')
+    return render(request, 'reports/written_list.html', {
+        'reports': WrittenReport.objects.select_related('author'),
+    })
+
+
+@login_required
+def written_update(request, pk):
+    """Правка письменного отчёта."""
+    report = get_object_or_404(WrittenReport, pk=pk)
+    if request.method == 'POST':
+        report.problems = request.POST.get('problems', '').strip()
+        report.achievements = request.POST.get('achievements', '').strip()
+        report.save(update_fields=['problems', 'achievements', 'updated_at'])
+        messages.success(request, 'Отчёт обновлён.')
+    return redirect('reports:written_list')
+
+
+@login_required
+def written_delete(request, pk):
+    """Удаление письменного отчёта."""
+    report = get_object_or_404(WrittenReport, pk=pk)
+    if request.method == 'POST':
+        date = report.date
+        report.delete()
+        messages.success(request, f'Отчёт от {date:%d.%m.%Y} удалён.')
+    return redirect('reports:written_list')

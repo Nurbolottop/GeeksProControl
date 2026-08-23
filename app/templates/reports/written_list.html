@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+
+{% block title %}Письменный отчёт — GeeksPro Control{% endblock %}
+
+{% block content %}
+<nav class="crumbs">
+    <a href="{% url 'reports:weekly_list' %}">Недельные отчёты</a>
+    <span class="crumbs__sep">›</span>
+    <span class="crumbs__current">Письменный отчёт</span>
+</nav>
+
+<div class="page-head">
+    <div>
+        <h1>Письменный отчёт</h1>
+        <div class="sub">Дата ставится сама — {{ today|date:'d.m.Y' }}</div>
+    </div>
+</div>
+
+<form method="post" class="panel">
+    {% csrf_token %}
+    <div class="panel-head">
+        <h2>Новый отчёт</h2>
+    </div>
+    <div class="form-row">
+        <div class="form-field">
+            <label for="achievements">Достижения</label>
+            <textarea id="achievements" name="achievements" rows="8"
+                      placeholder="Что получилось: сдали, запустили, закрыли"></textarea>
+        </div>
+        <div class="form-field">
+            <label for="problems">Проблемы</label>
+            <textarea id="problems" name="problems" rows="8"
+                      placeholder="Что мешает: люди, сроки, заказчик, доступы"></textarea>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn">Сохранить отчёт</button>
+    </div>
+</form>
+
+{% for report in reports %}
+    <div class="panel" x-data="{ edit: false }">
+        <div class="panel-head">
+            <h2>Отчёт от {{ report.date|date:'d.m.Y' }}</h2>
+            <div style="display:flex; gap:8px; align-items:center">
+                {% if report.author %}
+                    <span style="font-size:12px; color: var(--text-muted)">
+                        {{ report.author.display_name|default:report.author.username }}
+                    </span>
+                {% endif %}
+                <button type="button" class="btn btn--secondary btn--sm" @click="edit = !edit"
+                        x-text="edit ? 'Отмена' : 'Изменить'"></button>
+                <form method="post" action="{% url 'reports:written_delete' report.pk %}" style="margin:0"
+                      onsubmit="return confirm('Удалить отчёт от {{ report.date|date:'d.m.Y' }}?')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--secondary btn--sm" title="Удалить">✕</button>
+                </form>
+            </div>
+        </div>
+
+        <div x-show="!edit" class="written-grid">
+            <div class="written-part written-part--good">
+                <div class="written-part__title">Достижения</div>
+                <div class="report-part__text">
+                    {% if report.achievements %}{{ report.achievements|linebreaksbr }}
+                    {% else %}<span style="color: var(--text-muted)">не заполнено</span>{% endif %}
+                </div>
+            </div>
+            <div class="written-part written-part--bad">
+                <div class="written-part__title">Проблемы</div>
+                <div class="report-part__text">
+                    {% if report.problems %}{{ report.problems|linebreaksbr }}
+                    {% else %}<span style="color: var(--text-muted)">не заполнено</span>{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'reports:written_update' report.pk %}"
+              x-show="edit" x-cloak>
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Достижения</label>
+                    <textarea name="achievements" rows="8">{{ report.achievements }}</textarea>
+                </div>
+                <div class="form-field">
+                    <label>Проблемы</label>
+                    <textarea name="problems" rows="8">{{ report.problems }}</textarea>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">Сохранить</button>
+            </div>
+        </form>
+    </div>
+{% empty %}
+    <div class="panel empty" style="text-align:center; padding: 26px 20px;">
+        Письменных отчётов пока нет — напишите первый выше.
+    </div>
+{% endfor %}
+{% endblock %}

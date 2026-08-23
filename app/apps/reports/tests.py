@@ -200,3 +200,65 @@ class WeeklyReportDeleteTests(TestCase):
         self.assertContains(
             response, reverse("reports:weekly_delete", args=[self.report.pk]),
         )
+
+
+class WrittenReportTests(TestCase):
+    """Письменный отчёт: проблемы и достижения."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+
+    def test_report_saved_with_both_parts(self):
+        from apps.reports.models import WrittenReport
+        from django.utils import timezone
+
+        response = self.client.post(reverse("reports:written_list"), {
+            "achievements": "ОБА сдали заказчику",
+            "problems": "Нет доступов к прод-серверу",
+        })
+        self.assertEqual(response.status_code, 302)
+        report = WrittenReport.objects.get()
+        self.assertEqual(report.achievements, "ОБА сдали заказчику")
+        self.assertIn("доступов", report.problems)
+        self.assertEqual(report.date, timezone.localdate())
+        self.assertEqual(report.author, self.user)
+
+    def test_empty_report_not_saved(self):
+        from apps.reports.models import WrittenReport
+
+        self.client.post(reverse("reports:written_list"), {
+            "achievements": "  ", "problems": "",
+        })
+        self.assertEqual(WrittenReport.objects.count(), 0)
+
+    def test_only_one_part_is_enough(self):
+        from apps.reports.models import WrittenReport
+
+        self.client.post(reverse("reports:written_list"), {
+            "achievements": "", "problems": "Срываем сроки по Учкуну",
+        })
+        self.assertEqual(WrittenReport.objects.count(), 1)
+
+    def test_report_updated_and_deleted(self):
+        from apps.reports.models import WrittenReport
+
+        report = WrittenReport.objects.create(achievements="старое")
+        self.client.post(
+            reverse("reports:written_update", args=[report.pk]),
+            {"achievements": "новое", "problems": ""},
+        )
+        report.refresh_from_db()
+        self.assertEqual(report.achievements, "новое")
+
+        self.client.post(reverse("reports:written_delete", args=[report.pk]))
+        self.assertFalse(WrittenReport.objects.filter(pk=report.pk).exists())
+
+    def test_button_on_weekly_page(self):
+        response = self.client.get(reverse("reports:weekly_list"))
+        self.assertContains(response, reverse("reports:written_list"))
+        self.assertContains(response, "Письменный отчёт")

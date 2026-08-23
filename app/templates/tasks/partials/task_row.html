@@ -5,6 +5,8 @@
             <div style="font-size:12px; color: var(--text-muted)">
                 <a href="{{ task.project.get_absolute_url }}">{{ task.project.name }}</a>
             </div>
+        {% else %}
+            <div style="font-size:12px; color: var(--text-muted)">Без проекта</div>
         {% endif %}
     </td>
     <td>

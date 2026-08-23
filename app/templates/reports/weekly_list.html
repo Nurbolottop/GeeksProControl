@@ -9,6 +9,7 @@
         <div class="sub">Цифры считаются автоматически по данным платформы, неделя с понедельника по воскресенье</div>
     </div>
     <div class="page-actions">
+        <a href="{% url 'reports:written_list' %}" class="btn btn--secondary">Письменный отчёт</a>
         <form method="post" action="{% url 'reports:weekly_generate' %}" style="margin:0">
             {% csrf_token %}
             <input type="hidden" name="week" value="{{ last_week|date:'Y-m-d' }}">
