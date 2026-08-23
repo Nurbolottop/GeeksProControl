@@ -101,3 +101,43 @@ class InternsTotalTests(TestCase):
         self.assertEqual(response.context["totals"]["total"], 3)
         self.assertContains(response, "Всего стажёров")
         self.assertContains(response, "Итого")
+
+
+class LeadsNotCountedAsInternsTests(TestCase):
+    """Тимлид — сотрудник: ни в направлениях, ни в общем счёте его нет."""
+
+    def setUp(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.spec = Specialization.objects.create(name="Backend")
+        project = Project.objects.create(name="Омур")
+        self.dev = Intern.objects.create(full_name="Стажёр", specialization=self.spec)
+        self.lead = Intern.objects.create(full_name="Тимлид", specialization=self.spec)
+        TeamMember.objects.create(
+            project=project, intern=self.dev, role=TeamRole.BACKEND,
+        )
+        TeamMember.objects.create(
+            project=project, intern=self.lead, role=TeamRole.TEAM_LEAD,
+        )
+
+    def test_direction_row_without_lead(self):
+        row = next(
+            r for r in services.interns_summary()
+            if r["specialization"] == self.spec
+        )
+        self.assertEqual(row["total"], 1)
+        self.assertEqual(row["busy"], 1)
+
+    def test_totals_without_lead(self):
+        totals = services.interns_total()
+        self.assertEqual(totals["total"], 1)
+        self.assertEqual(totals["leads"], 1)
+
+    def test_weekly_report_counts_interns_without_leads(self):
+        import datetime
+        from apps.reports import weekly_form
+
+        data = weekly_form.build(datetime.date(2026, 8, 17))
+        self.assertEqual(data["interns"]["active"], 1)

@@ -13,7 +13,13 @@ FORECAST_MONTHS = 3
 
 
 def interns_summary() -> list[dict]:
-    """По каждому направлению: всего стажёров, занято на проектах, свободно."""
+    """По каждому направлению: всего стажёров, занято на проектах, свободно.
+
+    Тимлиды сюда не входят — они сотрудники, а не стажёры.
+    """
+    from apps.teams.selectors import lead_intern_ids
+
+    leads = lead_intern_ids()
     busy_ids = set(
         TeamMember.objects.filter(
             status=TeamMember.Status.ACTIVE, intern__isnull=False,
@@ -25,6 +31,7 @@ def interns_summary() -> list[dict]:
             Intern.objects.active()
             .filter(specialization=spec)
             .exclude(status=InternStatus.DROPPED)
+            .exclude(pk__in=leads)
             .values_list('pk', flat=True),
         )
         busy = sum(1 for pk in people if pk in busy_ids)
@@ -44,6 +51,9 @@ def interns_total() -> dict:
     Считается по людям, а не сложением направлений: человек без
     направления тоже попадает в общее число.
     """
+    from apps.teams.selectors import lead_intern_ids
+
+    leads = lead_intern_ids()
     busy_ids = set(
         TeamMember.objects.filter(
             status=TeamMember.Status.ACTIVE, intern__isnull=False,
@@ -52,12 +62,14 @@ def interns_total() -> dict:
     people = list(
         Intern.objects.active()
         .exclude(status=InternStatus.DROPPED)
+        .exclude(pk__in=leads)
         .values_list('pk', flat=True),
     )
     busy = sum(1 for pk in people if pk in busy_ids)
     without_spec = (
         Intern.objects.active()
         .exclude(status=InternStatus.DROPPED)
+        .exclude(pk__in=leads)
         .filter(specialization__isnull=True)
         .count()
     )
@@ -66,6 +78,7 @@ def interns_total() -> dict:
         'busy': busy,
         'free': len(people) - busy,
         'without_spec': without_spec,
+        'leads': len(leads),
     }
 
 

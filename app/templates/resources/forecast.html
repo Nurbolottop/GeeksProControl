@@ -6,7 +6,10 @@
 <div class="page-head">
     <div>
         <h1>Стажёры по направлениям</h1>
-        <div class="sub">Сколько людей в каждом направлении, сколько занято и свободно</div>
+        <div class="sub">
+            Сколько стажёров в каждом направлении, сколько занято и свободно.
+            Тимлиды сюда не входят — они сотрудники.
+        </div>
     </div>
     <div class="page-actions">
         <a href="{% url 'resources:graduations' %}" class="btn btn--secondary">Выпуски</a>
@@ -25,6 +28,10 @@
     <div class="kpi-card kpi-card--green">
         <div class="kpi-card__value">{{ totals.free }}</div>
         <div class="kpi-card__label">Свободны</div>
+    </div>
+    <div class="kpi-card kpi-card--yellow">
+        <div class="kpi-card__value">{{ totals.leads }}</div>
+        <div class="kpi-card__label">Тимлиды — сотрудники, не в счёт</div>
     </div>
 </div>
 

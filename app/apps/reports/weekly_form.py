@@ -70,8 +70,13 @@ def build(week_start: datetime.date) -> dict:
     stopped_by_us = _status_changes(first, last, CANCELLED_LABEL)
     stopped_by_client = _status_changes(first, last, REFUSED_LABEL)
 
-    # --- Стажёры ---
-    active_interns = interns.filter(status__in=WORKING_STATUSES).count()
+    # --- Стажёры (тимлиды — сотрудники, в счёт не идут) ---
+    from apps.teams.selectors import lead_intern_ids
+
+    leads = lead_intern_ids()
+    active_interns = (
+        interns.filter(status__in=WORKING_STATUSES).exclude(pk__in=leads).count()
+    )
     new_interns = interns.filter(
         internship_start_date__gte=first, internship_start_date__lte=last,
     ).count()

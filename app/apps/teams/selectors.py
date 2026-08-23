@@ -69,3 +69,16 @@ def group_by_role(members) -> list[dict]:
             'active': sum(1 for m in people if m.status == 'active'),
         })
     return sections
+
+
+def lead_intern_ids() -> set:
+    """Кто из людей — тимлид. Тимлиды сотрудники, а не стажёры.
+
+    Используется везде, где считаются или показываются стажёры,
+    чтобы тимлиды в эти списки и цифры не попадали.
+    """
+    return set(
+        TeamMember.objects.filter(role=TeamRole.TEAM_LEAD)
+        .exclude(intern__isnull=True)
+        .values_list('intern_id', flat=True),
+    )

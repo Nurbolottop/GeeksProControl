@@ -13,13 +13,9 @@ from apps.training.models import Specialization, TrainingGroup
 
 def lead_ids() -> set:
     """Тимлиды — сотрудники на зарплате, в списке стажёров их нет."""
-    from apps.teams.models import TeamRole
+    from apps.teams.selectors import lead_intern_ids
 
-    return set(
-        TeamMember.objects.filter(role=TeamRole.TEAM_LEAD)
-        .exclude(intern__isnull=True)
-        .values_list('intern_id', flat=True),
-    )
+    return lead_intern_ids()
 
 
 @login_required
