@@ -193,7 +193,29 @@ def lead_list(request):
         })
         entry['projects'].append(member)
 
+    # Раскладываем по направлениям: у каждого направления свой блок
+    groups: dict[str, dict] = {}
+    for entry in by_person.values():
+        spec = entry['intern'].specialization
+        name = str(spec) if spec else 'Без направления'
+        group = groups.setdefault(name, {'name': name, 'leads': []})
+        group['leads'].append(entry)
+    sections = sorted(
+        groups.values(), key=lambda g: (-len(g['leads']), g['name']),
+    )
+    for group in sections:
+        group['leads'].sort(key=lambda e: -len(e['projects']))
+
+    # Направления, где тимлида нет вообще — это дыра, её видно сразу
+    covered = set(groups)
+    missing = [
+        spec.name for spec in Specialization.objects.order_by('name')
+        if spec.name not in covered
+    ]
+
     return render(request, 'teams/lead_list.html', {
+        'sections': sections,
+        'missing': missing,
         'rows': list(by_person.values()),
         'total': len(by_person),
         'projects': Project.objects.active().order_by('name'),

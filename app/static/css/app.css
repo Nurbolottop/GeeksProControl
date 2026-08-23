@@ -1312,6 +1312,87 @@ a:hover { color: var(--accent-dark); }
     background: #f6f7fb;
 }
 
+/* ---- Страница тимлидов ---- */
+.lead-summary {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+.lead-summary__item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+.lead-summary__item--total {
+    background: var(--yellow-bg);
+    border-color: var(--yellow-line);
+}
+.lead-summary__value { font-size: 20px; font-weight: 800; color: var(--text); }
+.lead-summary__label { font-size: 12.5px; color: var(--text-muted); }
+
+.lead-missing {
+    margin-bottom: 18px;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--red-bg);
+    border: 1px solid var(--red-line);
+    color: var(--red);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.lead-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+}
+.lead-card {
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: #fbfcfe;
+}
+.lead-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.lead-card__name { font-size: 14.5px; font-weight: 700; color: var(--text); }
+.lead-card__name:hover { color: var(--primary); }
+.lead-card__count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.lead-card__projects { display: flex; flex-wrap: wrap; gap: 6px; }
+.lead-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px 4px 11px;
+    border-radius: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    font-size: 12.5px;
+}
+.lead-chip a { color: var(--text); text-decoration: none; }
+.lead-chip a:hover { color: var(--primary); }
+.lead-chip__x {
+    width: 18px;
+    height: 18px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #c2c7d4;
+    font-size: 10px;
+    line-height: 1;
+    cursor: pointer;
+}
+.lead-chip__x:hover { background: var(--red-bg); color: var(--red); }
+
 /* ---- Профиль тимлида ---- */
 .lead-panel { border-left: 3px solid var(--yellow); }
 .lead-projects { display: flex; flex-wrap: wrap; gap: 8px; }

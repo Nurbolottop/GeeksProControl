@@ -6,71 +6,72 @@
 <div class="page-head">
     <div>
         <h1>Тимлиды</h1>
-        <div class="sub">
-            Тимлид — тот же человек из «Стажёров», просто ведёт направление в команде.
-            Отдельной базы нет: снимете роль — человек останется.
-        </div>
+        <div class="sub">Сотрудники, которые ведут направление в командах проектов</div>
     </div>
     <div class="page-actions">
-        <span class="badge badge--blue">{{ total }} чел.</span>
+        <a href="#assign" class="btn">+ Назначить тимлида</a>
     </div>
 </div>
 
-<div class="panel" style="padding: 0;">
-    <div class="table-wrap">
-        <table class="data">
-            <thead>
-            <tr>
-                <th>Человек</th>
-                <th>Направление</th>
-                <th>Ведёт в проектах</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for row in rows %}
-                <tr>
-                    <td>
-                        <a href="{{ row.intern.get_absolute_url }}">
-                            <strong>{{ row.intern.full_name }}</strong>
+<div class="lead-summary">
+    <div class="lead-summary__item lead-summary__item--total">
+        <span class="lead-summary__value">{{ total }}</span>
+        <span class="lead-summary__label">всего тимлидов</span>
+    </div>
+    {% for section in sections %}
+        <div class="lead-summary__item">
+            <span class="lead-summary__value">{{ section.leads|length }}</span>
+            <span class="lead-summary__label">{{ section.name }}</span>
+        </div>
+    {% endfor %}
+</div>
+
+{% if missing %}
+    <div class="lead-missing">
+        Без тимлида: {{ missing|join:", " }}
+    </div>
+{% endif %}
+
+{% for section in sections %}
+    <div class="panel">
+        <div class="panel-head">
+            <h2>{{ section.name }}</h2>
+            <span class="panel-bar__note">{{ section.leads|length }} чел.</span>
+        </div>
+        <div class="lead-grid">
+            {% for row in section.leads %}
+                <div class="lead-card">
+                    <div class="lead-card__head">
+                        <a href="{{ row.intern.get_absolute_url }}" class="lead-card__name">
+                            {{ row.intern.full_name }}
                         </a>
-                    </td>
-                    <td>
-                        <span class="badge badge--gray">
-                            {{ row.intern.specialization|default:'без направления' }}
-                        </span>
-                    </td>
-                    <td>
+                        <span class="lead-card__count">{{ row.projects|length }} проектов</span>
+                    </div>
+                    <div class="lead-card__projects">
                         {% for member in row.projects %}
-                            <div style="display:flex; gap:8px; align-items:center; padding:3px 0">
+                            <span class="lead-chip">
                                 {% if member.project %}
                                     <a href="{{ member.project.get_absolute_url }}?tab=team">{{ member.project.name }}</a>
-                                {% else %}
-                                    <span style="color: var(--text-muted)">без проекта</span>
-                                {% endif %}
-                                <form method="post" action="{% url 'teams:lead_remove' member.pk %}" style="margin:0"
-                                      onsubmit="return confirm('Снять {{ row.intern.full_name|escapejs }} с роли тимлида в этом проекте?')">
+                                {% else %}без проекта{% endif %}
+                                <form method="post" action="{% url 'teams:lead_remove' member.pk %}" style="display:inline; margin:0"
+                                      onsubmit="return confirm('Снять {{ row.intern.full_name|escapejs }} с роли тимлида в проекте «{{ member.project.name|escapejs }}»?')">
                                     {% csrf_token %}
-                                    <button type="submit" class="check-remove" title="Снять роль тимлида">✕</button>
+                                    <button type="submit" class="lead-chip__x" title="Снять роль тимлида">✕</button>
                                 </form>
-                            </div>
+                            </span>
                         {% endfor %}
-                    </td>
-                    <td style="text-align: right; white-space: nowrap">
-                        <a href="{% url 'interns:update' row.intern.pk %}" class="btn btn--secondary btn--sm">Настроить</a>
-                    </td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="4" class="empty" style="text-align:center; padding: 30px;">
-                    Тимлидов пока нет — назначьте ниже.
-                </td></tr>
+                    </div>
+                </div>
             {% endfor %}
-            </tbody>
-        </table>
+        </div>
     </div>
-</div>
+{% empty %}
+    <div class="panel empty" style="text-align:center; padding: 30px;">
+        Тимлидов пока нет — назначьте ниже.
+    </div>
+{% endfor %}
 
-<div class="panel" x-data="{ open: false }">
+<div class="panel" id="assign" x-data="{ open: {% if not total %}true{% else %}false{% endif %} }">
     <div class="panel-head">
         <h2>Назначить тимлида</h2>
         <button type="button" class="btn btn--secondary btn--sm" @click="open = !open"
@@ -98,8 +99,8 @@
         </div>
     </form>
     <div x-show="!open" class="sub" style="color: var(--text-muted); font-size: 12.5px">
-        Направление берётся из карточки человека. Один человек может вести
-        направление в нескольких проектах.
+        Направление берётся из карточки человека. Один тимлид может вести
+        направление сразу в нескольких проектах.
     </div>
 </div>
 {% endblock %}
