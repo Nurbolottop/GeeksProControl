@@ -7,6 +7,7 @@
     <div>
         <h1>{{ intern.full_name }}</h1>
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--{{ kind_tone }}">{{ kind }}</span>
             <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
             <span class="badge badge--green">{{ intern.get_status_display }}</span>
             {% if intern.rating %}<span class="badge badge--yellow">★ {{ intern.rating }}</span>{% endif %}
@@ -30,10 +31,8 @@
         <div class="def"><dt>Email</dt><dd>{{ intern.email|default:'—' }}</dd></div>
         <div class="def"><dt>Город</dt><dd>{{ intern.city|default:'—' }}</dd></div>
         <div class="def"><dt>Филиал</dt><dd>{{ intern.branch|default:'—' }}</dd></div>
-        <div class="def"><dt>Учебная группа</dt><dd>{{ intern.training_group|default:'—' }}</dd></div>
-        <div class="def"><dt>Окончание обучения</dt><dd>{{ intern.education_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
         <div class="def"><dt>Начало стажировки</dt><dd>{{ intern.internship_start_date|date:'d.m.Y'|default:'—' }}</dd></div>
-        <div class="def"><dt>Текущий Team Lead</dt><dd>{{ intern.team_lead.display_name|default:'—' }}</dd></div>
+        <div class="def"><dt>Кто в команде</dt><dd>{{ kind }}</dd></div>
         <div class="def"><dt>Количество проектов</dt><dd>{{ projects_count }}</dd></div>
     </dl>
     {% if intern.comment %}
@@ -41,6 +40,25 @@
         <p style="margin:0">{{ intern.comment|linebreaksbr }}</p>
     {% endif %}
 </div>
+
+{% if is_lead %}
+    <div class="panel lead-panel">
+        <div class="panel-head">
+            <h2>Ведёт направление {{ intern.specialization|default:'' }}</h2>
+            <a href="{% url 'teams:lead_list' %}" class="btn btn--secondary btn--sm">Все тимлиды</a>
+        </div>
+        <div class="lead-projects">
+            {% for member in lead_projects %}
+                <a href="{{ member.project.get_absolute_url }}?tab=team" class="lead-chip">
+                    {{ member.project.name }}
+                </a>
+            {% endfor %}
+        </div>
+        <div class="sub" style="color: var(--text-muted); font-size: 12.5px; margin-top: 10px">
+            Тимлид — сотрудник, а не стажёр: в общем списке стажёров его нет.
+        </div>
+    </div>
+{% endif %}
 
 <div class="panel">
     <h2>Текущие проекты ({{ active_memberships|length }})</h2>

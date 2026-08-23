@@ -88,8 +88,26 @@ def intern_detail(request, pk):
     past_memberships = [
         m for m in memberships if m.status == TeamMember.Status.LEFT
     ]
+    from apps.teams.models import TeamRole
+    roles = {m.role for m in active_memberships}
+    is_lead = TeamRole.TEAM_LEAD in roles
+    is_pm = TeamRole.PROJECT_MANAGER in roles
+    if is_lead:
+        kind, kind_tone = 'Тимлид направления', 'orange'
+    elif is_pm:
+        kind, kind_tone = 'Project Manager', 'blue'
+    else:
+        kind, kind_tone = 'Стажёр', 'gray'
+
     context = {
         'intern': intern,
+        'is_lead': is_lead,
+        'is_pm': is_pm,
+        'kind': kind,
+        'kind_tone': kind_tone,
+        'lead_projects': [
+            m for m in active_memberships if m.role == TeamRole.TEAM_LEAD
+        ],
         'active_memberships': active_memberships,
         'past_memberships': past_memberships,
         'projects_count': len(active_memberships) + len(past_memberships),
