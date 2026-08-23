@@ -60,25 +60,32 @@ class KPISnapshot(TimeStampedModel):
         return f'{self.get_period_type_display()} с {self.period_start:%d.%m.%Y}'
 
 
-class WrittenReport(TimeStampedModel):
-    """Письменный отчёт руководителя: проблемы и достижения.
+class WrittenNote(TimeStampedModel):
+    """Запись руководителя: достижение, проблема или вопрос.
 
-    Пишется руками, отдельно от цифр недельного отчёта.
-    Дата ставится автоматически днём написания.
+    Добавляется по одной, дата ставится днём написания.
     """
 
+    class Kind(models.TextChoices):
+        ACHIEVEMENT = 'achievement', 'Достижение'
+        PROBLEM = 'problem', 'Проблема'
+        QUESTION = 'question', 'Вопрос'
+
+    kind = models.CharField(
+        'Раздел', max_length=20,
+        choices=Kind.choices, default=Kind.ACHIEVEMENT, db_index=True,
+    )
+    text = models.TextField('Текст')
     date = models.DateField('Дата', auto_now_add=True, db_index=True)
-    problems = models.TextField('Проблемы', blank=True)
-    achievements = models.TextField('Достижения', blank=True)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='+', verbose_name='Автор', null=True, blank=True,
     )
 
     class Meta:
-        verbose_name = 'Письменный отчёт'
-        verbose_name_plural = 'Письменные отчёты'
+        verbose_name = 'Запись отчёта'
+        verbose_name_plural = 'Записи отчёта'
         ordering = ['-date', '-created_at']
 
     def __str__(self) -> str:
-        return f'Письменный отчёт от {self.date:%d.%m.%Y}'
+        return f'{self.get_kind_display()} от {self.date:%d.%m.%Y}'

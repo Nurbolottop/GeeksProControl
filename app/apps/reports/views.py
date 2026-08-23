@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.reports import services, weekly_form
-from apps.reports.models import KPISnapshot, WeeklyReport, WrittenReport
+from apps.reports.models import KPISnapshot, WeeklyReport, WrittenNote
 
 
 @login_required
@@ -93,44 +93,58 @@ def weekly_delete(request, pk):
 
 @login_required
 def written_list(request):
-    """Письменные отчёты: проблемы и достижения."""
+    """Записи руководителя: достижения, проблемы и вопросы."""
     if request.method == 'POST':
-        problems = request.POST.get('problems', '').strip()
-        achievements = request.POST.get('achievements', '').strip()
-        if not problems and not achievements:
-            messages.error(request, 'Отчёт пустой — заполните хотя бы один раздел.')
+        text = request.POST.get('text', '').strip()
+        kind = request.POST.get('kind', '')
+        if kind not in WrittenNote.Kind.values:
+            kind = WrittenNote.Kind.ACHIEVEMENT
+        if not text:
+            messages.error(request, 'Пустая запись — напишите текст.')
         else:
-            report = WrittenReport.objects.create(
-                problems=problems, achievements=achievements,
-                author=request.user,
+            note = WrittenNote.objects.create(
+                kind=kind, text=text, author=request.user,
             )
-            messages.success(
-                request, f'Отчёт от {report.date:%d.%m.%Y} сохранён.',
-            )
+            messages.success(request, f'{note.get_kind_display()} добавлено.')
         return redirect('reports:written_list')
+
+    notes = list(WrittenNote.objects.select_related('author'))
+    sections = [
+        {
+            'key': kind,
+            'label': label,
+            'notes': [note for note in notes if note.kind == kind],
+        }
+        for kind, label in WrittenNote.Kind.choices
+    ]
     return render(request, 'reports/written_list.html', {
-        'reports': WrittenReport.objects.select_related('author'),
+        'sections': sections,
+        'kinds': WrittenNote.Kind.choices,
+        'total': len(notes),
     })
 
 
 @login_required
 def written_update(request, pk):
-    """Правка письменного отчёта."""
-    report = get_object_or_404(WrittenReport, pk=pk)
+    """Правка записи."""
+    note = get_object_or_404(WrittenNote, pk=pk)
     if request.method == 'POST':
-        report.problems = request.POST.get('problems', '').strip()
-        report.achievements = request.POST.get('achievements', '').strip()
-        report.save(update_fields=['problems', 'achievements', 'updated_at'])
-        messages.success(request, 'Отчёт обновлён.')
+        text = request.POST.get('text', '').strip()
+        if text:
+            note.text = text
+            note.save(update_fields=['text', 'updated_at'])
+            messages.success(request, 'Запись обновлена.')
+        else:
+            messages.error(request, 'Пустая запись — не сохранено.')
     return redirect('reports:written_list')
 
 
 @login_required
 def written_delete(request, pk):
-    """Удаление письменного отчёта."""
-    report = get_object_or_404(WrittenReport, pk=pk)
+    """Удаление записи."""
+    note = get_object_or_404(WrittenNote, pk=pk)
     if request.method == 'POST':
-        date = report.date
-        report.delete()
-        messages.success(request, f'Отчёт от {date:%d.%m.%Y} удалён.')
+        label = note.get_kind_display()
+        note.delete()
+        messages.success(request, f'{label} удалено.')
     return redirect('reports:written_list')

@@ -12,90 +12,74 @@
 <div class="page-head">
     <div>
         <h1>Письменный отчёт</h1>
-        <div class="sub">Дата ставится сама — {{ today|date:'d.m.Y' }}</div>
+        <div class="sub">Записи добавляются по одной, дата ставится сама</div>
+    </div>
+    <div class="page-actions">
+        <span class="badge badge--gray">{{ total }} записей</span>
     </div>
 </div>
 
-<form method="post" class="panel">
+<form method="post" class="panel" x-data="{ kind: 'achievement' }">
     {% csrf_token %}
     <div class="panel-head">
-        <h2>Новый отчёт</h2>
+        <h2>Добавить запись</h2>
     </div>
-    <div class="form-row">
-        <div class="form-field">
-            <label for="achievements">Достижения</label>
-            <textarea id="achievements" name="achievements" rows="8"
-                      placeholder="Что получилось: сдали, запустили, закрыли"></textarea>
-        </div>
-        <div class="form-field">
-            <label for="problems">Проблемы</label>
-            <textarea id="problems" name="problems" rows="8"
-                      placeholder="Что мешает: люди, сроки, заказчик, доступы"></textarea>
-        </div>
+    <div class="note-kinds">
+        {% for value, label in kinds %}
+            <label class="note-kind note-kind--{{ value }}">
+                <input type="radio" name="kind" value="{{ value }}"
+                       x-model="kind" {% if forloop.first %}checked{% endif %}>
+                <span>{{ label }}</span>
+            </label>
+        {% endfor %}
+    </div>
+    <div class="form-field" style="margin-top: 14px">
+        <textarea name="text" rows="4"
+                  :placeholder="kind === 'problem' ? 'Что мешает: люди, сроки, заказчик, доступы'
+                              : kind === 'question' ? 'Что надо решить или уточнить'
+                              : 'Что получилось: сдали, запустили, закрыли'"></textarea>
     </div>
     <div class="form-actions">
-        <button type="submit" class="btn">Сохранить отчёт</button>
+        <button type="submit" class="btn">Добавить</button>
     </div>
 </form>
 
-{% for report in reports %}
-    <div class="panel" x-data="{ edit: false }">
+{% for section in sections %}
+    <div class="panel note-panel note-panel--{{ section.key }}">
         <div class="panel-head">
-            <h2>Отчёт от {{ report.date|date:'d.m.Y' }}</h2>
-            <div style="display:flex; gap:8px; align-items:center">
-                {% if report.author %}
-                    <span style="font-size:12px; color: var(--text-muted)">
-                        {{ report.author.display_name|default:report.author.username }}
-                    </span>
-                {% endif %}
-                <button type="button" class="btn btn--secondary btn--sm" @click="edit = !edit"
-                        x-text="edit ? 'Отмена' : 'Изменить'"></button>
-                <form method="post" action="{% url 'reports:written_delete' report.pk %}" style="margin:0"
-                      onsubmit="return confirm('Удалить отчёт от {{ report.date|date:'d.m.Y' }}?')">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn--secondary btn--sm" title="Удалить">✕</button>
-                </form>
-            </div>
+            <h2>{{ section.label }}</h2>
+            <span class="panel-bar__note">{{ section.notes|length }}</span>
         </div>
-
-        <div x-show="!edit" class="written-grid">
-            <div class="written-part written-part--good">
-                <div class="written-part__title">Достижения</div>
-                <div class="report-part__text">
-                    {% if report.achievements %}{{ report.achievements|linebreaksbr }}
-                    {% else %}<span style="color: var(--text-muted)">не заполнено</span>{% endif %}
+        {% for note in section.notes %}
+            <div class="note-row" x-data="{ edit: false }">
+                <div class="note-row__body">
+                    <div class="report-part__text" x-show="!edit">{{ note.text|linebreaksbr }}</div>
+                    <form method="post" action="{% url 'reports:written_update' note.pk %}"
+                          x-show="edit" x-cloak style="margin:0">
+                        {% csrf_token %}
+                        <div class="form-field">
+                            <textarea name="text" rows="3">{{ note.text }}</textarea>
+                        </div>
+                        <div class="form-actions" style="margin-top: 8px">
+                            <button type="submit" class="btn btn--sm">Сохранить</button>
+                        </div>
+                    </form>
+                    <div class="note-row__meta">
+                        {{ note.date|date:'d.m.Y' }}{% if note.author %} · {{ note.author.display_name|default:note.author.username }}{% endif %}
+                    </div>
+                </div>
+                <div class="note-row__actions">
+                    <button type="button" class="btn-edit" @click="edit = !edit" title="Изменить">✎</button>
+                    <form method="post" action="{% url 'reports:written_delete' note.pk %}" style="margin:0"
+                          onsubmit="return confirm('Удалить запись?')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-edit btn-edit--danger" title="Удалить">✕</button>
+                    </form>
                 </div>
             </div>
-            <div class="written-part written-part--bad">
-                <div class="written-part__title">Проблемы</div>
-                <div class="report-part__text">
-                    {% if report.problems %}{{ report.problems|linebreaksbr }}
-                    {% else %}<span style="color: var(--text-muted)">не заполнено</span>{% endif %}
-                </div>
-            </div>
-        </div>
-
-        <form method="post" action="{% url 'reports:written_update' report.pk %}"
-              x-show="edit" x-cloak>
-            {% csrf_token %}
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Достижения</label>
-                    <textarea name="achievements" rows="8">{{ report.achievements }}</textarea>
-                </div>
-                <div class="form-field">
-                    <label>Проблемы</label>
-                    <textarea name="problems" rows="8">{{ report.problems }}</textarea>
-                </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn">Сохранить</button>
-            </div>
-        </form>
-    </div>
-{% empty %}
-    <div class="panel empty" style="text-align:center; padding: 26px 20px;">
-        Письменных отчётов пока нет — напишите первый выше.
+        {% empty %}
+            <div class="empty" style="padding: 8px 2px; font-size: 13px">Пока пусто.</div>
+        {% endfor %}
     </div>
 {% endfor %}
 {% endblock %}

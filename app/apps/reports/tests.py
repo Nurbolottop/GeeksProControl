@@ -202,8 +202,8 @@ class WeeklyReportDeleteTests(TestCase):
         )
 
 
-class WrittenReportTests(TestCase):
-    """Письменный отчёт: проблемы и достижения."""
+class WrittenNoteTests(TestCase):
+    """Записи добавляются по одной и раскладываются по разделам."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -213,50 +213,62 @@ class WrittenReportTests(TestCase):
         )
         self.client.force_login(self.user)
 
-    def test_report_saved_with_both_parts(self):
-        from apps.reports.models import WrittenReport
+    def test_note_added_with_kind(self):
+        from apps.reports.models import WrittenNote
         from django.utils import timezone
 
         response = self.client.post(reverse("reports:written_list"), {
-            "achievements": "ОБА сдали заказчику",
-            "problems": "Нет доступов к прод-серверу",
+            "kind": "problem", "text": "Нет доступов к прод-серверу",
         })
         self.assertEqual(response.status_code, 302)
-        report = WrittenReport.objects.get()
-        self.assertEqual(report.achievements, "ОБА сдали заказчику")
-        self.assertIn("доступов", report.problems)
-        self.assertEqual(report.date, timezone.localdate())
-        self.assertEqual(report.author, self.user)
+        note = WrittenNote.objects.get()
+        self.assertEqual(note.kind, WrittenNote.Kind.PROBLEM)
+        self.assertEqual(note.date, timezone.localdate())
+        self.assertEqual(note.author, self.user)
 
-    def test_empty_report_not_saved(self):
-        from apps.reports.models import WrittenReport
-
-        self.client.post(reverse("reports:written_list"), {
-            "achievements": "  ", "problems": "",
-        })
-        self.assertEqual(WrittenReport.objects.count(), 0)
-
-    def test_only_one_part_is_enough(self):
-        from apps.reports.models import WrittenReport
+    def test_question_kind_available(self):
+        from apps.reports.models import WrittenNote
 
         self.client.post(reverse("reports:written_list"), {
-            "achievements": "", "problems": "Срываем сроки по Учкуну",
+            "kind": "question", "text": "Кто ведёт CRM для ОБА?",
         })
-        self.assertEqual(WrittenReport.objects.count(), 1)
-
-    def test_report_updated_and_deleted(self):
-        from apps.reports.models import WrittenReport
-
-        report = WrittenReport.objects.create(achievements="старое")
-        self.client.post(
-            reverse("reports:written_update", args=[report.pk]),
-            {"achievements": "новое", "problems": ""},
+        self.assertEqual(
+            WrittenNote.objects.get().kind, WrittenNote.Kind.QUESTION,
         )
-        report.refresh_from_db()
-        self.assertEqual(report.achievements, "новое")
 
-        self.client.post(reverse("reports:written_delete", args=[report.pk]))
-        self.assertFalse(WrittenReport.objects.filter(pk=report.pk).exists())
+    def test_empty_note_not_saved(self):
+        from apps.reports.models import WrittenNote
+
+        self.client.post(reverse("reports:written_list"), {
+            "kind": "problem", "text": "   ",
+        })
+        self.assertEqual(WrittenNote.objects.count(), 0)
+
+    def test_sections_split_by_kind(self):
+        from apps.reports.models import WrittenNote
+
+        WrittenNote.objects.create(kind="achievement", text="сдали ОБА")
+        WrittenNote.objects.create(kind="problem", text="срываем Учкун")
+        WrittenNote.objects.create(kind="question", text="кто ПМ на Умай?")
+        response = self.client.get(reverse("reports:written_list"))
+        sections = {s["key"]: s["notes"] for s in response.context["sections"]}
+        self.assertEqual(len(sections["achievement"]), 1)
+        self.assertEqual(len(sections["problem"]), 1)
+        self.assertEqual(len(sections["question"]), 1)
+
+    def test_note_updated_and_deleted(self):
+        from apps.reports.models import WrittenNote
+
+        note = WrittenNote.objects.create(kind="problem", text="старое")
+        self.client.post(
+            reverse("reports:written_update", args=[note.pk]),
+            {"text": "новое"},
+        )
+        note.refresh_from_db()
+        self.assertEqual(note.text, "новое")
+
+        self.client.post(reverse("reports:written_delete", args=[note.pk]))
+        self.assertFalse(WrittenNote.objects.filter(pk=note.pk).exists())
 
     def test_button_on_weekly_page(self):
         response = self.client.get(reverse("reports:weekly_list"))

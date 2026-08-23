@@ -1312,28 +1312,47 @@ a:hover { color: var(--accent-dark); }
     background: #f6f7fb;
 }
 
-/* ---- Письменный отчёт ---- */
-.written-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+/* ---- Письменный отчёт: записи по одной ---- */
+.note-kinds { display: flex; gap: 8px; flex-wrap: wrap; }
+.note-kind { cursor: pointer; }
+.note-kind input { position: absolute; opacity: 0; pointer-events: none; }
+.note-kind span {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    transition: all .12s ease;
+}
+.note-kind--achievement input:checked + span {
+    background: var(--green); border-color: var(--green); color: #fff;
+}
+.note-kind--problem input:checked + span {
+    background: var(--red); border-color: var(--red); color: #fff;
+}
+.note-kind--question input:checked + span {
+    background: var(--blue); border-color: var(--blue); color: #fff;
+}
+
+.note-panel { border-left: 3px solid var(--border-strong); }
+.note-panel--achievement { border-left-color: var(--green); }
+.note-panel--problem { border-left-color: var(--red); }
+.note-panel--question { border-left-color: var(--blue); }
+
+.note-row {
+    display: flex;
     gap: 12px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
 }
-.written-part {
-    padding: 14px 16px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-}
-.written-part--good { background: var(--green-bg); border-color: var(--green-line); }
-.written-part--bad { background: var(--red-bg); border-color: var(--red-line); }
-.written-part__title {
-    font-size: 11.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    margin-bottom: 6px;
-}
-.written-part--good .written-part__title { color: var(--green); }
-.written-part--bad .written-part__title { color: var(--red); }
+.note-row:last-child { border-bottom: 0; }
+.note-row__body { flex: 1 1 auto; min-width: 0; }
+.note-row__meta { margin-top: 4px; font-size: 11.5px; color: var(--text-muted); }
+.note-row__actions { display: flex; gap: 4px; flex: none; }
 
 /* ---- Страница тимлидов ---- */
 .lead-summary {
