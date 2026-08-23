@@ -34,6 +34,7 @@ def forecast(request):
     """Прогноз потребности (ТЗ §14)."""
     return render(request, 'resources/forecast.html', {
         'rows': services.interns_summary(),
+        'totals': services.interns_total(),
         'planned': (
             PlannedProject.objects
             .exclude(status__in=[

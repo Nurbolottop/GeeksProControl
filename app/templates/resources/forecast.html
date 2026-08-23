@@ -13,6 +13,21 @@
     </div>
 </div>
 
+<div class="kpi-grid">
+    <div class="kpi-card kpi-card--info">
+        <div class="kpi-card__value">{{ totals.total }}</div>
+        <div class="kpi-card__label">Всего стажёров</div>
+    </div>
+    <div class="kpi-card kpi-card--yellow">
+        <div class="kpi-card__value">{{ totals.busy }}</div>
+        <div class="kpi-card__label">Заняты на проектах</div>
+    </div>
+    <div class="kpi-card kpi-card--green">
+        <div class="kpi-card__value">{{ totals.free }}</div>
+        <div class="kpi-card__label">Свободны</div>
+    </div>
+</div>
+
 <div class="panel" style="padding: 0;">
     <div class="table-wrap">
         <table class="data">
@@ -42,6 +57,28 @@
                 <tr><td colspan="4" class="empty" style="text-align:center; padding: 24px;">Нет направлений.</td></tr>
             {% endfor %}
             </tbody>
+            <tfoot>
+            <tr class="data__total">
+                <td><strong>Итого</strong></td>
+                <td><strong style="font-size:15px">{{ totals.total }}</strong></td>
+                <td><strong>{{ totals.busy }}</strong></td>
+                <td>
+                    {% if totals.free %}
+                        <span class="badge badge--green">{{ totals.free }}</span>
+                    {% else %}
+                        <span class="badge badge--gray">0</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if totals.without_spec %}
+                <tr>
+                    <td colspan="4" style="font-size:12px; color: var(--text-muted)">
+                        Без направления: {{ totals.without_spec }} чел. —
+                        они входят в «Итого», но не попадают ни в одну строку выше.
+                    </td>
+                </tr>
+            {% endif %}
+            </tfoot>
         </table>
     </div>
 </div>

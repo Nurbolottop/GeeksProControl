@@ -1307,6 +1307,11 @@ a:hover { color: var(--accent-dark); }
 .btn-edit--danger { color: #c2c7d4; }
 .btn-edit--danger:hover { color: var(--red); border-color: var(--red-line); }
 
+.data__total td {
+    border-top: 2px solid var(--border-strong);
+    background: #f6f7fb;
+}
+
 /* ---- Отчёт по проекту ---- */
 .report-status {
     display: inline-block;

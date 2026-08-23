@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from apps.interns.models import Intern, InternStatus
 from apps.resources.models import PlannedProject, PlannedProjectNeed
+from apps.resources import services
 from apps.resources.services import resource_balance
 from apps.training.models import Specialization, TrainingGroup
 
@@ -59,3 +60,44 @@ class ResourceBalanceTests(TestCase):
         )
         row = self._row()
         self.assertEqual(row['needed'], 0)
+
+
+class InternsTotalTests(TestCase):
+    """Общий итог по стажёрам считается по людям, а не сложением строк."""
+
+    def setUp(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.back = Specialization.objects.create(name="Backend")
+        self.project = Project.objects.create(name="Омур")
+        busy = Intern.objects.create(full_name="Занятый", specialization=self.back)
+        Intern.objects.create(full_name="Свободный", specialization=self.back)
+        Intern.objects.create(full_name="Без направления")
+        TeamMember.objects.create(
+            project=self.project, intern=busy, role=TeamRole.BACKEND,
+        )
+
+    def test_total_counts_everyone(self):
+        totals = services.interns_total()
+        self.assertEqual(totals["total"], 3)
+        self.assertEqual(totals["busy"], 1)
+        self.assertEqual(totals["free"], 2)
+        self.assertEqual(totals["without_spec"], 1)
+
+    def test_total_bigger_than_sum_of_rows_when_spec_missing(self):
+        rows_total = sum(row["total"] for row in services.interns_summary())
+        self.assertEqual(rows_total, 2)
+        self.assertEqual(services.interns_total()["total"], 3)
+
+    def test_page_shows_totals(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(user)
+        response = self.client.get(reverse("resources:forecast"))
+        self.assertEqual(response.context["totals"]["total"], 3)
+        self.assertContains(response, "Всего стажёров")
+        self.assertContains(response, "Итого")

@@ -38,6 +38,37 @@ def interns_summary() -> list[dict]:
     return rows
 
 
+def interns_total() -> dict:
+    """Общий итог по стажёрам: всего, занято, свободно.
+
+    Считается по людям, а не сложением направлений: человек без
+    направления тоже попадает в общее число.
+    """
+    busy_ids = set(
+        TeamMember.objects.filter(
+            status=TeamMember.Status.ACTIVE, intern__isnull=False,
+        ).values_list('intern_id', flat=True),
+    )
+    people = list(
+        Intern.objects.active()
+        .exclude(status=InternStatus.DROPPED)
+        .values_list('pk', flat=True),
+    )
+    busy = sum(1 for pk in people if pk in busy_ids)
+    without_spec = (
+        Intern.objects.active()
+        .exclude(status=InternStatus.DROPPED)
+        .filter(specialization__isnull=True)
+        .count()
+    )
+    return {
+        'total': len(people),
+        'busy': busy,
+        'free': len(people) - busy,
+        'without_spec': without_spec,
+    }
+
+
 def resource_balance(today: datetime.date | None = None) -> list[dict]:
     """Таблица баланса: Направление | Доступно | Выпуск | Нужно | Баланс.
 
