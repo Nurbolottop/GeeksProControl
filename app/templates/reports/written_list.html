@@ -14,7 +14,7 @@
         <h1>Письменный отчёт</h1>
         <div class="sub">
             За неделю {{ week_start|date:'d.m' }} — {{ week_end|date:'d.m.Y' }}
-            {% if not is_current_week %} · это не текущая неделя{% endif %}
+            {% if is_future_week %} · эта неделя ещё не прошла{% endif %}
         </div>
     </div>
     <div class="page-actions">
@@ -30,8 +30,8 @@
     <a href="?week={{ next_week|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">
         {{ next_week|date:'d.m' }} ›
     </a>
-    {% if not is_current_week %}
-        <a href="{% url 'reports:written_list' %}" class="badge badge--yellow">← текущая неделя</a>
+    {% if not is_default_week %}
+        <a href="{% url 'reports:written_list' %}" class="badge badge--yellow">← прошедшая неделя</a>
     {% endif %}
 </div>
 

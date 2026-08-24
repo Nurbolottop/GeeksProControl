@@ -15,13 +15,15 @@ def weekly_list(request):
     """Недельные отчёты: список и кнопки за эту и прошлую неделю."""
     today = timezone.localdate()
     this_week, _ = weekly_form.week_bounds(today)
+    # Отчёт всегда смотрит назад: основная кнопка — прошедшая неделя
     last_week = this_week - datetime.timedelta(days=7)
+    before_last = last_week - datetime.timedelta(days=7)
     return render(request, 'reports/weekly_list.html', {
         'reports': WeeklyReport.objects.all()[:26],
-        'this_week': this_week,
-        'this_week_end': this_week + datetime.timedelta(days=6),
         'last_week': last_week,
         'last_week_end': last_week + datetime.timedelta(days=6),
+        'before_last': before_last,
+        'before_last_end': before_last + datetime.timedelta(days=6),
     })
 
 
@@ -96,10 +98,12 @@ def weekly_delete(request, pk):
 def written_list(request):
     """Записи за неделю: достижения, проблемы и вопросы."""
     today = timezone.localdate()
+    # По умолчанию — прошедшая неделя: отчёт пишется по факту, а не наперёд
+    default_day = today - datetime.timedelta(days=7)
     try:
         day = datetime.date.fromisoformat(request.GET.get('week', ''))
     except ValueError:
-        day = today
+        day = default_day
     week_start, week_end = weekly_form.week_bounds(day)
 
     if request.method == 'POST':
@@ -144,7 +148,8 @@ def written_list(request):
         'week_end': week_end,
         'prev_week': week_start - datetime.timedelta(days=7),
         'next_week': week_start + datetime.timedelta(days=7),
-        'is_current_week': week_start == weekly_form.week_bounds(today)[0],
+        'is_default_week': week_start == weekly_form.week_bounds(default_day)[0],
+        'is_future_week': week_start > weekly_form.week_bounds(today)[0],
     })
 
 

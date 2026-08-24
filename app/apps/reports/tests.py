@@ -334,3 +334,60 @@ class WeeklyNoteScopeTests(TestCase):
         )
         note = WrittenNote.objects.get()
         self.assertEqual(note.week_start, datetime.date(2026, 8, 10))
+
+
+
+class BackwardWeekTests(TestCase):
+    """Отчёт смотрит назад: по умолчанию открывается прошедшая неделя."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+
+    def test_written_defaults_to_past_week(self):
+        from django.utils import timezone
+        from apps.reports import weekly_form
+
+        response = self.client.get(reverse("reports:written_list"))
+        expected, _ = weekly_form.week_bounds(
+            timezone.localdate() - datetime.timedelta(days=7),
+        )
+        self.assertEqual(response.context["week_start"], expected)
+
+    def test_note_written_into_past_week_by_default(self):
+        from apps.reports.models import WrittenNote
+        from apps.reports import weekly_form
+        from django.utils import timezone
+
+        self.client.post(reverse("reports:written_list"), {
+            "kind": "achievement", "text": "сдали проект",
+        })
+        expected, _ = weekly_form.week_bounds(
+            timezone.localdate() - datetime.timedelta(days=7),
+        )
+        self.assertEqual(WrittenNote.objects.get().week_start, expected)
+
+    def test_future_week_marked(self):
+        from django.utils import timezone
+        from apps.reports import weekly_form
+
+        next_week = timezone.localdate() + datetime.timedelta(days=7)
+        response = self.client.get(
+            reverse("reports:written_list") + f"?week={next_week:%Y-%m-%d}",
+        )
+        self.assertTrue(response.context["is_future_week"])
+
+    def test_weekly_list_offers_past_weeks(self):
+        from django.utils import timezone
+        from apps.reports import weekly_form
+
+        response = self.client.get(reverse("reports:weekly_list"))
+        this_week, _ = weekly_form.week_bounds(timezone.localdate())
+        self.assertEqual(
+            response.context["last_week"], this_week - datetime.timedelta(days=7),
+        )
+        self.assertContains(response, "за прошедшую неделю")

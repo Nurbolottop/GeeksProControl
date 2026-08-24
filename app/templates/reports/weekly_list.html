@@ -6,22 +6,25 @@
 <div class="page-head">
     <div>
         <h1>Недельные отчёты</h1>
-        <div class="sub">Цифры считаются автоматически по данным платформы, неделя с понедельника по воскресенье</div>
+        <div class="sub">
+            Цифры считаются автоматически по данным платформы.
+            Отчёт всегда за прошедшую неделю, понедельник — воскресенье.
+        </div>
     </div>
     <div class="page-actions">
         <a href="{% url 'reports:written_list' %}" class="btn btn--secondary">Письменный отчёт</a>
         <form method="post" action="{% url 'reports:weekly_generate' %}" style="margin:0">
             {% csrf_token %}
-            <input type="hidden" name="week" value="{{ last_week|date:'Y-m-d' }}">
+            <input type="hidden" name="week" value="{{ before_last|date:'Y-m-d' }}">
             <button type="submit" class="btn btn--secondary">
-                Прошлая неделя ({{ last_week|date:'d.m' }} — {{ last_week_end|date:'d.m' }})
+                Позапрошлая ({{ before_last|date:'d.m' }} — {{ before_last_end|date:'d.m' }})
             </button>
         </form>
         <form method="post" action="{% url 'reports:weekly_generate' %}" style="margin:0">
             {% csrf_token %}
-            <input type="hidden" name="week" value="{{ this_week|date:'Y-m-d' }}">
+            <input type="hidden" name="week" value="{{ last_week|date:'Y-m-d' }}">
             <button type="submit" class="btn">
-                Отчёт за эту неделю ({{ this_week|date:'d.m' }} — {{ this_week_end|date:'d.m' }})
+                Отчёт за прошедшую неделю ({{ last_week|date:'d.m' }} — {{ last_week_end|date:'d.m' }})
             </button>
         </form>
     </div>
