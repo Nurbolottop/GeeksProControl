@@ -277,7 +277,7 @@ class WrittenNoteTests(TestCase):
 
 
 class WeeklyNoteScopeTests(TestCase):
-    \"\"\"Записи относятся к неделе: чужая неделя не показывается.\"\"\"
+    """Записи относятся к неделе: чужая неделя не показывается."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
