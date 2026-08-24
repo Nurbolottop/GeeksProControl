@@ -247,10 +247,19 @@ class WrittenNoteTests(TestCase):
     def test_sections_split_by_kind(self):
         from apps.reports.models import WrittenNote
 
-        WrittenNote.objects.create(kind="achievement", text="сдали ОБА")
-        WrittenNote.objects.create(kind="problem", text="срываем Учкун")
-        WrittenNote.objects.create(kind="question", text="кто ПМ на Умай?")
-        response = self.client.get(reverse("reports:written_list"))
+        week = datetime.date(2026, 8, 17)
+        WrittenNote.objects.create(
+            kind="achievement", text="сдали ОБА", week_start=week,
+        )
+        WrittenNote.objects.create(
+            kind="problem", text="срываем Учкун", week_start=week,
+        )
+        WrittenNote.objects.create(
+            kind="question", text="кто ПМ на Умай?", week_start=week,
+        )
+        response = self.client.get(
+            reverse("reports:written_list") + "?week=2026-08-17",
+        )
         sections = {s["key"]: s["notes"] for s in response.context["sections"]}
         self.assertEqual(len(sections["achievement"]), 1)
         self.assertEqual(len(sections["problem"]), 1)
@@ -287,7 +296,7 @@ class WeeklyNoteScopeTests(TestCase):
         )
         self.client.force_login(self.user)
 
-    def test_note_gets_week_of_writing(self):
+    def test_note_gets_default_week(self):
         from apps.reports.models import WrittenNote
         from apps.reports import weekly_form
         from django.utils import timezone
@@ -296,7 +305,9 @@ class WeeklyNoteScopeTests(TestCase):
             "kind": "achievement", "text": "сдали Омур",
         })
         note = WrittenNote.objects.get()
-        week_start, _ = weekly_form.week_bounds(timezone.localdate())
+        week_start, _ = weekly_form.week_bounds(
+            timezone.localdate() - datetime.timedelta(days=7),
+        )
         self.assertEqual(note.week_start, week_start)
 
     def test_other_week_not_shown(self):
