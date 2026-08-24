@@ -3,6 +3,7 @@ import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.reports import services, weekly_form
@@ -93,7 +94,14 @@ def weekly_delete(request, pk):
 
 @login_required
 def written_list(request):
-    """Записи руководителя: достижения, проблемы и вопросы."""
+    """Записи за неделю: достижения, проблемы и вопросы."""
+    today = timezone.localdate()
+    try:
+        day = datetime.date.fromisoformat(request.GET.get('week', ''))
+    except ValueError:
+        day = today
+    week_start, week_end = weekly_form.week_bounds(day)
+
     if request.method == 'POST':
         text = request.POST.get('text', '').strip()
         kind = request.POST.get('kind', '')
@@ -103,12 +111,18 @@ def written_list(request):
             messages.error(request, 'Пустая запись — напишите текст.')
         else:
             note = WrittenNote.objects.create(
-                kind=kind, text=text, author=request.user,
+                kind=kind, text=text, week_start=week_start,
+                author=request.user,
             )
             messages.success(request, f'{note.get_kind_display()} добавлено.')
-        return redirect('reports:written_list')
+        return redirect(
+            f"{reverse('reports:written_list')}?week={week_start:%Y-%m-%d}",
+        )
 
-    notes = list(WrittenNote.objects.select_related('author'))
+    notes = list(
+        WrittenNote.objects.filter(week_start=week_start)
+        .select_related('author'),
+    )
     titles = {
         WrittenNote.Kind.ACHIEVEMENT: 'Достижения',
         WrittenNote.Kind.PROBLEM: 'Проблемы',
@@ -126,6 +140,11 @@ def written_list(request):
         'sections': sections,
         'kinds': WrittenNote.Kind.choices,
         'total': len(notes),
+        'week_start': week_start,
+        'week_end': week_end,
+        'prev_week': week_start - datetime.timedelta(days=7),
+        'next_week': week_start + datetime.timedelta(days=7),
+        'is_current_week': week_start == weekly_form.week_bounds(today)[0],
     })
 
 
@@ -141,7 +160,9 @@ def written_update(request, pk):
             messages.success(request, 'Запись обновлена.')
         else:
             messages.error(request, 'Пустая запись — не сохранено.')
-    return redirect('reports:written_list')
+    return redirect(
+        f"{reverse('reports:written_list')}?week={note.week_start:%Y-%m-%d}",
+    )
 
 
 @login_required
@@ -150,6 +171,10 @@ def written_delete(request, pk):
     note = get_object_or_404(WrittenNote, pk=pk)
     if request.method == 'POST':
         label = note.get_kind_display()
+        week = note.week_start
         note.delete()
         messages.success(request, f'{label} удалено.')
+        return redirect(
+            f"{reverse('reports:written_list')}?week={week:%Y-%m-%d}",
+        )
     return redirect('reports:written_list')

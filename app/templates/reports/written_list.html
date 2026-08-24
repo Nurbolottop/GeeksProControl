@@ -12,17 +12,34 @@
 <div class="page-head">
     <div>
         <h1>Письменный отчёт</h1>
-        <div class="sub">Записи добавляются по одной, дата ставится сама</div>
+        <div class="sub">
+            За неделю {{ week_start|date:'d.m' }} — {{ week_end|date:'d.m.Y' }}
+            {% if not is_current_week %} · это не текущая неделя{% endif %}
+        </div>
     </div>
     <div class="page-actions">
-        <span class="badge badge--gray">{{ total }} записей</span>
+        <span class="badge badge--gray">{{ total }} записей за неделю</span>
     </div>
 </div>
 
-<form method="post" class="panel" x-data="{ kind: 'achievement' }">
+<div class="month-nav">
+    <a href="?week={{ prev_week|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">
+        ‹ {{ prev_week|date:'d.m' }}
+    </a>
+    <strong>{{ week_start|date:'d.m' }} — {{ week_end|date:'d.m.Y' }}</strong>
+    <a href="?week={{ next_week|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">
+        {{ next_week|date:'d.m' }} ›
+    </a>
+    {% if not is_current_week %}
+        <a href="{% url 'reports:written_list' %}" class="badge badge--yellow">← текущая неделя</a>
+    {% endif %}
+</div>
+
+<form method="post" action="?week={{ week_start|date:'Y-m-d' }}"
+      class="panel" x-data="{ kind: 'achievement' }">
     {% csrf_token %}
     <div class="panel-head">
-        <h2>Добавить запись</h2>
+        <h2>Добавить запись за {{ week_start|date:'d.m' }} — {{ week_end|date:'d.m' }}</h2>
     </div>
     <div class="note-kinds">
         {% for value, label in kinds %}
@@ -65,7 +82,7 @@
                         </div>
                     </form>
                     <div class="note-row__meta">
-                        {{ note.date|date:'d.m.Y' }}{% if note.author %} · {{ note.author.display_name|default:note.author.username }}{% endif %}
+                        записано {{ note.date|date:'d.m.Y' }}{% if note.author %} · {{ note.author.display_name|default:note.author.username }}{% endif %}
                     </div>
                 </div>
                 <div class="note-row__actions">
@@ -78,7 +95,7 @@
                 </div>
             </div>
         {% empty %}
-            <div class="empty" style="padding: 8px 2px; font-size: 13px">Пока пусто.</div>
+            <div class="empty" style="padding: 8px 2px; font-size: 13px">За эту неделю пусто.</div>
         {% endfor %}
     </div>
 {% endfor %}

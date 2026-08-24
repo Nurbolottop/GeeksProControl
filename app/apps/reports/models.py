@@ -1,3 +1,5 @@
+import datetime
+
 from django.conf import settings
 from django.db import models
 
@@ -77,6 +79,7 @@ class WrittenNote(TimeStampedModel):
     )
     text = models.TextField('Текст')
     date = models.DateField('Дата', auto_now_add=True, db_index=True)
+    week_start = models.DateField('Неделя', db_index=True)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='+', verbose_name='Автор', null=True, blank=True,
@@ -85,7 +88,20 @@ class WrittenNote(TimeStampedModel):
     class Meta:
         verbose_name = 'Запись отчёта'
         verbose_name_plural = 'Записи отчёта'
-        ordering = ['-date', '-created_at']
+        ordering = ['-week_start', '-created_at']
 
     def __str__(self) -> str:
-        return f'{self.get_kind_display()} от {self.date:%d.%m.%Y}'
+        return f'{self.get_kind_display()} за неделю {self.week_start:%d.%m.%Y}'
+
+    def save(self, *args, **kwargs):
+        # Запись относится к неделе, в которую её написали
+        if not self.week_start:
+            from django.utils import timezone
+
+            day = self.date or timezone.localdate()
+            self.week_start = day - datetime.timedelta(days=day.weekday())
+        super().save(*args, **kwargs)
+
+    @property
+    def week_end(self) -> datetime.date:
+        return self.week_start + datetime.timedelta(days=6)

@@ -274,3 +274,63 @@ class WrittenNoteTests(TestCase):
         response = self.client.get(reverse("reports:weekly_list"))
         self.assertContains(response, reverse("reports:written_list"))
         self.assertContains(response, "Письменный отчёт")
+
+
+class WeeklyNoteScopeTests(TestCase):
+    \"\"\"Записи относятся к неделе: чужая неделя не показывается.\"\"\"
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+
+    def test_note_gets_week_of_writing(self):
+        from apps.reports.models import WrittenNote
+        from apps.reports import weekly_form
+        from django.utils import timezone
+
+        self.client.post(reverse("reports:written_list"), {
+            "kind": "achievement", "text": "сдали Омур",
+        })
+        note = WrittenNote.objects.get()
+        week_start, _ = weekly_form.week_bounds(timezone.localdate())
+        self.assertEqual(note.week_start, week_start)
+
+    def test_other_week_not_shown(self):
+        from apps.reports.models import WrittenNote
+
+        WrittenNote.objects.create(
+            kind="achievement", text="старое",
+            week_start=datetime.date(2026, 8, 10),
+        )
+        response = self.client.get(
+            reverse("reports:written_list") + "?week=2026-08-17",
+        )
+        self.assertEqual(response.context["total"], 0)
+        self.assertNotContains(response, "старое")
+
+    def test_selected_week_shown(self):
+        from apps.reports.models import WrittenNote
+
+        WrittenNote.objects.create(
+            kind="problem", text="срываем сроки",
+            week_start=datetime.date(2026, 8, 10),
+        )
+        response = self.client.get(
+            reverse("reports:written_list") + "?week=2026-08-12",
+        )
+        self.assertEqual(response.context["week_start"], datetime.date(2026, 8, 10))
+        self.assertContains(response, "срываем сроки")
+
+    def test_note_written_into_selected_week(self):
+        from apps.reports.models import WrittenNote
+
+        self.client.post(
+            reverse("reports:written_list") + "?week=2026-08-10",
+            {"kind": "question", "text": "кто ведёт CRM?"},
+        )
+        note = WrittenNote.objects.get()
+        self.assertEqual(note.week_start, datetime.date(2026, 8, 10))
