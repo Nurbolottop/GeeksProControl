@@ -1,6 +1,6 @@
-{% comment %}Последний написанный отчёт по проекту — виден сразу на «Обзоре».{% endcomment %}
+{% comment %}Последний написанный отчёт по проекту — виден сразу на «Обзоре», выделен.{% endcomment %}
 {% if last_report %}
-<div class="panel" id="section-last-report">
+<div class="panel last-report-panel" id="section-last-report">
     <div class="panel-head">
         <h2>Последний отчёт — {{ last_report.date|date:'d.m.Y' }}</h2>
         <a href="?tab=report" class="btn btn--secondary btn--sm">Все отчёты →</a>
@@ -13,7 +13,7 @@
     {% endif %}
 </div>
 {% else %}
-<div class="panel" id="section-last-report">
+<div class="panel last-report-panel last-report-panel--empty" id="section-last-report">
     <div class="panel-head">
         <h2>Последний отчёт</h2>
         <a href="?tab=report" class="btn btn--sm">+ Написать отчёт</a>

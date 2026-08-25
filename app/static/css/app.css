@@ -1450,6 +1450,28 @@ a:hover { color: var(--accent-dark); }
 }
 .lead-chip:hover { border-color: var(--yellow); }
 
+/* ---- Последний отчёт на «Обзоре» — выделяем среди прочих блоков ---- */
+.last-report-panel {
+    border-left: 4px solid var(--primary);
+    background: linear-gradient(180deg, var(--blue-bg) 0%, var(--surface) 140px);
+    box-shadow: var(--shadow-md, var(--shadow-sm));
+}
+.last-report-panel .panel-head h2 {
+    font-size: 17px;
+    color: var(--primary-dark, var(--primary));
+}
+.last-report-panel .report-part__text {
+    font-size: 14.5px;
+    padding: 14px 16px;
+    background: var(--surface);
+    border: 1px solid var(--blue-line);
+    border-radius: var(--radius-sm);
+}
+.last-report-panel--empty {
+    border-left-color: var(--border-strong);
+    background: var(--surface);
+}
+
 /* ---- Отчёт по проекту ---- */
 .report-status {
     display: inline-block;
