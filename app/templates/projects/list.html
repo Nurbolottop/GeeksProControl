@@ -73,6 +73,7 @@
                 <th>Срок</th>
                 <th>Deadline</th>
                 <th>Прогресс</th>
+                <th>Отчёт</th>
             </tr>
             </thead>
             <tbody>
@@ -100,9 +101,19 @@
                             <span class="progress__label">{{ project.progress }}%</span>
                         </div>
                     </td>
+                    <td style="white-space: nowrap">
+                        {% if project.last_report %}
+                            <a href="{{ project.get_absolute_url }}?tab=report" class="badge badge--blue"
+                               title="{{ project.last_report.text|truncatewords:25 }}">
+                                {{ project.last_report.date|date:'d.m.Y' }}
+                            </a>
+                        {% else %}
+                            <a href="{{ project.get_absolute_url }}?tab=report" class="badge badge--gray">Нет отчёта</a>
+                        {% endif %}
+                    </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="9" class="empty" style="text-align:center; padding: 24px;">Проектов не найдено.</td></tr>
+                <tr><td colspan="10" class="empty" style="text-align:center; padding: 24px;">Проектов не найдено.</td></tr>
             {% endfor %}
             </tbody>
         </table>

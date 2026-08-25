@@ -52,6 +52,26 @@ PROJECT_CATEGORIES = {
 }
 
 
+def _attach_last_reports(projects) -> None:
+    """Подтягивает последний написанный отчёт для каждого проекта на странице.
+
+    Один запрос вместо N+1: берём все отчёты нужных проектов сразу,
+    в Python оставляем по одному — самому свежему — на проект.
+    """
+    ids = [p.pk for p in projects]
+    if not ids:
+        return
+    reports = (
+        ProjectReport.objects.filter(project_id__in=ids)
+        .order_by('project_id', '-date', '-created_at')
+    )
+    latest_by_project = {}
+    for report in reports:
+        latest_by_project.setdefault(report.project_id, report)
+    for project in projects:
+        project.last_report = latest_by_project.get(project.pk)
+
+
 @login_required
 def project_list(request, category='all'):
     config = PROJECT_CATEGORIES[category]
@@ -70,6 +90,7 @@ def project_list(request, category='all'):
     paginator = Paginator(qs, int(per_page))
     page = paginator.get_page(request.GET.get('page'))
     selectors.annotate_deadline_statuses(page.object_list)
+    _attach_last_reports(page.object_list)
 
     context = {
         'page': page,

@@ -398,3 +398,57 @@ class LastReportOnOverviewTests(TestCase):
         self.model.objects.create(project=self.project, text="текст")
         response = self.client.get(self.project.get_absolute_url())
         self.assertContains(response, "?tab=report")
+
+
+
+
+class ProjectListLastReportColumnTests(TestCase):
+    """В общем списке проектов виден последний отчёт по каждому."""
+
+    def setUp(self):
+        from apps.projects.models import ProjectReport
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = make_project(name="Учкун")
+        create_project(self.project)
+        self.model = ProjectReport
+
+    def test_no_report_shows_placeholder(self):
+        response = self.client.get(reverse("projects:list"))
+        self.assertContains(response, "Нет отчёта")
+
+    def test_latest_report_date_shown(self):
+        self.model.objects.create(project=self.project, text="старый")
+        newest = self.model.objects.create(project=self.project, text="новый отчёт")
+        response = self.client.get(reverse("projects:list"))
+        found = [
+            p for p in response.context["page"].object_list
+            if p.pk == self.project.pk
+        ][0]
+        self.assertEqual(found.last_report, newest)
+
+    def test_last_report_lookup_does_not_scale_per_project(self):
+        """Больше проектов с отчётами не должно давать N+1 запросов."""
+        from django.db import connection, reset_queries
+        from django.test import override_settings
+
+        self.model.objects.create(project=self.project, text="отчёт")
+
+        with override_settings(DEBUG=True):
+            reset_queries()
+            self.client.get(reverse("projects:list"))
+            baseline = len(connection.queries)
+
+            for i in range(10):
+                extra = make_project(name=f"Доп {i}")
+                create_project(extra)
+                self.model.objects.create(project=extra, text=f"отчёт {i}")
+
+            reset_queries()
+            self.client.get(reverse("projects:list"))
+            with_more_projects = len(connection.queries)
+
+        # N+1 добавил бы примерно по запросу на каждый новый проект (10 лишних);
+        # нормальный рост от самих проектов гораздо меньше этого.
+        self.assertLess(with_more_projects, baseline + 10)
