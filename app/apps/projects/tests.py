@@ -493,3 +493,19 @@ class StageReopenRollsBackCurrentStageTests(TestCase):
 
         self.project.refresh_from_db()
         self.assertEqual(self.project.current_stage, ProjectStageKey.NEW)
+
+    def test_completing_a_stage_via_edit_form_advances_project_forward(self):
+        """Этап завершили не кнопкой «Завершить», а обычным «Изменить» —
+        проект всё равно должен уйти на следующий незавершённый этап."""
+        from apps.projects.services import update_stage
+
+        for key in (
+            ProjectStageKey.NEW, ProjectStageKey.DOCUMENTS,
+            ProjectStageKey.REQUIREMENTS, ProjectStageKey.TEAM_FORMING,
+        ):
+            stage = self.project.stages.get(key=key)
+            stage.status = stage.Status.DONE
+            update_stage(stage, user=self.user)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.current_stage, ProjectStageKey.DESIGN)

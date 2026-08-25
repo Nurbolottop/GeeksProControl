@@ -175,15 +175,31 @@ def move_project_to_stage(project: Project, stage_key: str, user=None) -> Projec
     return project
 
 
+def _resync_current_stage(project: Project, user=None) -> None:
+    """project.current_stage — это первый незавершённый этап по порядку.
+
+    Пересчитывается при каждом сохранении любого этапа, поэтому неважно,
+    каким путём его поменяли — кнопкой «Завершить» или обычным «Изменить» —
+    бейдж «Этап» никогда не разойдётся с тем, что реально сделано: не
+    отстанет (переоткрыли пройденный этап) и не убежит вперёд (этап
+    завершили через форму, а не через «Завершить»).
+    """
+    next_stage = (
+        project.stages.exclude(status=ProjectStage.Status.DONE)
+        .order_by('order').first()
+    )
+    if next_stage:
+        target_key = next_stage.key
+    else:
+        last_stage = project.stages.order_by('-order').first()
+        target_key = last_stage.key if last_stage else None
+    if target_key and target_key != project.current_stage:
+        move_project_to_stage(project, target_key, user=user)
+
+
 @transaction.atomic
 def update_stage(stage: ProjectStage, user=None) -> ProjectStage:
-    """Сохранение этапа с автоматикой дат начала и завершения.
-
-    Если раньше завершённый этап переоткрыли (статус стал не «Завершён»),
-    проект не может продолжать стоять на более позднем этапе — возвращаем
-    project.current_stage на переоткрытый этап, иначе бейдж «Этап» будет
-    показывать стадию впереди того, что реально происходит.
-    """
+    """Сохранение этапа с автоматикой дат начала и завершения."""
     if stage.status == ProjectStage.Status.IN_PROGRESS and not stage.start_date:
         stage.start_date = timezone.localdate()
     if stage.status == ProjectStage.Status.DONE and not stage.end_date:
@@ -193,14 +209,7 @@ def update_stage(stage: ProjectStage, user=None) -> ProjectStage:
         stage.end_date = None
     stage.save()
     _touch_project(stage.project)
-
-    if stage.status != ProjectStage.Status.DONE:
-        current = stage.project.stages.filter(
-            key=stage.project.current_stage,
-        ).first()
-        if current and stage.order < current.order:
-            move_project_to_stage(stage.project, stage.key, user=user)
-
+    _resync_current_stage(stage.project, user=user)
     return stage
 
 
@@ -218,16 +227,8 @@ def complete_stage(stage: ProjectStage, user=None) -> ProjectStage:
         project=project, field=f'Этап «{stage.get_key_display()}»',
         new_value='Завершён', user=user,
     )
-    # Проект автоматически переходит на следующий незавершённый этап
-    next_stage = (
-        project.stages.filter(order__gt=stage.order)
-        .exclude(status=ProjectStage.Status.DONE)
-        .order_by('order').first()
-    )
-    if next_stage and project.current_stage != next_stage.key:
-        move_project_to_stage(project, next_stage.key, user=user)
-    else:
-        _touch_project(project)
+    _touch_project(project)
+    _resync_current_stage(project, user=user)
     return stage
 
 
