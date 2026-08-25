@@ -92,7 +92,7 @@
                     </td>
                     <td>{% if project.client %}<a href="{% url 'clients:detail' project.client.pk %}">{{ project.client }}</a>{% else %}—{% endif %}</td>
                     <td>{{ project.project_type|default:'—' }}</td>
-                    <td><span class="badge badge--blue">{{ project.get_current_stage_display }}</span></td>
+                    <td>{% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}</td>
                     <td>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status delay_days=project.delay_days %}</td>
                     <td>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</td>
                     <td>

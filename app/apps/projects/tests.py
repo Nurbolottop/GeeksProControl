@@ -515,3 +515,31 @@ class StageReopenRollsBackCurrentStageTests(TestCase):
 
         self.project.refresh_from_db()
         self.assertEqual(self.project.current_stage, ProjectStageKey.DESIGN)
+
+
+class StageBadgeColorTests(TestCase):
+    """Бейдж этапа выделяется зелёным, когда проект завершён."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+
+    def test_completed_project_shows_green_badge_in_list(self):
+        project = make_project(name="Энактус", status=ProjectStatus.COMPLETED)
+        create_project(project)
+        project.current_stage = ProjectStageKey.COMPLETED
+        project.save(update_fields=['current_stage'])
+
+        response = self.client.get(reverse("projects:list"))
+        self.assertContains(
+            response, '<span class="badge badge--green">✓ Завершён</span>',
+        )
+
+    def test_active_project_keeps_blue_badge_in_list(self):
+        project = make_project(name="Учкун")
+        create_project(project)
+
+        response = self.client.get(reverse("projects:list"))
+        self.assertContains(
+            response, '<span class="badge badge--blue">Новый</span>',
+        )

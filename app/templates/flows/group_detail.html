@@ -73,7 +73,7 @@
                         <div><a href="{{ group.project.get_absolute_url }}">{{ group.project.name }}</a></div>
                     </div>
                     <div class="meta-row"><span>Клиент</span><div>{{ group.project.client|default:'—' }}</div></div>
-                    <div class="meta-row"><span>Этап</span><div><span class="badge badge--blue">{{ group.project.get_current_stage_display }}</span></div></div>
+                    <div class="meta-row"><span>Этап</span><div>{% include 'projects/partials/stage_badge.html' with stage_key=group.project.current_stage stage_display=group.project.get_current_stage_display %}</div></div>
                     <div class="meta-row"><span>Срок</span><div>{% include 'projects/partials/deadline_badge.html' with status=group.project.deadline_status delay_days=group.project.delay_days %}</div></div>
                     <div class="meta-row"><span>Deadline</span><div>{{ group.project.planned_end_date|date:'d.m.Y'|default:'—' }}</div></div>
                     <div class="meta-row"><span>Прогресс</span><div>{{ group.project.progress }}%</div></div>
