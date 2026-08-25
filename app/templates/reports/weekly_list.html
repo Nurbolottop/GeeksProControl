@@ -42,7 +42,7 @@
                 </span>
                 <a href="{% url 'reports:weekly_detail' report.pk %}" class="btn btn--sm">Открыть</a>
                 <form method="post" action="{% url 'reports:weekly_delete' report.pk %}" style="margin:0"
-                      onsubmit="return confirm('Удалить отчёт за неделю {{ report.week_start|date:'d.m.Y' }}? Написанный текст пропадёт.')">
+                      data-confirm="Удалить отчёт за неделю {{ report.week_start|date:'d.m.Y' }}? Написанный текст пропадёт.">
                     {% csrf_token %}
                     <button type="submit" class="btn btn--secondary btn--sm" title="Удалить отчёт">✕</button>
                 </form>

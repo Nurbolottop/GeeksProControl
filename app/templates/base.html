@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
     <script src="{% static 'js/htmx.min.js' %}" defer></script>
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
+    <script src="{% static 'js/confirm-modal.js' %}" defer></script>
 </head>
 <body class="page-{% if request.resolver_match %}{{ request.resolver_match.namespace|default:request.resolver_match.url_name|default:'home' }}{% else %}home{% endif %}"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>

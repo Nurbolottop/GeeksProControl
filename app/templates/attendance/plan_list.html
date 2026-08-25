@@ -42,7 +42,7 @@
                             </td>
                             <td>
                                 <form method="post" action="{% url 'attendance:plan_delete' plan.pk %}" style="margin:0"
-                                      onsubmit="return confirm('Удалить план «{{ plan.get_kind_display|escapejs }}»?')">
+                                      data-confirm="Удалить план «{{ plan.get_kind_display|escapejs }}»?">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn--secondary btn--sm">✕</button>
                                 </form>

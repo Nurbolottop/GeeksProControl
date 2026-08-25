@@ -91,6 +91,19 @@ def project_list(request, category='all'):
             current_stage=ProjectStageKey.DELIVERY, status=ProjectStatus.ACTIVE,
         )
 
+    # Список идёт по этапам жизненного цикла: новые сверху,
+    # «Сдача» и «Продакшен» — внизу; внутри этапа — свежие первыми
+    from django.db.models import Case, IntegerField, Value, When
+    stage_order = Case(
+        *[
+            When(current_stage=key, then=Value(index))
+            for index, key in enumerate(ProjectStageKey.values)
+        ],
+        default=Value(len(ProjectStageKey.values)),
+        output_field=IntegerField(),
+    )
+    qs = qs.annotate(stage_order=stage_order).order_by('stage_order', '-created_at')
+
     per_page = request.GET.get('per_page', '25')
     if per_page not in ('25', '50', '100'):
         per_page = '25'

@@ -54,7 +54,7 @@
                                     <a href="{{ member.project.get_absolute_url }}?tab=team">{{ member.project.name }}</a>
                                 {% else %}без проекта{% endif %}
                                 <form method="post" action="{% url 'teams:lead_remove' member.pk %}" style="display:inline; margin:0"
-                                      onsubmit="return confirm('Снять {{ row.intern.full_name|escapejs }} с роли тимлида в проекте «{{ member.project.name|escapejs }}»?')">
+                                      data-confirm="Снять {{ row.intern.full_name|escapejs }} с роли тимлида в проекте «{{ member.project.name|escapejs }}»?">
                                     {% csrf_token %}
                                     <button type="submit" class="lead-chip__x" title="Снять роль тимлида">✕</button>
                                 </form>

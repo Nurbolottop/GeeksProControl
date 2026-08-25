@@ -517,6 +517,29 @@ class StageReopenRollsBackCurrentStageTests(TestCase):
         self.assertEqual(self.project.current_stage, ProjectStageKey.DESIGN)
 
 
+class ProjectListStageOrderTests(TestCase):
+    """Список проектов идёт по этапам: новые сверху, сдача и продакшен внизу."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        for name, stage in [
+            ("НаПродакшене", ProjectStageKey.PRODUCTION),
+            ("Новичок", ProjectStageKey.NEW),
+            ("НаСдаче", ProjectStageKey.DELIVERY),
+            ("ВДизайне", ProjectStageKey.DESIGN),
+        ]:
+            project = make_project(name=name)
+            create_project(project)
+            project.current_stage = stage
+            project.save(update_fields=["current_stage"])
+
+    def test_ordered_by_lifecycle_stage(self):
+        response = self.client.get(reverse("projects:list"))
+        names = [p.name for p in response.context["page"].object_list]
+        self.assertEqual(names, ["Новичок", "ВДизайне", "НаСдаче", "НаПродакшене"])
+
+
 class ProjectDeleteTests(TestCase):
     """Удаление проекта: только POST, подтверждение кодом, запись в аудит (ТЗ §27)."""
 

@@ -26,7 +26,7 @@
            hx-vals='{"date": "{{ row.date|date:"Y-m-d" }}"}'
            hx-target="#pcheck-{{ row.item.pk }}" hx-swap="outerHTML">
     <form method="post" action="{% url 'dailycheck:project_item_delete' row.item.pk %}"
-          style="margin:0" onsubmit="return confirm('Убрать пункт «{{ row.item.title|escapejs }}» из ежедневной проверки проекта?')">
+          style="margin:0" data-confirm="Убрать пункт «{{ row.item.title|escapejs }}» из ежедневной проверки проекта?">
         {% csrf_token %}
         <button type="submit" class="check-remove" title="Убрать пункт">✕</button>
     </form>

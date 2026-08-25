@@ -29,7 +29,7 @@
                 <button type="button" class="btn btn--secondary btn--sm" @click="edit = !edit"
                         x-text="edit ? 'Отмена' : 'Изменить'"></button>
                 <form method="post" action="{% url 'projects:report_delete' report.pk %}" style="margin:0"
-                      onsubmit="return confirm('Удалить отчёт от {{ report.date|date:'d.m.Y' }}?')">
+                      data-confirm="Удалить отчёт от {{ report.date|date:'d.m.Y' }}?">
                     {% csrf_token %}
                     <button type="submit" class="btn btn--secondary btn--sm" title="Удалить">✕</button>
                 </form>

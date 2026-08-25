@@ -75,7 +75,7 @@
                     <td style="white-space: nowrap; text-align: right">
                         <a href="{% url 'attendance:meeting_detail' meeting.pk %}" class="btn btn--sm">Отметить</a>
                         <form method="post" action="{% url 'attendance:meeting_delete' meeting.pk %}" style="display:inline"
-                              onsubmit="return confirm('Удалить собрание {{ meeting.date|date:'d.m.Y' }}?')">
+                              data-confirm="Удалить собрание {{ meeting.date|date:'d.m.Y' }}?">
                             {% csrf_token %}
                             <button type="submit" class="btn btn--secondary btn--sm">✕</button>
                         </form>

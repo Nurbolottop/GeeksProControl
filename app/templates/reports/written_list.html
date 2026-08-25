@@ -88,7 +88,7 @@
                 <div class="note-row__actions">
                     <button type="button" class="btn-edit" @click="edit = !edit" title="Изменить">✎</button>
                     <form method="post" action="{% url 'reports:written_delete' note.pk %}" style="margin:0"
-                          onsubmit="return confirm('Удалить запись?')">
+                          data-confirm="Удалить запись?">
                         {% csrf_token %}
                         <button type="submit" class="btn-edit btn-edit--danger" title="Удалить">✕</button>
                     </form>

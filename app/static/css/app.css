@@ -2124,3 +2124,38 @@ a.member__name:hover { color: var(--accent-dark); }
 ::-webkit-scrollbar-track { background: transparent; }
 
 .inline-form { display: inline; }
+
+/* --- Модал подтверждения (confirm-modal.js) --- */
+.cmodal { position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px; }
+.cmodal.is-open { display: flex; }
+.cmodal__overlay { position: absolute; inset: 0; background: rgba(20, 24, 31, .45); backdrop-filter: blur(3px); }
+body.cmodal-open { overflow: hidden; }
+.cmodal__card {
+    position: relative; background: var(--surface); border-radius: var(--radius);
+    box-shadow: 0 24px 60px rgba(20, 24, 31, .25); padding: 28px;
+    width: 100%; max-width: 440px;
+    animation: cmodal-pop .16s ease;
+}
+@keyframes cmodal-pop { from { transform: translateY(10px) scale(.97); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cmodal__card { animation: none; } }
+.cmodal__icon { width: 44px; height: 44px; border-radius: 12px; margin-bottom: 14px;
+    background: #eef0fd; display: flex; align-items: center; justify-content: center; }
+.cmodal__icon::before { content: '?'; font-size: 20px; font-weight: 700; color: var(--primary); }
+.cmodal--danger .cmodal__icon { background: #fdeeee; }
+.cmodal--danger .cmodal__icon::before { content: '!'; color: var(--red); }
+.cmodal__title { font-size: 18px; font-weight: 700; margin: 0 0 8px; color: var(--text); }
+.cmodal__text { font-size: 14.5px; line-height: 1.55; color: var(--text); margin: 0 0 16px; }
+.cmodal__label { display: block; font-size: 13px; color: #5c6472; margin-bottom: 6px; }
+.cmodal__label b { color: var(--text); font-family: ui-monospace, Menlo, monospace; }
+.cmodal__input {
+    width: 100%; padding: 10px 12px; border: 1.5px solid var(--border-strong, #d5d9e2);
+    border-radius: var(--radius-sm); font-size: 15px; font-family: inherit;
+}
+.cmodal__input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(67, 83, 232, .15); }
+.cmodal--danger .cmodal__input:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(194, 47, 47, .12); }
+.cmodal__error { font-size: 13px; color: var(--red); margin-top: 6px; }
+.cmodal__input-wrap { margin-bottom: 16px; }
+.cmodal__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+.btn--danger-solid { background: var(--red); border-color: var(--red); box-shadow: 0 1px 2px rgba(194, 47, 47, .3); }
+.btn--danger-solid:hover { background: #a82626; box-shadow: 0 4px 12px rgba(194, 47, 47, .3); }
+.btn--danger-solid:disabled, .cmodal__ok:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }

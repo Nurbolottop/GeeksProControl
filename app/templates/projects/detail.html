@@ -30,7 +30,9 @@
     <div class="page-actions">
         <a href="{% url 'projects:update' project.pk %}" class="btn btn--secondary">Редактировать</a>
         <form method="post" action="{% url 'projects:delete' project.pk %}" class="inline-form"
-              onsubmit="return confirmProjectDelete(this, '{{ project.display_code|default:project.pk }}')">
+              data-confirm="Проект будет удалён безвозвратно вместе с этапами, задачами, отчётами, документами и историей."
+              data-confirm-input="{{ project.display_code|default:project.pk }}"
+              data-confirm-ok="Удалить проект">
             {% csrf_token %}
             <input type="hidden" name="confirm_code">
             <button type="submit" class="btn btn--danger">Удалить</button>
@@ -122,7 +124,7 @@
             <a href="{% url 'teams:member_add' project.pk %}" class="btn btn--sm">+ Участник</a>
             {% if team_members %}
                 <form method="post" action="{% url 'teams:team_clear' project.pk %}" style="margin:0"
-                      onsubmit="return confirm('Расформировать команду проекта? Все участники будут сняты, люди останутся в базе.')">
+                      data-confirm="Расформировать команду проекта? Все участники будут сняты, люди останутся в базе.">
                     {% csrf_token %}
                     <button type="submit" class="btn btn--secondary btn--sm">Расформировать</button>
                 </form>
@@ -157,7 +159,7 @@
                         <div class="member__actions">
                             <a href="{% url 'teams:member_edit' member.pk %}" class="btn-edit" title="Изменить">✎</a>
                             <form method="post" action="{% url 'teams:member_delete' member.pk %}" style="margin:0"
-                                  onsubmit="return confirm('Убрать {{ member.person_name|escapejs }} из команды?')">
+                                  data-confirm="Убрать {{ member.person_name|escapejs }} из команды?">
                                 {% csrf_token %}
                                 <button type="submit" class="btn-edit btn-edit--danger" title="Убрать из команды">✕</button>
                             </form>
@@ -218,7 +220,7 @@
                         <td style="white-space: nowrap">
                             <a href="{% url 'projects:access_update' access.pk %}" class="btn btn--secondary btn--sm">Изменить</a>
                             <form method="post" action="{% url 'projects:access_delete' access.pk %}" style="display:inline"
-                                  onsubmit="return confirm('Удалить доступ «{{ access.service|escapejs }}»?')">
+                                  data-confirm="Удалить доступ «{{ access.service|escapejs }}»?">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn--secondary btn--sm">✕</button>
                             </form>
@@ -349,19 +351,5 @@
 </div>
 {% endif %}
 
-<script>
-function confirmProjectDelete(form, code) {
-    const typed = prompt(
-        'Проект будет удалён БЕЗВОЗВРАТНО вместе с этапами, задачами, отчётами, ' +
-        'документами и историей.\n\nДля подтверждения введите код проекта: ' + code,
-    );
-    if (typed === null) return false;
-    if (typed.trim() !== String(code)) {
-        alert('Код не совпал — проект не удалён.');
-        return false;
-    }
-    form.querySelector('[name=confirm_code]').value = typed.trim();
-    return true;
-}
-</script>
+
 {% endblock %}
