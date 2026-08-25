@@ -102,3 +102,80 @@ class InternKindBadgeTests(TestCase):
         self.assertContains(
             response, '<span class="badge badge--gray">Стажёр</span>',
         )
+
+
+class InternListProjectColumnTests(TestCase):
+    """В общем списке стажёров видно, над каким проектом кто работает."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+
+    def test_shows_current_project(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Балажан")
+        intern = Intern.objects.create(full_name="Аскар Тестов")
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(reverse("interns:list"))
+        self.assertContains(response, "Балажан")
+
+    def test_no_project_shows_dash(self):
+        Intern.objects.create(full_name="Без проекта Тестов")
+        response = self.client.get(reverse("interns:list"))
+        self.assertContains(response, "—")
+
+    def test_left_membership_not_shown_as_current(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Завершённый проект")
+        intern = Intern.objects.create(full_name="Вышел Тестов")
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        response = self.client.get(reverse("interns:list"))
+        self.assertNotContains(response, "Завершённый проект")
+
+    def test_project_lookup_does_not_scale_per_intern(self):
+        """Больше стажёров с проектами не должно давать N+1 запросов."""
+        from django.db import connection, reset_queries
+        from django.test import override_settings
+
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Балажан")
+        intern = Intern.objects.create(full_name="Аскар Тестов")
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        with override_settings(DEBUG=True):
+            reset_queries()
+            self.client.get(reverse("interns:list"))
+            baseline = len(connection.queries)
+
+            for i in range(10):
+                extra_project = Project.objects.create(name=f"Проект {i}")
+                extra_intern = Intern.objects.create(full_name=f"Стажёр {i}")
+                TeamMember.objects.create(
+                    project=extra_project, intern=extra_intern,
+                    role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
+                )
+
+            reset_queries()
+            self.client.get(reverse("interns:list"))
+            with_more_interns = len(connection.queries)
+
+        self.assertLess(with_more_interns, baseline + 10)

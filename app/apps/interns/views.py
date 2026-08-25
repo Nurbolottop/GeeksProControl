@@ -18,6 +18,26 @@ def lead_ids() -> set:
     return lead_intern_ids()
 
 
+def _attach_current_projects(interns) -> None:
+    """Над каким проектом сейчас работает — один запрос вместо N+1."""
+    ids = [i.pk for i in interns]
+    if not ids:
+        return
+    memberships = (
+        TeamMember.objects.filter(
+            intern_id__in=ids, status=TeamMember.Status.ACTIVE,
+            project__isnull=False,
+        )
+        .select_related('project')
+        .order_by('project__name')
+    )
+    by_intern = {}
+    for member in memberships:
+        by_intern.setdefault(member.intern_id, []).append(member.project)
+    for intern in interns:
+        intern.current_projects = by_intern.get(intern.pk, [])
+
+
 @login_required
 def intern_list(request):
     qs = (
@@ -56,6 +76,7 @@ def intern_list(request):
     page = paginator.get_page(params.get('page'))
     for intern in page.object_list:
         intern.is_busy = intern.pk in busy_ids
+    _attach_current_projects(page.object_list)
     from apps.resources.services import interns_summary
     context = {
         'page': page,

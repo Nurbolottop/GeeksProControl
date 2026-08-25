@@ -64,6 +64,7 @@
             <tr>
                 <th>ФИО</th>
                 <th>Направление</th>
+                <th>Проект</th>
                 <th>Статус</th>
                 <th>Группа</th>
                 <th>Team Lead</th>
@@ -79,6 +80,11 @@
                         <div style="font-size:12px; color: var(--text-muted)">{{ intern.city|default:'' }}</div>
                     </td>
                     <td>{{ intern.specialization|default:'—' }}</td>
+                    <td>
+                        {% for project in intern.current_projects %}
+                            <a href="{{ project.get_absolute_url }}">{{ project.name }}</a>{% if not forloop.last %}, {% endif %}
+                        {% empty %}—{% endfor %}
+                    </td>
                     <td>
                         {% if intern.status == 'active' or intern.status == 'internship' %}
                             <span class="badge badge--green">{{ intern.get_status_display }}</span>
@@ -99,7 +105,7 @@
                     <td>{% if intern.rating %}★ {{ intern.rating }}{% else %}—{% endif %}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Стажёров не найдено.</td></tr>
+                <tr><td colspan="8" class="empty" style="text-align:center; padding: 24px;">Стажёров не найдено.</td></tr>
             {% endfor %}
             </tbody>
         </table>
