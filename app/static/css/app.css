@@ -1377,7 +1377,7 @@ a:hover { color: var(--accent-dark); }
 .note-row__meta { margin-top: 4px; font-size: 11.5px; color: var(--text-muted); }
 .note-row__actions { display: flex; gap: 4px; flex: none; }
 
-/* ---- Страница тимлидов ---- */
+/* ---- Страницы «Тимлиды» / «ПМ» ---- */
 .lead-summary {
     display: flex;
     gap: 10px;
@@ -1394,8 +1394,8 @@ a:hover { color: var(--accent-dark); }
     background: var(--surface);
 }
 .lead-summary__item--total {
-    background: var(--yellow-bg);
-    border-color: var(--yellow-line);
+    background: var(--accent-soft);
+    border-color: var(--accent-soft);
 }
 .lead-summary__value { font-size: 20px; font-weight: 800; color: var(--text); }
 .lead-summary__label { font-size: 12.5px; color: var(--text-muted); }
@@ -1413,65 +1413,86 @@ a:hover { color: var(--accent-dark); }
 
 .lead-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 12px;
 }
 .lead-card {
-    padding: 14px 16px;
+    padding: 16px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
-    background: #fbfcfe;
+    background: var(--surface);
+    transition: border-color .12s ease, box-shadow .12s ease;
 }
+.lead-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
 .lead-card__head {
     display: flex;
-    justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: 10px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
-.lead-card__name { font-size: 14.5px; font-weight: 700; color: var(--text); }
-.lead-card__name:hover { color: var(--primary); }
-.lead-card__count { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.lead-card__avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+    flex-shrink: 0;
+}
+.lead-card__info { min-width: 0; flex: 1; }
+.lead-card__name {
+    display: block;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lead-card__name:hover { color: var(--accent); }
+.lead-card__count { font-size: 12px; color: var(--text-muted); }
 .lead-card__projects { display: flex; flex-wrap: wrap; gap: 6px; }
 .lead-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 6px 4px 11px;
+    gap: 2px;
+    padding: 3px 4px 3px 10px;
     border-radius: 20px;
-    background: var(--surface);
-    border: 1px solid var(--border-strong);
-    font-size: 12.5px;
+    background: var(--gray-bg);
+    border: 1px solid var(--gray-line);
+    font-size: 12px;
 }
-.lead-chip a { color: var(--text); text-decoration: none; }
-.lead-chip a:hover { color: var(--primary); }
+.lead-chip a { color: var(--text); text-decoration: none; font-weight: 600; }
+.lead-chip a:hover { color: var(--accent); }
 .lead-chip__x {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     border: 0;
     border-radius: 50%;
     background: transparent;
-    color: #c2c7d4;
+    color: var(--text-muted);
     font-size: 10px;
     line-height: 1;
     cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
 }
 .lead-chip__x:hover { background: var(--red-bg); color: var(--red); }
 
-/* ---- Профиль тимлида ---- */
-.lead-panel { border-left: 3px solid var(--yellow); }
+/* ---- Профиль тимлида / ПМ на карточке стажёра ---- */
+.lead-panel { border-left: 3px solid var(--accent); }
 .lead-projects { display: flex; flex-wrap: wrap; gap: 8px; }
-.lead-chip {
+.lead-projects__chip {
     padding: 6px 12px;
     border-radius: 20px;
-    background: var(--yellow-bg);
-    border: 1px solid var(--yellow-line);
-    color: var(--text);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-soft);
+    color: var(--accent-dark);
     font-size: 12.5px;
     font-weight: 600;
     text-decoration: none;
 }
-.lead-chip:hover { border-color: var(--yellow); }
+.lead-projects__chip:hover { border-color: var(--accent); }
 
 /* ---- Последний отчёт на «Обзоре» — выделяем среди прочих блоков ---- */
 .last-report-panel {

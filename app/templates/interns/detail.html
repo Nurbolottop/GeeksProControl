@@ -50,7 +50,7 @@
         </div>
         <div class="lead-projects">
             {% for member in lead_projects %}
-                <a href="{{ member.project.get_absolute_url }}?tab=team" class="lead-chip">
+                <a href="{{ member.project.get_absolute_url }}?tab=team" class="lead-projects__chip">
                     {{ member.project.name }}
                 </a>
             {% endfor %}

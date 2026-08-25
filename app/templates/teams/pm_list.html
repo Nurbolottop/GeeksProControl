@@ -25,10 +25,13 @@
         {% for row in rows %}
             <div class="lead-card">
                 <div class="lead-card__head">
-                    <a href="{{ row.intern.get_absolute_url }}" class="lead-card__name">
-                        {{ row.intern.full_name }}
-                    </a>
-                    <span class="lead-card__count">{{ row.projects|length }} проектов</span>
+                    <div class="lead-card__avatar">{{ row.intern.full_name|first|upper }}</div>
+                    <div class="lead-card__info">
+                        <a href="{{ row.intern.get_absolute_url }}" class="lead-card__name">
+                            {{ row.intern.full_name }}
+                        </a>
+                        <span class="lead-card__count">{{ row.projects|length }} проектов</span>
+                    </div>
                 </div>
                 <div class="lead-card__projects">
                     {% for member in row.projects %}
