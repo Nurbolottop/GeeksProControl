@@ -78,6 +78,13 @@ def project_list(request, category='all'):
     qs = selectors.filter_projects(selectors.projects_qs(), request.GET)
     if config['statuses']:
         qs = qs.filter(status__in=config['statuses'])
+    elif not request.GET.get('status'):
+        # Завершённые и отменённые в общий список не попадают — для них есть
+        # страницы «Завершённые» и «Отклонённые»; явный фильтр по статусу
+        # это правило переопределяет
+        qs = qs.exclude(status__in=[
+            ProjectStatus.COMPLETED, ProjectStatus.CANCELLED, ProjectStatus.REFUSED,
+        ])
     # Переход со «На сдаче» на dashboard
     if request.GET.get('view') == 'delivery':
         qs = qs.filter(
