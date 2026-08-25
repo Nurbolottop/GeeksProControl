@@ -9,6 +9,7 @@ from apps.projects.forms import ProjectForm
 from apps.projects.models import (
     DeadlineStatus,
     Project,
+    ProjectStage,
     ProjectStageKey,
     ProjectStatus,
     ProjectType,
@@ -472,6 +473,11 @@ class StageReopenRollsBackCurrentStageTests(TestCase):
         from apps.projects.services import complete_stage, update_stage
 
         delivery = self.project.stages.get(key=ProjectStageKey.DELIVERY)
+        # Все этапы до «Сдачи» уже пройдены — как в реальной жизни,
+        # где этапы завершаются по порядку.
+        self.project.stages.filter(order__lt=delivery.order).update(
+            status=ProjectStage.Status.DONE,
+        )
 
         complete_stage(delivery, user=self.user)
         self.project.refresh_from_db()
