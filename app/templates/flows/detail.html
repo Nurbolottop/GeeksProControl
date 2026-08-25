@@ -146,7 +146,7 @@
                 </thead>
                 <tbody>
                 {% for project in projects %}
-                    <tr>
+                    <tr {% if project.status == 'completed' %}class="project-row--completed"{% endif %}>
                         <td><strong>{{ project.display_code }}</strong></td>
                         <td>
                             <a href="{{ project.get_absolute_url }}"><strong>{{ project.name }}</strong></a>

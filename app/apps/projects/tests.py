@@ -543,3 +543,20 @@ class StageBadgeColorTests(TestCase):
         self.assertContains(
             response, '<span class="badge badge--blue">Новый</span>',
         )
+
+    def test_completed_project_row_is_highlighted(self):
+        """Мало одного бейджа — завершённый проект должен быть виден по
+        всему ряду в списке, иначе теряется среди активных со схожими
+        по цвету бейджами (например, красной просрочкой)."""
+        project = make_project(name="Вистайл", status=ProjectStatus.COMPLETED)
+        create_project(project)
+
+        response = self.client.get(reverse("projects:list"))
+        self.assertContains(response, 'class="project-row--completed"')
+
+    def test_active_project_row_is_not_highlighted(self):
+        project = make_project(name="Учкун")
+        create_project(project)
+
+        response = self.client.get(reverse("projects:list"))
+        self.assertNotContains(response, 'project-row--completed')

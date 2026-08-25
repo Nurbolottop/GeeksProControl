@@ -395,6 +395,12 @@ table.data tbody tr { transition: background .1s ease; }
 table.data tbody tr:hover td { background: #f6f7fd; }
 table.data tbody tr:last-child td { border-bottom: none; }
 
+/* Завершённый проект — весь ряд подсвечен зелёным, чтобы это было видно
+   сразу, а не только по одному бейджу среди прочих */
+table.data tbody tr.project-row--completed { background: var(--green-bg); }
+table.data tbody tr.project-row--completed td:first-child { box-shadow: inset 3px 0 0 var(--green); }
+table.data tbody tr.project-row--completed:hover td { background: #cdefdd; }
+
 /* Ссылки в таблицах — тёмные, чтобы не было «моря синего»;
    акцент появляется при наведении */
 table.data td a { color: var(--text); font-weight: 600; }
