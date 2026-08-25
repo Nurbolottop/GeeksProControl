@@ -66,13 +66,13 @@
             <tr>
                 <th>ID</th>
                 <th>Проект</th>
+                <th>ПМ</th>
                 <th>Клиент</th>
                 <th>Тип</th>
                 <th>Этап</th>
                 <th>Срок</th>
                 <th>Deadline</th>
                 <th>Прогресс</th>
-                <th>ПМ</th>
             </tr>
             </thead>
             <tbody>
@@ -86,6 +86,9 @@
                             {{ project.get_status_display }}{% if project.city %} · {{ project.city }}{% endif %}{% if project.flow %} · {{ project.flow }}{% endif %}
                         </div>
                     </td>
+                    <td style="font-size: 12px">
+                        {{ project.pm.full_name|default:'—' }}
+                    </td>
                     <td>{% if project.client %}<a href="{% url 'clients:detail' project.client.pk %}">{{ project.client }}</a>{% else %}—{% endif %}</td>
                     <td>{{ project.project_type|default:'—' }}</td>
                     <td><span class="badge badge--blue">{{ project.get_current_stage_display }}</span></td>
@@ -96,9 +99,6 @@
                             <div class="progress__bar"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>
                             <span class="progress__label">{{ project.progress }}%</span>
                         </div>
-                    </td>
-                    <td style="font-size: 12px">
-                        {{ project.pm.full_name|default:'—' }}
                     </td>
                 </tr>
             {% empty %}
