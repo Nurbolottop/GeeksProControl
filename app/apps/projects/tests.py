@@ -368,3 +368,33 @@ class ProjectReportTests(TestCase):
         report = self.model.objects.create(project=self.project, text="текст")
         self.client.post(reverse("projects:report_delete", args=[report.pk]))
         self.assertFalse(self.model.objects.filter(pk=report.pk).exists())
+
+
+class LastReportOnOverviewTests(TestCase):
+    """Последний отчёт по проекту виден сразу на «Обзоре»."""
+
+    def setUp(self):
+        from apps.projects.models import ProjectReport
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = make_project(name="БилимОрдо")
+        create_project(self.project)
+        self.model = ProjectReport
+
+    def test_no_reports_shows_placeholder(self):
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, "Отчётов по проекту ещё нет")
+
+    def test_latest_report_shown_on_overview(self):
+        self.model.objects.create(project=self.project, text="старый отчёт")
+        newest = self.model.objects.create(project=self.project, text="новый отчёт")
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertEqual(response.context["last_report"], newest)
+        self.assertContains(response, "новый отчёт")
+        self.assertNotContains(response, "старый отчёт")
+
+    def test_overview_links_to_full_report_tab(self):
+        self.model.objects.create(project=self.project, text="текст")
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, "?tab=report")

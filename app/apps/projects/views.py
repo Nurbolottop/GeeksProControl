@@ -213,6 +213,9 @@ def project_detail(request, pk):
         context['delivery_checks'] = checks
         context['delivery_failed'] = failed
         context['delivery_ready'] = not failed
+        context['last_report'] = (
+            project.reports.select_related('author').first()
+        )
     return render(request, 'projects/detail.html', context)
 
 
