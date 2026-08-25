@@ -110,6 +110,7 @@ def create_project(project: Project, user=None) -> Project:
         project=project, field='created',
         new_value='Проект создан', user=user,
     )
+    _resync_progress(project)
     ensure_group(project)
     # Автоматические чек-листы задач отключены: задачи заводятся руками
     return project
