@@ -94,6 +94,11 @@ class InternKindBadgeTests(TestCase):
         )
 
     def test_pm_badge_is_intern_not_project_manager(self):
+        """Проверяем именно верхний бейдж «Кто в команде», а не факт
+        упоминания роли — «— Project Manager» у проекта в списке ниже
+        законно и должен остаться: там честно показана роль на проекте."""
         response = self.client.get(self.pm.get_absolute_url())
         self.assertEqual(response.context["kind"], "Стажёр")
-        self.assertNotContains(response, "Project Manager")
+        self.assertContains(
+            response, '<span class="badge badge--gray">Стажёр</span>',
+        )
