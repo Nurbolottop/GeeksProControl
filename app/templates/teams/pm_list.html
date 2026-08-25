@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}ПМ — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>ПМ</h1>
+        <div class="sub">Стажёры, которые ведут проекты как Project Manager</div>
+    </div>
+    <div class="page-actions">
+        <a href="#assign" class="btn">+ Назначить ПМ</a>
+    </div>
+</div>
+
+<div class="lead-summary">
+    <div class="lead-summary__item lead-summary__item--total">
+        <span class="lead-summary__value">{{ total }}</span>
+        <span class="lead-summary__label">всего ПМ</span>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="lead-grid">
+        {% for row in rows %}
+            <div class="lead-card">
+                <div class="lead-card__head">
+                    <a href="{{ row.intern.get_absolute_url }}" class="lead-card__name">
+                        {{ row.intern.full_name }}
+                    </a>
+                    <span class="lead-card__count">{{ row.projects|length }} проектов</span>
+                </div>
+                <div class="lead-card__projects">
+                    {% for member in row.projects %}
+                        <span class="lead-chip">
+                            {% if member.project %}
+                                <a href="{{ member.project.get_absolute_url }}?tab=team">{{ member.project.name }}</a>
+                            {% else %}без проекта{% endif %}
+                            <form method="post" action="{% url 'teams:pm_remove' member.pk %}" style="display:inline; margin:0"
+                                  data-confirm="Снять {{ row.intern.full_name|escapejs }} с роли ПМ в проекте «{{ member.project.name|escapejs }}»?">
+                                {% csrf_token %}
+                                <button type="submit" class="lead-chip__x" title="Снять роль ПМ">✕</button>
+                            </form>
+                        </span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% empty %}
+            <div class="empty" style="text-align:center; padding: 30px; grid-column: 1 / -1;">
+                ПМов пока нет — назначьте ниже.
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="panel" id="assign" x-data="{ open: {% if not total %}true{% else %}false{% endif %} }">
+    <div class="panel-head">
+        <h2>Назначить ПМ</h2>
+        <button type="button" class="btn btn--secondary btn--sm" @click="open = !open"
+                x-text="open ? 'Отмена' : '+ Назначить'"></button>
+    </div>
+    <form method="post" action="{% url 'teams:pm_add' %}" x-show="open" x-cloak>
+        {% csrf_token %}
+        <div class="form-row">
+            <div class="form-field">
+                <label>Человек</label>
+                {% include 'partials/person_picker.html' %}
+            </div>
+            <div class="form-field">
+                <label for="pm-project">Проект</label>
+                <select id="pm-project" name="project">
+                    <option value="">Выберите проект</option>
+                    {% for project in projects %}
+                        <option value="{{ project.pk }}">{{ project.display_code }} · {{ project.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">Назначить ПМом</button>
+        </div>
+    </form>
+    <div x-show="!open" class="sub" style="color: var(--text-muted); font-size: 12.5px">
+        Один ПМ может вести сразу несколько проектов.
+    </div>
+</div>
+{% endblock %}

@@ -15,4 +15,7 @@ urlpatterns = [
     path('leads/', views.lead_list, name='lead_list'),
     path('leads/add/', views.lead_add, name='lead_add'),
     path('leads/<int:pk>/remove/', views.lead_remove, name='lead_remove'),
+    path('pm/', views.pm_list, name='pm_list'),
+    path('pm/add/', views.pm_add, name='pm_add'),
+    path('pm/<int:pk>/remove/', views.pm_remove, name='pm_remove'),
 ]

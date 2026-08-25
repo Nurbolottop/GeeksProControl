@@ -297,6 +297,91 @@ def lead_remove(request, pk):
 
 
 @login_required
+def pm_list(request):
+    """ПМы: кто где ведёт проект — отдельно от общего списка стажёров."""
+    pms = (
+        TeamMember.objects.filter(role=TeamRole.PROJECT_MANAGER)
+        .select_related('intern', 'project')
+        .order_by('intern__full_name')
+    )
+    by_person = {}
+    for member in pms:
+        entry = by_person.setdefault(member.intern_id, {
+            'intern': member.intern,
+            'projects': [],
+        })
+        entry['projects'].append(member)
+    rows = sorted(by_person.values(), key=lambda e: -len(e['projects']))
+
+    return render(request, 'teams/pm_list.html', {
+        'rows': rows,
+        'total': len(rows),
+        'projects': Project.objects.active().order_by('name'),
+        'people': [
+            {
+                'id': person.pk,
+                'name': person.full_name,
+                'spec': str(person.specialization) if person.specialization_id else '',
+            }
+            for person in Intern.objects.filter(is_archived=False)
+            .select_related('specialization').order_by('full_name')
+        ],
+    })
+
+
+@login_required
+def pm_add(request):
+    """Назначить человека ПМом проекта."""
+    if request.method != 'POST':
+        return redirect('teams:pm_list')
+
+    project = Project.objects.filter(pk=request.POST.get('project')).first()
+    if project is None:
+        messages.error(request, 'Выберите проект.')
+        return redirect('teams:pm_list')
+
+    data, created_person = _with_new_person(request, role=TeamRole.PROJECT_MANAGER)
+    intern = Intern.objects.filter(pk=data.get('intern')).first()
+    if intern is None:
+        messages.error(request, 'Выберите человека.')
+        return redirect('teams:pm_list')
+
+    member, made = TeamMember.objects.get_or_create(
+        project=project, intern=intern,
+        defaults={
+            'group': getattr(project, 'group', None),
+            'role': TeamRole.PROJECT_MANAGER,
+            'status': TeamMember.Status.ACTIVE,
+        },
+    )
+    if not made and member.role != TeamRole.PROJECT_MANAGER:
+        member.role = TeamRole.PROJECT_MANAGER
+        member.save(update_fields=['role', 'updated_at'])
+        made = True
+    if created_person:
+        messages.success(request, f'{created_person} заведён(а) в базе.')
+    messages.success(request, (
+        f'{intern.full_name} — ПМ проекта «{project.name}».'
+        if made else f'{intern.full_name} уже ПМ в «{project.name}».'
+    ))
+    return redirect(_safe_next(request) or 'teams:pm_list')
+
+
+@login_required
+def pm_remove(request, pk):
+    """Снять роль ПМа: человек остаётся в базе, участие в проекте — нет."""
+    member = get_object_or_404(
+        TeamMember.objects.select_related('intern', 'project'), pk=pk,
+    )
+    if request.method == 'POST':
+        name = member.person_name
+        project = member.project.name if member.project_id else 'проекте'
+        member.delete()
+        messages.success(request, f'{name} больше не ПМ в «{project}».')
+    return redirect('teams:pm_list')
+
+
+@login_required
 def member_delete(request, pk):
     """Убрать участника из команды. Человек остаётся в базе."""
     member = get_object_or_404(

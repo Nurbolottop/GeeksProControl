@@ -88,18 +88,16 @@ def intern_detail(request, pk):
     from apps.teams.models import TeamRole
     roles = {m.role for m in active_memberships}
     is_lead = TeamRole.TEAM_LEAD in roles
-    is_pm = TeamRole.PROJECT_MANAGER in roles
     if is_lead:
         kind, kind_tone = 'Тимлид направления', 'orange'
-    elif is_pm:
-        kind, kind_tone = 'Project Manager', 'blue'
     else:
+        # ПМ — тоже стажёр, а не отдельная категория: его роль и так
+        # видна по проектам ниже и по направлению «PM» в шапке.
         kind, kind_tone = 'Стажёр', 'gray'
 
     context = {
         'intern': intern,
         'is_lead': is_lead,
-        'is_pm': is_pm,
         'kind': kind,
         'kind_tone': kind_tone,
         'lead_projects': [

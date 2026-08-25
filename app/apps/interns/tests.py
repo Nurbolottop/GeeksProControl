@@ -66,3 +66,34 @@ class LeadsHiddenFromInternListTests(TestCase):
         response = self.client.get(self.lead.get_absolute_url())
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Болотбеков Алишер")
+
+    def test_lead_badge_says_lead(self):
+        response = self.client.get(self.lead.get_absolute_url())
+        self.assertEqual(response.context["kind"], "Тимлид направления")
+
+
+class InternKindBadgeTests(TestCase):
+    """ПМ — тоже стажёр, а не отдельная категория (в отличие от тимлида,
+    который считается сотрудником): бейдж «Кто в команде» не должен
+    превращаться в отдельное «Project Manager», дублируя направление «PM»."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+        self.project = Project.objects.create(name="Балажан")
+        self.pm = Intern.objects.create(full_name="Болотбекова Умутай")
+        TeamMember.objects.create(
+            project=self.project, intern=self.pm, role=TeamRole.PROJECT_MANAGER,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+    def test_pm_badge_is_intern_not_project_manager(self):
+        response = self.client.get(self.pm.get_absolute_url())
+        self.assertEqual(response.context["kind"], "Стажёр")
+        self.assertNotContains(response, "Project Manager")

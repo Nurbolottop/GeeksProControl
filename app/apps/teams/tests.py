@@ -283,6 +283,60 @@ class InternDetailLeadPromotionTests(TestCase):
         self.assertEqual(member.role, TeamRole.TEAM_LEAD)
 
 
+class PMSectionTests(TestCase):
+    """Раздел «ПМ»: отдельный отфильтрованный список — не нужно искать
+    руководителей проектов в общем списке стажёров."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Балажан"))
+        self.person = Intern.objects.create(full_name="Болотбекова Умутай")
+
+    def test_page_lists_pms(self):
+        TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.PROJECT_MANAGER,
+        )
+        response = self.client.get(reverse("teams:pm_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Болотбекова Умутай")
+        self.assertEqual(response.context["total"], 1)
+
+    def test_assign_pm(self):
+        self.client.post(reverse("teams:pm_add"), {
+            "intern": self.person.pk, "project": self.project.pk,
+        })
+        member = TeamMember.objects.get(project=self.project, intern=self.person)
+        self.assertEqual(member.role, TeamRole.PROJECT_MANAGER)
+
+    def test_existing_member_becomes_pm(self):
+        member = TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.BACKEND,
+        )
+        self.client.post(reverse("teams:pm_add"), {
+            "intern": self.person.pk, "project": self.project.pk,
+        })
+        member.refresh_from_db()
+        self.assertEqual(member.role, TeamRole.PROJECT_MANAGER)
+
+    def test_remove_pm_keeps_person(self):
+        member = TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.PROJECT_MANAGER,
+        )
+        self.client.post(reverse("teams:pm_remove", args=[member.pk]))
+        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        self.assertTrue(Intern.objects.filter(pk=self.person.pk).exists())
+
+    def test_pm_not_shown_on_lead_page(self):
+        TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.PROJECT_MANAGER,
+        )
+        response = self.client.get(reverse("teams:lead_list"))
+        self.assertNotContains(response, "Болотбекова Умутай")
+
+
 class InternDeleteTests(TestCase):
     """Стажёра можно удалить из базы."""
 
