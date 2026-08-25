@@ -33,6 +33,21 @@ TRACKED_FIELDS = {
     'priority': 'Приоритет',
 }
 
+# Статусы, после которых команда больше не работает над проектом:
+# участников надо освобождать, иначе они «зависают» занятыми навсегда.
+TERMINAL_STATUSES = {
+    ProjectStatus.COMPLETED, ProjectStatus.CANCELLED, ProjectStatus.REFUSED,
+}
+
+
+def release_team(project: Project, when: datetime.date | None = None) -> None:
+    """Освобождает активных участников команды (ТЗ §42.3)."""
+    from apps.teams.models import TeamMember
+
+    project.team_members.filter(status=TeamMember.Status.ACTIVE).update(
+        status=TeamMember.Status.LEFT, left_at=when or timezone.localdate(),
+    )
+
 
 def calculate_deadline_status(
     project: Project, today: datetime.date | None = None,
@@ -143,6 +158,9 @@ def update_project(
             ))
     project.last_activity_at = timezone.now()
     project.save()
+    old_status = old_values.get('status')
+    if project.status in TERMINAL_STATUSES and old_status != project.status:
+        release_team(project)
     if records:
         ProjectStatusHistory.objects.bulk_create(records)
         from apps.audit.services import log as audit_log

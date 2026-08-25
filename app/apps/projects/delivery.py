@@ -125,7 +125,7 @@ def complete_project(
     При ``force=True`` (только Head) проверки пропускаются,
     но причина обязательна и фиксируется в истории (ТЗ §18.1).
     """
-    from apps.teams.models import TeamMember
+    from apps.projects.services import release_team
 
     failed = failed_checks(project)
     if failed and not force:
@@ -140,10 +140,7 @@ def complete_project(
     project.last_activity_at = timezone.now()
     project.save()
 
-    # Освобождаем команду (ТЗ §42.3)
-    project.team_members.filter(status=TeamMember.Status.ACTIVE).update(
-        status=TeamMember.Status.LEFT, left_at=today,
-    )
+    release_team(project, today)
 
     ProjectStatusHistory.objects.create(
         project=project,

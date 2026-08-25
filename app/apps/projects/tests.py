@@ -15,6 +15,7 @@ from apps.projects.models import (
     ProjectType,
     lifecycle_stages,
 )
+from apps.projects import services
 from apps.projects.services import calculate_deadline_status, create_project
 
 User = get_user_model()
@@ -735,3 +736,107 @@ class StageBadgeColorTests(TestCase):
         response = self.client.get(reverse("projects:list_completed"))
         self.assertNotContains(response, "Просрочка")
         self.assertNotContains(response, "Сдан")
+
+
+class TeamReleasedOnTerminalStatusTests(TestCase):
+    """Команда освобождается, когда проект отменён/завершён — не только
+    через кнопку «Завершить проект», но и через обычную форму статуса.
+
+    Раньше это работало только в delivery.complete_project(): если
+    статус меняли на «Отменён» (или на «Завершён» вручную, не кнопкой),
+    участники команды так и оставались «активными» навсегда — стажёры
+    выглядели занятыми на проекте, которого фактически уже нет."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.project = make_project(name="ВФК")
+        create_project(self.project)
+
+    def _add_member(self):
+        from apps.interns.models import Intern
+        from apps.teams.models import TeamMember, TeamRole
+
+        intern = Intern.objects.create(full_name="Умутай")
+        return TeamMember.objects.create(
+            project=self.project, intern=intern,
+            role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
+        )
+
+    def test_cancelling_releases_active_members(self):
+        from apps.teams.models import TeamMember
+
+        member = self._add_member()
+        old_values = {f: getattr(self.project, f) for f in services.TRACKED_FIELDS}
+        self.project.status = ProjectStatus.CANCELLED
+        services.update_project(self.project, old_values, user=self.user)
+
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
+        self.assertIsNotNone(member.left_at)
+
+    def test_refusing_releases_active_members(self):
+        from apps.teams.models import TeamMember
+
+        member = self._add_member()
+        old_values = {f: getattr(self.project, f) for f in services.TRACKED_FIELDS}
+        self.project.status = ProjectStatus.REFUSED
+        services.update_project(self.project, old_values, user=self.user)
+
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
+
+    def test_completing_via_edit_form_releases_active_members_too(self):
+        from apps.teams.models import TeamMember
+
+        member = self._add_member()
+        old_values = {f: getattr(self.project, f) for f in services.TRACKED_FIELDS}
+        self.project.status = ProjectStatus.COMPLETED
+        services.update_project(self.project, old_values, user=self.user)
+
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
+
+    def test_pausing_does_not_release_active_members(self):
+        """Пауза — не терминальный статус, работа может возобновиться."""
+        from apps.teams.models import TeamMember
+
+        member = self._add_member()
+        old_values = {f: getattr(self.project, f) for f in services.TRACKED_FIELDS}
+        self.project.status = ProjectStatus.PAUSED
+        services.update_project(self.project, old_values, user=self.user)
+
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.ACTIVE)
+
+    def test_saving_an_already_cancelled_project_again_is_a_no_op(self):
+        """Повторное сохранение без смены статуса не трогает уже вышедших."""
+        from apps.teams.models import TeamMember
+
+        member = self._add_member()
+        old_values = {f: getattr(self.project, f) for f in services.TRACKED_FIELDS}
+        self.project.status = ProjectStatus.CANCELLED
+        services.update_project(self.project, old_values, user=self.user)
+
+        left_at = TeamMember.objects.get(pk=member.pk).left_at
+
+        old_values = {f: getattr(self.project, f) for f in services.TRACKED_FIELDS}
+        services.update_project(self.project, old_values, user=self.user)
+
+        self.assertEqual(TeamMember.objects.get(pk=member.pk).left_at, left_at)
+
+    def test_cancelling_via_edit_page_releases_team(self):
+        """То же самое, но через настоящий POST на страницу редактирования
+        проекта — не только напрямую через сервис."""
+        from apps.teams.models import TeamMember
+
+        member = self._add_member()
+        self.client.force_login(self.user)
+        self.client.post(reverse("projects:update", args=[self.project.pk]), {
+            "name": self.project.name, "status": ProjectStatus.CANCELLED,
+            "current_stage": self.project.current_stage,
+            "priority": self.project.priority,
+            "planned_end_date": "", "change_reason": "",
+        })
+
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
