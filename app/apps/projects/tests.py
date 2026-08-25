@@ -517,6 +517,43 @@ class StageReopenRollsBackCurrentStageTests(TestCase):
         self.assertEqual(self.project.current_stage, ProjectStageKey.DESIGN)
 
 
+class FinishedProjectsHiddenFromAllListTests(TestCase):
+    """Завершённые и отменённые проекты не выходят в общем списке —
+    для них есть страницы «Завершённые» и «Отклонённые»."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.active = make_project(name="Активный")
+        create_project(self.active)
+        for name, status in [
+            ("Завершённый", ProjectStatus.COMPLETED),
+            ("Отменённый", ProjectStatus.CANCELLED),
+            ("Отказ клиента", ProjectStatus.REFUSED),
+        ]:
+            project = make_project(name=name, status=status)
+            create_project(project)
+
+    def test_all_list_hides_finished_and_cancelled(self):
+        response = self.client.get(reverse("projects:list"))
+        names = [p.name for p in response.context["page"].object_list]
+        self.assertEqual(names, ["Активный"])
+
+    def test_explicit_status_filter_still_works(self):
+        response = self.client.get(
+            reverse("projects:list"), {"status": ProjectStatus.COMPLETED},
+        )
+        names = [p.name for p in response.context["page"].object_list]
+        self.assertEqual(names, ["Завершённый"])
+
+    def test_dedicated_pages_still_show_them(self):
+        response = self.client.get(reverse("projects:list_completed"))
+        self.assertContains(response, "Завершённый")
+        response = self.client.get(reverse("projects:list_rejected"))
+        self.assertContains(response, "Отменённый")
+        self.assertContains(response, "Отказ клиента")
+
+
 class StageBadgeColorTests(TestCase):
     """Бейдж этапа выделяется зелёным, когда проект завершён."""
 
@@ -530,7 +567,7 @@ class StageBadgeColorTests(TestCase):
         project.current_stage = ProjectStageKey.COMPLETED
         project.save(update_fields=['current_stage'])
 
-        response = self.client.get(reverse("projects:list"))
+        response = self.client.get(reverse("projects:list_completed"))
         self.assertContains(
             response, '<span class="badge badge--green">✓ Завершён</span>',
         )
@@ -551,7 +588,7 @@ class StageBadgeColorTests(TestCase):
         project = make_project(name="Вистайл", status=ProjectStatus.COMPLETED)
         create_project(project)
 
-        response = self.client.get(reverse("projects:list"))
+        response = self.client.get(reverse("projects:list_completed"))
         self.assertContains(response, 'class="project-row--completed"')
 
     def test_active_project_row_is_not_highlighted(self):
@@ -565,7 +602,7 @@ class StageBadgeColorTests(TestCase):
         project = make_project(name="ВФК", status=ProjectStatus.CANCELLED)
         create_project(project)
 
-        response = self.client.get(reverse("projects:list"))
+        response = self.client.get(reverse("projects:list_rejected"))
         self.assertContains(response, 'class="project-row--cancelled"')
 
     def test_completed_project_deadline_column_has_no_delay_badge(self):
@@ -578,6 +615,6 @@ class StageBadgeColorTests(TestCase):
         )
         create_project(project)
 
-        response = self.client.get(reverse("projects:list"))
+        response = self.client.get(reverse("projects:list_completed"))
         self.assertNotContains(response, "Просрочка")
         self.assertNotContains(response, "Сдан")
