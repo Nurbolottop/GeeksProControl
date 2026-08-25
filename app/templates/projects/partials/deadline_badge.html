@@ -6,14 +6,6 @@
     <span class="badge badge--orange">▲ Отставание</span>
 {% elif status == 'at_risk' %}
     <span class="badge badge--yellow">● Риск задержки</span>
-{% elif status == 'completed' %}
-    {% if delay_days is None %}
-        <span class="badge badge--gray">Сдан</span>
-    {% elif delay_days > 0 %}
-        <span class="badge badge--red">Просрочка {{ delay_days }} дн.</span>
-    {% else %}
-        <span class="badge badge--green">✓ Сдан в срок</span>
-    {% endif %}
 {% else %}
     <span class="badge badge--green">✓ По графику</span>
 {% endif %}

@@ -31,11 +31,11 @@ def make_project(**kwargs) -> Project:
 class DeadlineStatusTests(TestCase):
     """Статус срока (ТЗ §8, §22)."""
 
-    def test_completed_project(self):
+    def test_completed_project_has_no_deadline_status(self):
+        """Проект завершён — контроль срока больше не ведётся (как у
+        отменённых/приостановленных): бейдж «Срок» просто пустой."""
         project = make_project(status=ProjectStatus.COMPLETED)
-        self.assertEqual(
-            calculate_deadline_status(project, TODAY), DeadlineStatus.COMPLETED,
-        )
+        self.assertEqual(calculate_deadline_status(project, TODAY), '')
 
     def test_no_deadline_is_on_track(self):
         project = make_project(planned_end_date=None)
@@ -560,3 +560,24 @@ class StageBadgeColorTests(TestCase):
 
         response = self.client.get(reverse("projects:list"))
         self.assertNotContains(response, 'project-row--completed')
+
+    def test_cancelled_project_row_is_highlighted_too(self):
+        project = make_project(name="ВФК", status=ProjectStatus.CANCELLED)
+        create_project(project)
+
+        response = self.client.get(reverse("projects:list"))
+        self.assertContains(response, 'class="project-row--cancelled"')
+
+    def test_completed_project_deadline_column_has_no_delay_badge(self):
+        """Завершённый проект больше не тянет за собой «Просрочку N дн.» —
+        как и у отменённых, «Срок» просто пустой: контроль сроков окончен."""
+        project = make_project(
+            name="Энактус", status=ProjectStatus.COMPLETED,
+            planned_end_date=datetime.date(2026, 5, 6),
+            actual_end_date=datetime.date(2026, 8, 24),
+        )
+        create_project(project)
+
+        response = self.client.get(reverse("projects:list"))
+        self.assertNotContains(response, "Просрочка")
+        self.assertNotContains(response, "Сдан")

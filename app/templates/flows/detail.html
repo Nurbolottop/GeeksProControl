@@ -47,7 +47,7 @@
                     {% if group.project %}
                         <div class="group-card__row">
                             {% include 'projects/partials/stage_badge.html' with stage_key=group.project.current_stage stage_display=group.project.get_current_stage_display %}
-                            {% include 'projects/partials/deadline_badge.html' with status=group.project.deadline_status delay_days=group.project.delay_days %}
+                            {% include 'projects/partials/deadline_badge.html' with status=group.project.deadline_status %}
                         </div>
                         <div class="progress" style="margin-top:10px">
                             <div class="progress__bar"><div class="progress__fill" style="width: {{ group.project.progress }}%"></div></div>
@@ -146,7 +146,7 @@
                 </thead>
                 <tbody>
                 {% for project in projects %}
-                    <tr {% if project.status == 'completed' %}class="project-row--completed"{% endif %}>
+                    <tr {% if project.status == 'completed' %}class="project-row--completed"{% elif project.status == 'cancelled' %}class="project-row--cancelled"{% endif %}>
                         <td><strong>{{ project.display_code }}</strong></td>
                         <td>
                             <a href="{{ project.get_absolute_url }}"><strong>{{ project.name }}</strong></a>
@@ -154,7 +154,7 @@
                         </td>
                         <td>{{ project.client|default:'—' }}</td>
                         <td>{% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}</td>
-                        <td>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status delay_days=project.delay_days %}</td>
+                        <td>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</td>
                         <td>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</td>
                         <td>
                             <div class="progress">

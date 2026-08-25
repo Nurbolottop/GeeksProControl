@@ -32,7 +32,7 @@
                             <span>ПМ: {{ project.pm.full_name|default:'не назначен' }}</span>
                             {% if project.planned_end_date %}<span>Deadline: {{ project.planned_end_date|date:'d.m.Y' }}</span>{% endif %}
                             <span>
-                                {% include 'projects/partials/deadline_badge.html' with status=project.deadline_status delay_days=project.delay_days %}
+                                {% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}
                             </span>
                             <div class="progress">
                                 <div class="progress__bar"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>

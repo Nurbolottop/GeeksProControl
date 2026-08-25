@@ -401,6 +401,12 @@ table.data tbody tr.project-row--completed { background: var(--green-bg); }
 table.data tbody tr.project-row--completed td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 table.data tbody tr.project-row--completed:hover td { background: #cdefdd; }
 
+/* Отменённый проект — тоже виден по всему ряду, но приглушённо-серым,
+   а не зелёным (это не «успех», просто больше не в работе) */
+table.data tbody tr.project-row--cancelled { background: var(--gray-bg); }
+table.data tbody tr.project-row--cancelled td:first-child { box-shadow: inset 3px 0 0 var(--gray); }
+table.data tbody tr.project-row--cancelled:hover td { background: #e2e5ed; }
+
 /* Ссылки в таблицах — тёмные, чтобы не было «моря синего»;
    акцент появляется при наведении */
 table.data td a { color: var(--text); font-weight: 600; }

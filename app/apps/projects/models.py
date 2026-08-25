@@ -102,7 +102,6 @@ class DeadlineStatus(models.TextChoices):
     AT_RISK = 'at_risk', 'Риск задержки'
     BEHIND = 'behind', 'Отставание'
     OVERDUE = 'overdue', 'Просрочен'
-    COMPLETED = 'completed', 'Завершён'
 
 
 class Project(TimeStampedModel, ArchivableModel):

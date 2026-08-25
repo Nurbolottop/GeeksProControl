@@ -39,12 +39,10 @@ def calculate_deadline_status(
 ) -> str:
     """Статус срока проекта (ТЗ §8): rule-based, без AI.
 
-    По графику / Риск задержки / Отставание / Просрочен / Завершён.
+    По графику / Риск задержки / Отставание / Просрочен.
     """
-    if project.status == ProjectStatus.COMPLETED:
-        return DeadlineStatus.COMPLETED
     if project.status != ProjectStatus.ACTIVE:
-        # Приостановлен / отменён / отказ — контроль срока не ведётся
+        # Завершён / приостановлен / отменён / отказ — контроль срока не ведётся
         return ''
     if not project.planned_end_date:
         return DeadlineStatus.ON_TRACK

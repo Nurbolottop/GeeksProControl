@@ -50,7 +50,7 @@
             </thead>
             <tbody>
             {% for project in projects %}
-                <tr {% if project.status == 'completed' %}class="project-row--completed"{% endif %}>
+                <tr {% if project.status == 'completed' %}class="project-row--completed"{% elif project.status == 'cancelled' %}class="project-row--cancelled"{% endif %}>
                     <td>{{ project.display_code }}</td>
                     <td><a href="{{ project.get_absolute_url }}"><strong>{{ project.name }}</strong></a></td>
                     <td>{{ project.project_type|default:'—' }}</td>
