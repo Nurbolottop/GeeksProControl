@@ -195,6 +195,23 @@ def _resync_current_stage(project: Project, user=None) -> None:
         move_project_to_stage(project, target_key, user=user)
 
 
+def _resync_progress(project: Project) -> None:
+    """project.progress — процент завершённых этапов.
+
+    Служебный последний этап «Завершён» не считается: иначе прогресс
+    никогда не дойдёт до 100% раньше самого завершения проекта, а это
+    одно из обязательных условий кнопки «Завершить проект».
+    """
+    stages = list(project.stages.exclude(key=ProjectStageKey.COMPLETED))
+    if not stages:
+        return
+    done = sum(1 for s in stages if s.status == ProjectStage.Status.DONE)
+    percent = round(100 * done / len(stages))
+    if percent != project.progress:
+        project.progress = percent
+        project.save(update_fields=['progress', 'updated_at'])
+
+
 @transaction.atomic
 def update_stage(stage: ProjectStage, user=None) -> ProjectStage:
     """Сохранение этапа с автоматикой дат начала и завершения."""
@@ -208,6 +225,7 @@ def update_stage(stage: ProjectStage, user=None) -> ProjectStage:
     stage.save()
     _touch_project(stage.project)
     _resync_current_stage(stage.project, user=user)
+    _resync_progress(stage.project)
     return stage
 
 
@@ -227,6 +245,7 @@ def complete_stage(stage: ProjectStage, user=None) -> ProjectStage:
     )
     _touch_project(project)
     _resync_current_stage(project, user=user)
+    _resync_progress(project)
     return stage
 
 

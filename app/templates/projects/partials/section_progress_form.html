@@ -13,11 +13,6 @@
         </div>
         <div class="form-grid">
             <div class="form-field">
-                <label for="{{ form.progress.id_for_label }}">Прогресс, %</label>
-                {{ form.progress }}
-                {% if form.progress.errors %}<div class="form-errors">{{ form.progress.errors.0 }}</div>{% endif %}
-            </div>
-            <div class="form-field">
                 <label for="{{ form.current_stage.id_for_label }}">Текущий этап</label>
                 {{ form.current_stage }}
             </div>

@@ -20,7 +20,7 @@ class ProjectForm(forms.ModelForm):
         fields = [
             'name', 'client', 'city', 'flow', 'project_type', 'description',
             'contract_date', 'start_date', 'planned_end_date',
-            'status', 'current_stage', 'priority', 'progress',
+            'status', 'current_stage', 'priority',
             'head_comment',
             'github_url', 'figma_url', 'staging_url', 'production_url',
             'domain', 'is_favorite',
@@ -81,11 +81,15 @@ class ProjectCreateForm(forms.ModelForm):
 
 
 class ProjectProgressForm(forms.ModelForm):
-    """Инлайн-форма: прогресс и текущий этап."""
+    """Инлайн-форма: текущий этап.
+
+    Прогресс больше не редактируется тут вручную — считается сам,
+    по доле завершённых этапов (apps.projects.services._resync_progress).
+    """
 
     class Meta:
         model = Project
-        fields = ['progress', 'current_stage']
+        fields = ['current_stage']
 
 
 class ProjectClientForm(forms.ModelForm):

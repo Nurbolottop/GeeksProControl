@@ -517,6 +517,57 @@ class StageReopenRollsBackCurrentStageTests(TestCase):
         self.assertEqual(self.project.current_stage, ProjectStageKey.DESIGN)
 
 
+class StageProgressAutoCalcTests(TestCase):
+    """Прогресс проекта считается сам — по доле завершённых этапов."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.project = make_project(name="Учкун")
+        create_project(self.project)
+
+    def test_new_project_starts_at_zero(self):
+        self.assertEqual(self.project.progress, 0)
+
+    def test_completing_stages_raises_progress(self):
+        from apps.projects.services import update_stage
+
+        for key in (
+            ProjectStageKey.NEW, ProjectStageKey.DOCUMENTS,
+            ProjectStageKey.REQUIREMENTS, ProjectStageKey.TEAM_FORMING,
+        ):
+            stage = self.project.stages.get(key=key)
+            stage.status = stage.Status.DONE
+            update_stage(stage, user=self.user)
+
+        self.project.refresh_from_db()
+        # 4 из 12 «настоящих» этапов (без служебного «Завершён» в конце)
+        self.assertEqual(self.project.progress, round(100 * 4 / 12))
+
+    def test_completing_project_via_button_reaches_full_progress(self):
+        from apps.projects.services import complete_stage
+
+        for stage in self.project.stages.exclude(key=ProjectStageKey.COMPLETED).order_by('order'):
+            complete_stage(stage, user=self.user)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.progress, 100)
+
+    def test_reopening_a_stage_lowers_progress_back(self):
+        from apps.projects.services import complete_stage, update_stage
+
+        stage = self.project.stages.get(key=ProjectStageKey.NEW)
+        complete_stage(stage, user=self.user)
+        self.project.refresh_from_db()
+        self.assertGreater(self.project.progress, 0)
+
+        stage.refresh_from_db()
+        stage.status = stage.Status.IN_PROGRESS
+        update_stage(stage, user=self.user)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.progress, 0)
+
+
 class ProjectListStageOrderTests(TestCase):
     """Список проектов идёт по этапам: новые сверху, сдача и продакшен внизу."""
 
