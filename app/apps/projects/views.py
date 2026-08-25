@@ -315,6 +315,42 @@ def project_update(request, pk):
 
 
 @login_required
+def project_delete(request, pk):
+    """Удаление проекта — только POST с подтверждением кодом проекта.
+
+    Вместе с проектом каскадно удаляются его этапы, задачи, отчёты,
+    документы, доступы и история. Факт удаления остаётся в журнале аудита.
+    """
+    from apps.audit.services import log as audit_log
+
+    project = get_object_or_404(Project, pk=pk)
+    if request.method != 'POST':
+        return redirect(project.get_absolute_url())
+
+    confirm = request.POST.get('confirm_code', '').strip()
+    expected = project.display_code or str(project.pk)
+    if confirm != expected:
+        messages.error(
+            request,
+            f'Проект не удалён: для подтверждения введите его код «{expected}».',
+        )
+        return redirect(project.get_absolute_url())
+
+    name = str(project)
+    counts = (
+        f'этапов {project.stages.count()}, задач {project.tasks.count()}, '
+        f'отчётов {project.reports.count()}, документов {project.documents.count()}'
+    )
+    audit_log(
+        project, 'deleted', old_value=counts,
+        reason=request.POST.get('reason', ''), user=request.user,
+    )
+    project.delete()
+    messages.success(request, f'Проект «{name}» удалён вместе со связанными данными.')
+    return redirect('projects:list')
+
+
+@login_required
 def project_complete(request, pk):
     """Кнопка «Завершить проект» (ТЗ §18): проверяет условия сдачи."""
     from apps.projects import delivery

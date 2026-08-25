@@ -517,6 +517,47 @@ class StageReopenRollsBackCurrentStageTests(TestCase):
         self.assertEqual(self.project.current_stage, ProjectStageKey.DESIGN)
 
 
+class ProjectDeleteTests(TestCase):
+    """Удаление проекта: только POST, подтверждение кодом, запись в аудит (ТЗ §27)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = make_project(name="Туризм")
+        create_project(self.project)
+        self.url = reverse("projects:delete", args=[self.project.pk])
+
+    def test_get_does_not_delete(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Project.objects.filter(pk=self.project.pk).exists())
+
+    def test_wrong_code_does_not_delete(self):
+        response = self.client.post(self.url, {"confirm_code": "не тот код"})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Project.objects.filter(pk=self.project.pk).exists())
+
+    def test_delete_with_code_removes_project_and_logs(self):
+        from apps.audit.models import AuditLog
+
+        code = self.project.display_code or str(self.project.pk)
+        response = self.client.post(self.url, {"confirm_code": code})
+        self.assertRedirects(response, reverse("projects:list"))
+        self.assertFalse(Project.objects.filter(pk=self.project.pk).exists())
+        entry = AuditLog.objects.get(
+            object_type="Project", object_id=str(self.project.pk), action="deleted",
+        )
+        self.assertEqual(entry.user, self.user)
+
+    def test_cascade_removes_related(self):
+        from apps.projects.models import ProjectReport
+
+        self.project.reports.create(text="отчёт", author=self.user)
+        code = self.project.display_code or str(self.project.pk)
+        self.client.post(self.url, {"confirm_code": code})
+        self.assertEqual(ProjectReport.objects.count(), 0)
+
+
 class FinishedProjectsHiddenFromAllListTests(TestCase):
     """Завершённые и отменённые проекты не выходят в общем списке —
     для них есть страницы «Завершённые» и «Отклонённые»."""

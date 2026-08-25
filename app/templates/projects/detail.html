@@ -29,6 +29,12 @@
     </div>
     <div class="page-actions">
         <a href="{% url 'projects:update' project.pk %}" class="btn btn--secondary">Редактировать</a>
+        <form method="post" action="{% url 'projects:delete' project.pk %}" class="inline-form"
+              onsubmit="return confirmProjectDelete(this, '{{ project.display_code|default:project.pk }}')">
+            {% csrf_token %}
+            <input type="hidden" name="confirm_code">
+            <button type="submit" class="btn btn--danger">Удалить</button>
+        </form>
     </div>
 </div>
 
@@ -342,4 +348,20 @@
     </div>
 </div>
 {% endif %}
+
+<script>
+function confirmProjectDelete(form, code) {
+    const typed = prompt(
+        'Проект будет удалён БЕЗВОЗВРАТНО вместе с этапами, задачами, отчётами, ' +
+        'документами и историей.\n\nДля подтверждения введите код проекта: ' + code,
+    );
+    if (typed === null) return false;
+    if (typed.trim() !== String(code)) {
+        alert('Код не совпал — проект не удалён.');
+        return false;
+    }
+    form.querySelector('[name=confirm_code]').value = typed.trim();
+    return true;
+}
+</script>
 {% endblock %}
