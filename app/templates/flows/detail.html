@@ -47,7 +47,7 @@
                     {% if group.project %}
                         <div class="group-card__row">
                             <span class="badge badge--blue">{{ group.project.get_current_stage_display }}</span>
-                            {% include 'projects/partials/deadline_badge.html' with status=group.project.deadline_status %}
+                            {% include 'projects/partials/deadline_badge.html' with status=group.project.deadline_status delay_days=group.project.delay_days %}
                         </div>
                         <div class="progress" style="margin-top:10px">
                             <div class="progress__bar"><div class="progress__fill" style="width: {{ group.project.progress }}%"></div></div>
@@ -154,7 +154,7 @@
                         </td>
                         <td>{{ project.client|default:'—' }}</td>
                         <td><span class="badge badge--blue">{{ project.get_current_stage_display }}</span></td>
-                        <td>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</td>
+                        <td>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status delay_days=project.delay_days %}</td>
                         <td>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</td>
                         <td>
                             <div class="progress">
