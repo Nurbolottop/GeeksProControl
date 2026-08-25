@@ -220,6 +220,68 @@ class LeadSectionTests(TestCase):
         member = TeamMember.objects.get(intern=intern)
         self.assertEqual(member.role, TeamRole.TEAM_LEAD)
 
+    def test_assign_lead_returns_to_given_next_url(self):
+        """Со страницы стажёра — назад на страницу стажёра, а не в общий
+        список тимлидов, чтобы не терять место."""
+        response = self.client.post(reverse("teams:lead_add"), {
+            "intern": self.person.pk, "project": self.project.pk,
+            "next": self.person.get_absolute_url(),
+        })
+        self.assertRedirects(response, self.person.get_absolute_url())
+
+    def test_assign_lead_ignores_unsafe_next_url(self):
+        response = self.client.post(reverse("teams:lead_add"), {
+            "intern": self.person.pk, "project": self.project.pk,
+            "next": "https://evil.example.com/",
+        })
+        self.assertRedirects(response, reverse("teams:lead_list"))
+
+
+class InternDetailLeadPromotionTests(TestCase):
+    """Со страницы стажёра можно сразу сделать его тимлидом на проекте —
+    раньше это было можно только через отдельную страницу «Тимлиды»."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Балажан"))
+        self.spec = Specialization.objects.create(name="UX/UI")
+        self.person = Intern.objects.create(
+            full_name="Макамбаева Айжаз", specialization=self.spec,
+        )
+
+    def test_button_shown_for_regular_member(self):
+        TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.UXUI,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(self.person.get_absolute_url())
+        self.assertContains(response, "Сделать тимлидом")
+
+    def test_button_hidden_when_already_lead(self):
+        TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(self.person.get_absolute_url())
+        self.assertNotContains(response, "Сделать тимлидом")
+
+    def test_promoting_from_intern_page_sets_lead_role_and_returns(self):
+        member = TeamMember.objects.create(
+            project=self.project, intern=self.person, role=TeamRole.UXUI,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.post(reverse("teams:lead_add"), {
+            "intern": self.person.pk, "project": self.project.pk,
+            "next": self.person.get_absolute_url(),
+        })
+        self.assertRedirects(response, self.person.get_absolute_url())
+        member.refresh_from_db()
+        self.assertEqual(member.role, TeamRole.TEAM_LEAD)
+
 
 class InternDeleteTests(TestCase):
     """Стажёра можно удалить из базы."""

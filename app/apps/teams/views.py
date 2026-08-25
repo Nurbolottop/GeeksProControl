@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.flows.models import Group
 from apps.interns.models import Intern
@@ -10,6 +11,17 @@ from apps.teams import services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember, TeamRole
 from apps.training.models import Specialization
+
+
+def _safe_next(request):
+    """Куда вернуться после действия — если пришли не со страницы тимлидов."""
+    next_url = request.POST.get('next')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return None
 
 
 def people_options(form):
@@ -267,7 +279,7 @@ def lead_add(request):
         f'{intern.full_name} — тимлид в проекте «{project.name}».'
         if made else f'{intern.full_name} уже тимлид в «{project.name}».'
     ))
-    return redirect('teams:lead_list')
+    return redirect(_safe_next(request) or 'teams:lead_list')
 
 
 @login_required
