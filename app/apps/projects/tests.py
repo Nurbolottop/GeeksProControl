@@ -452,3 +452,44 @@ class ProjectListLastReportColumnTests(TestCase):
         # N+1 добавил бы примерно по запросу на каждый новый проект (10 лишних);
         # нормальный рост от самих проектов гораздо меньше этого.
         self.assertLess(with_more_projects, baseline + 10)
+
+
+class StageReopenRollsBackCurrentStageTests(TestCase):
+    """Переоткрытие пройденного этапа откатывает project.current_stage.
+
+    Раньше update_stage() (форма «Изменить») никогда не трогал
+    current_stage: если уже пройденный этап вручную возвращали в
+    работу, бейдж «Этап» на карточке проекта продолжал показывать
+    более позднюю стадию, хотя по факту проект туда откатился.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.project = make_project(name="ОБА")
+        create_project(self.project)
+
+    def test_reopening_completed_stage_moves_project_back(self):
+        from apps.projects.services import complete_stage, update_stage
+
+        delivery = self.project.stages.get(key=ProjectStageKey.DELIVERY)
+
+        complete_stage(delivery, user=self.user)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.current_stage, ProjectStageKey.PRODUCTION)
+
+        delivery.refresh_from_db()
+        delivery.status = delivery.Status.IN_PROGRESS
+        update_stage(delivery, user=self.user)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.current_stage, ProjectStageKey.DELIVERY)
+
+    def test_editing_a_stage_ahead_of_current_does_not_move_project(self):
+        from apps.projects.services import update_stage
+
+        production = self.project.stages.get(key=ProjectStageKey.PRODUCTION)
+        production.status = production.Status.IN_PROGRESS
+        update_stage(production, user=self.user)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.current_stage, ProjectStageKey.NEW)

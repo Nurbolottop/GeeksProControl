@@ -177,7 +177,13 @@ def move_project_to_stage(project: Project, stage_key: str, user=None) -> Projec
 
 @transaction.atomic
 def update_stage(stage: ProjectStage, user=None) -> ProjectStage:
-    """Сохранение этапа с автоматикой дат начала и завершения."""
+    """Сохранение этапа с автоматикой дат начала и завершения.
+
+    Если раньше завершённый этап переоткрыли (статус стал не «Завершён»),
+    проект не может продолжать стоять на более позднем этапе — возвращаем
+    project.current_stage на переоткрытый этап, иначе бейдж «Этап» будет
+    показывать стадию впереди того, что реально происходит.
+    """
     if stage.status == ProjectStage.Status.IN_PROGRESS and not stage.start_date:
         stage.start_date = timezone.localdate()
     if stage.status == ProjectStage.Status.DONE and not stage.end_date:
@@ -187,6 +193,14 @@ def update_stage(stage: ProjectStage, user=None) -> ProjectStage:
         stage.end_date = None
     stage.save()
     _touch_project(stage.project)
+
+    if stage.status != ProjectStage.Status.DONE:
+        current = stage.project.stages.filter(
+            key=stage.project.current_stage,
+        ).first()
+        if current and stage.order < current.order:
+            move_project_to_stage(stage.project, stage.key, user=user)
+
     return stage
 
 
