@@ -29,6 +29,7 @@ class Intern(TimeStampedModel, ArchivableModel):
     full_name = models.CharField('ФИО', max_length=255)
     phone = models.CharField('Телефон', max_length=32, blank=True)
     email = models.EmailField('Email', blank=True)
+    telegram = models.CharField('Telegram', max_length=100, blank=True)
     city = models.CharField('Город', max_length=100, blank=True)
     branch = models.CharField('Филиал', max_length=100, blank=True)
     specialization = models.ForeignKey(

@@ -7,9 +7,9 @@ class InternForm(forms.ModelForm):
     class Meta:
         model = Intern
         fields = [
-            'full_name', 'phone', 'email', 'city', 'branch',
-            'specialization', 'training_group', 'education_end_date',
-            'internship_start_date', 'status', 'team_lead', 'comment',
+            'full_name', 'phone', 'email', 'telegram', 'city', 'branch',
+            'specialization', 'education_end_date',
+            'internship_start_date', 'status', 'comment',
         ]
         widgets = {
             'education_end_date': forms.DateInput(

@@ -31,7 +31,8 @@ def intern_list(request):
         qs = qs.filter(
             Q(full_name__icontains=search)
             | Q(phone__icontains=search)
-            | Q(email__icontains=search),
+            | Q(email__icontains=search)
+            | Q(telegram__icontains=search),
         )
     if params.get('specialization'):
         qs = qs.filter(specialization_id=params['specialization'])

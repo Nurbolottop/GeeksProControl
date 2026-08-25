@@ -29,7 +29,7 @@
 {% endif %}
 
 <form method="get" class="filters">
-    <input type="text" name="q" placeholder="Поиск: ФИО, телефон, email" value="{{ params.q|default:'' }}">
+    <input type="text" name="q" placeholder="Поиск: ФИО, телефон, email, telegram" value="{{ params.q|default:'' }}">
     <select name="specialization">
         <option value="">Направление: все</option>
         {% for spec in specializations %}
