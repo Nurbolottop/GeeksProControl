@@ -18,7 +18,7 @@ from apps.projects.services import (
 def projects_qs() -> QuerySet[Project]:
     return (
         Project.objects.active()
-        .select_related('client', 'project_type')
+        .select_related('client', 'project_type', 'flow')
         .prefetch_related('team_members__intern')
     )
 
