@@ -526,7 +526,9 @@ class StageProgressAutoCalcTests(TestCase):
         create_project(self.project)
 
     def test_new_project_starts_at_zero(self):
-        self.assertEqual(self.project.progress, 0)
+        project = make_project(name="Свежий", progress=0)
+        create_project(project)
+        self.assertEqual(project.progress, 0)
 
     def test_completing_stages_raises_progress(self):
         from apps.projects.services import update_stage
