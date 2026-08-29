@@ -67,7 +67,10 @@ class TeamMemberForm(forms.ModelForm):
             )
             field.help_text = f'Показаны только: {spec_name}'
         elif role == TeamRole.TEAM_LEAD:
-            field.help_text = 'Тимлид направления — выберите человека'
+            from apps.teams.selectors import lead_intern_ids
+
+            field.queryset = field.queryset.filter(pk__in=lead_intern_ids())
+            field.help_text = 'Показаны только те, кто уже тимлид — на другой проект'
 
         if role == TeamRole.TEAM_LEAD:
             self.fields['is_lead'].initial = True

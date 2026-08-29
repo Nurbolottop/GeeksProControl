@@ -148,7 +148,37 @@ class RoleSectionAddTests(TestCase):
         member = TeamMember.objects.get(project=self.project, intern=self.pm)
         self.assertEqual(member.role, TeamRole.PROJECT_MANAGER)
 
-    def test_team_lead_section_sets_lead_role(self):
+    def test_team_lead_section_lists_only_existing_leads(self):
+        """Тут добавляют существующего тимлида ещё на один проект — не
+        повышают случайного стажёра. Первого тимлида направления заводят
+        через страницу «Тимлиды» (там есть «+ новый человек»)."""
+        from apps.projects.services import create_project
+
+        other_project = create_project(Project(name="Учкун"))
+        TeamMember.objects.create(
+            project=other_project, intern=self.dev, role=TeamRole.TEAM_LEAD,
+        )
+        response = self.client.get(self._url("team_lead"))
+        people = [p["name"] for p in response.context["people"]]
+        self.assertIn("Капаров Улар", people)
+        self.assertNotIn("Айдана", people)
+
+    def test_team_lead_section_rejects_intern_who_is_not_a_lead(self):
+        response = self.client.post(
+            self._url("team_lead"),
+            {"intern": self.dev.pk, "role": "team_lead"},
+        )
+        self.assertFalse(
+            TeamMember.objects.filter(project=self.project, intern=self.dev).exists(),
+        )
+
+    def test_team_lead_section_accepts_existing_lead(self):
+        from apps.projects.services import create_project
+
+        other_project = create_project(Project(name="Учкун"))
+        TeamMember.objects.create(
+            project=other_project, intern=self.dev, role=TeamRole.TEAM_LEAD,
+        )
         self.client.post(
             self._url("team_lead"),
             {"intern": self.dev.pk, "role": "team_lead"},
