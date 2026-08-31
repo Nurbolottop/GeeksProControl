@@ -52,6 +52,25 @@ class WeeklyFormTests(TestCase):
         data = weekly_form.build(monday)
         self.assertEqual(data['projects']['signed_contracts'], 1)
 
+    def test_new_projects_counted_by_creation_date(self):
+        """«Новые проекты за неделю» — по дате создания записи в системе,
+        отдельно от «Подписано договоров» (та — по дате договора)."""
+        monday = datetime.date(2026, 8, 17)
+        created_this_week = Project.objects.create(name='Новый')
+        created_this_week.created_at = timezone.make_aware(
+            datetime.datetime(2026, 8, 18, 10, 0),
+        )
+        created_this_week.save(update_fields=['created_at'])
+
+        created_last_week = Project.objects.create(name='Старый')
+        created_last_week.created_at = timezone.make_aware(
+            datetime.datetime(2026, 8, 10, 10, 0),
+        )
+        created_last_week.save(update_fields=['created_at'])
+
+        data = weekly_form.build(monday)
+        self.assertEqual(data['projects']['new'], 1)
+
     def test_sections_cover_all_blocks(self):
         data = weekly_form.build(datetime.date(2026, 8, 17))
         sections = weekly_form.as_sections(data)

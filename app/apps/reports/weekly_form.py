@@ -47,6 +47,9 @@ def build(week_start: datetime.date) -> dict:
     signed_contracts = projects.filter(
         contract_date__gte=first, contract_date__lte=last,
     ).count()
+    new_projects = projects.filter(
+        created_at__date__gte=first, created_at__date__lte=last,
+    ).count()
 
     # --- Принятые заказчиком за неделю ---
     completed = list(
@@ -110,6 +113,7 @@ def build(week_start: datetime.date) -> dict:
         'projects': {
             'active': active_projects,
             'signed_contracts': signed_contracts,
+            'new': new_projects,
         },
         'accepted': {
             'in_time': accepted_in_time,
@@ -170,6 +174,7 @@ def gaps() -> dict:
 SECTIONS = [
     ('Проекты в разработке', 'projects', [
         ('Активных проектов — на конец недели', 'active', '', None),
+        ('Новые проекты за неделю', 'new', '', None),
         ('Подписано договоров за неделю', 'signed_contracts', '', 'contract_date'),
     ]),
     ('Принято заказчиком за неделю', 'accepted', [
