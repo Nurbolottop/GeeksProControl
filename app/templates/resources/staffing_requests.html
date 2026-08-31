@@ -36,7 +36,10 @@
                     <td>
                         {% if req.needed_by %}{{ req.needed_by|date:'d.m.Y' }}{% else %}—{% endif %}
                     </td>
-                    <td>{{ req.created_by.display_name|default:req.created_by.username|default:'—' }}</td>
+                    <td>
+                        {% if req.created_by %}{{ req.created_by.display_name|default:req.created_by.username }}
+                        {% else %}—{% endif %}
+                    </td>
                     <td style="color: var(--text-muted); font-size: 13px">{{ req.comment|default:'—' }}</td>
                     <td style="white-space: nowrap">
                         <form method="post" action="{% url 'resources:staffing_request_toggle' req.pk %}" style="display:inline; margin:0">
