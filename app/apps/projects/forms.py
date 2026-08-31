@@ -170,6 +170,7 @@ class ProjectDetailsForm(forms.ModelForm):
         model = Project
         fields = [
             'status', 'current_stage', 'flow', 'priority', 'project_type',
+            'is_problematic',
         ]
 
 

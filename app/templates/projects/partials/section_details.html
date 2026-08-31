@@ -17,6 +17,10 @@
         </div></div>
         <div class="meta-row"><span>Этап</span><div>{% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}</div></div>
         <div class="meta-row"><span>Срок</span><div>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</div></div>
+        <div class="meta-row"><span>Проблемный</span><div>
+            {% if project.is_problematic %}<span class="badge badge--red">⚠ Проблемный</span>
+            {% else %}<span class="badge badge--gray">Нет</span>{% endif %}
+        </div></div>
         <div class="meta-row"><span>Поток</span><div>{% if project.flow %}<a href="{{ project.flow.get_absolute_url }}">{{ project.flow }}</a>{% else %}—{% endif %}</div></div>
         <div class="meta-row"><span>Номер в потоке</span><div>{{ project.display_code }}</div></div>
         <div class="meta-row"><span>Приоритет</span><div>{{ project.get_priority_display }}</div></div>

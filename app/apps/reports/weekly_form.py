@@ -72,6 +72,7 @@ def build(week_start: datetime.date) -> dict:
     # --- Незавершённые: по факту смены статуса на этой неделе ---
     stopped_by_us = _status_changes(first, last, CANCELLED_LABEL)
     stopped_by_client = _status_changes(first, last, REFUSED_LABEL)
+    problematic_projects = projects.filter(is_problematic=True).count()
 
     # --- Стажёры (тимлиды — сотрудники, в счёт не идут) ---
     from apps.teams.selectors import lead_intern_ids
@@ -122,6 +123,7 @@ def build(week_start: datetime.date) -> dict:
         'stopped': {
             'by_us': stopped_by_us,
             'by_client': stopped_by_client,
+            'problematic': problematic_projects,
         },
         'interns': {
             'active': active_interns,
@@ -185,6 +187,7 @@ SECTIONS = [
     ('Незавершённые проекты за неделю', 'stopped', [
         ('Прекращены по инициативе исполнителя', 'by_us', '', None),
         ('Прекращены по инициативе заказчика', 'by_client', '', None),
+        ('Проблемные проекты', 'problematic', '', None),
     ]),
     ('Стажёры', 'interns', [
         ('Активных стажёров — на конец недели', 'active', '', None),

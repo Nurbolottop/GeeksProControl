@@ -71,6 +71,14 @@ class WeeklyFormTests(TestCase):
         data = weekly_form.build(monday)
         self.assertEqual(data['projects']['new'], 1)
 
+    def test_problematic_projects_counted(self):
+        """Проблемный проект отмечается вручную (галочка в «Деталях»),
+        отчёт просто считает текущее количество отмеченных."""
+        Project.objects.create(name='Горит', is_problematic=True)
+        Project.objects.create(name='Норм', is_problematic=False)
+        data = weekly_form.build(datetime.date(2026, 8, 17))
+        self.assertEqual(data['stopped']['problematic'], 1)
+
     def test_sections_cover_all_blocks(self):
         data = weekly_form.build(datetime.date(2026, 8, 17))
         sections = weekly_form.as_sections(data)

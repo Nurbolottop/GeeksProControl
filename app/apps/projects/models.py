@@ -160,6 +160,7 @@ class Project(TimeStampedModel, ArchivableModel):
     domain = models.CharField('Домен', max_length=255, blank=True)
 
     is_favorite = models.BooleanField('Избранный', default=False)
+    is_problematic = models.BooleanField('Проблемный', default=False)
     last_activity_at = models.DateTimeField('Последняя активность', null=True, blank=True)
 
     class Meta:

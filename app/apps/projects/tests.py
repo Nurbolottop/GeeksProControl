@@ -840,3 +840,30 @@ class TeamReleasedOnTerminalStatusTests(TestCase):
 
         member.refresh_from_db()
         self.assertEqual(member.status, TeamMember.Status.LEFT)
+
+
+class ProblematicProjectTests(TestCase):
+    """Отметка «Проблемный» — вручную, в панели «Детали» на «Обзоре»."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.project = make_project(name="Учкун")
+        create_project(self.project)
+
+    def test_marking_as_problematic_via_details_panel(self):
+        response = self.client.post(
+            reverse("projects:section", args=[self.project.pk, "details"]),
+            {
+                "status": "active", "current_stage": "new", "priority": "medium",
+                "is_problematic": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.project.refresh_from_db()
+        self.assertTrue(self.project.is_problematic)
+        self.assertContains(response, "⚠ Проблемный")
+
+    def test_not_problematic_by_default(self):
+        response = self.client.get(self.project.get_absolute_url())
+        self.assertContains(response, '<span class="badge badge--gray">Нет</span>')
