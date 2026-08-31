@@ -97,6 +97,8 @@
                        class="{% if request.resolver_match.url_name == 'pm_list' %}is-active{% endif %}">ПМ</a>
                     <a href="{% url 'teams:lead_list' %}"
                        class="{% if request.resolver_match.url_name == 'lead_list' %}is-active{% endif %}">Тимлиды</a>
+                    <a href="{% url 'resources:staffing_requests' %}"
+                       class="{% if request.resolver_match.url_name == 'staffing_requests' %}is-active{% endif %}">Запрос</a>
                     <a href="{% url 'resources:graduations' %}"
                        class="{% if request.resolver_match.url_name == 'graduations' %}is-active{% endif %}">Выпуски</a>
                 </div>

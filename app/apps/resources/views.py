@@ -4,8 +4,9 @@ from django.contrib.auth.decorators import login_required
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 
+from apps.projects.models import Project
 from apps.resources import services
-from apps.resources.models import PlannedProject, PlannedProjectNeed
+from apps.resources.models import PlannedProject, PlannedProjectNeed, StaffingRequest
 
 
 class PlannedProjectForm(forms.ModelForm):
@@ -83,3 +84,58 @@ def planned_update(request, pk):
         request, 'resources/planned_form.html',
         {'form': form, 'formset': formset, 'title': f'Редактирование: {planned.name}'},
     )
+
+
+class StaffingRequestForm(forms.ModelForm):
+    class Meta:
+        model = StaffingRequest
+        fields = ['project', 'specialization', 'count', 'needed_by', 'comment']
+        widgets = {
+            'needed_by': forms.DateInput(
+                attrs={'type': 'date'}, format='%Y-%m-%d',
+            ),
+            'comment': forms.Textarea(attrs={'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['project'].queryset = Project.objects.active().order_by('name')
+
+
+@login_required
+def staffing_requests(request):
+    """Запросы на стажёров: сколько нужно, на какой проект, к какой дате."""
+    form = StaffingRequestForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        req = form.save(commit=False)
+        req.created_by = request.user
+        req.save()
+        messages.success(request, 'Запрос добавлен.')
+        return redirect('resources:staffing_requests')
+    qs = StaffingRequest.objects.select_related(
+        'project', 'specialization', 'created_by',
+    )
+    return render(request, 'resources/staffing_requests.html', {
+        'form': form,
+        'open_requests': qs.filter(is_closed=False),
+        'closed_requests': qs.filter(is_closed=True)[:20],
+    })
+
+
+@login_required
+def staffing_request_toggle(request, pk):
+    """Закрыть запрос (человек нашёлся) или вернуть его в открытые."""
+    req = get_object_or_404(StaffingRequest, pk=pk)
+    if request.method == 'POST':
+        req.is_closed = not req.is_closed
+        req.save(update_fields=['is_closed', 'updated_at'])
+    return redirect('resources:staffing_requests')
+
+
+@login_required
+def staffing_request_delete(request, pk):
+    req = get_object_or_404(StaffingRequest, pk=pk)
+    if request.method == 'POST':
+        req.delete()
+        messages.success(request, 'Запрос удалён.')
+    return redirect('resources:staffing_requests')

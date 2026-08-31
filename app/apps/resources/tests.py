@@ -147,3 +147,79 @@ class LeadsNotCountedAsInternsTests(TestCase):
 
         data = weekly_form.build(datetime.date(2026, 8, 17))
         self.assertEqual(data["interns"]["active"], 1)
+
+
+class StaffingRequestTests(TestCase):
+    """Запрос на стажёров: сколько нужно, на какой проект, к какой дате."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+
+        self.spec = Specialization.objects.create(name="Backend")
+        self.project = Project.objects.create(name="Балажан")
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+
+    def test_create_request(self):
+        from django.urls import reverse
+
+        response = self.client.post(reverse("resources:staffing_requests"), {
+            "project": self.project.pk, "specialization": self.spec.pk,
+            "count": 2, "needed_by": "2026-09-15", "comment": "Срочно",
+        })
+        self.assertEqual(response.status_code, 302)
+        from apps.resources.models import StaffingRequest
+
+        req = StaffingRequest.objects.get()
+        self.assertEqual(req.project, self.project)
+        self.assertEqual(req.count, 2)
+        self.assertEqual(req.created_by, self.user)
+        self.assertFalse(req.is_closed)
+
+    def test_open_requests_shown_on_page(self):
+        from django.urls import reverse
+        from apps.resources.models import StaffingRequest
+
+        StaffingRequest.objects.create(
+            project=self.project, specialization=self.spec, count=3,
+        )
+        response = self.client.get(reverse("resources:staffing_requests"))
+        self.assertContains(response, "Балажан")
+        self.assertEqual(len(response.context["open_requests"]), 1)
+
+    def test_toggle_closes_and_reopens(self):
+        from django.urls import reverse
+        from apps.resources.models import StaffingRequest
+
+        req = StaffingRequest.objects.create(
+            project=self.project, specialization=self.spec, count=1,
+        )
+        self.client.post(reverse("resources:staffing_request_toggle", args=[req.pk]))
+        req.refresh_from_db()
+        self.assertTrue(req.is_closed)
+
+        self.client.post(reverse("resources:staffing_request_toggle", args=[req.pk]))
+        req.refresh_from_db()
+        self.assertFalse(req.is_closed)
+
+    def test_delete_removes_request(self):
+        from django.urls import reverse
+        from apps.resources.models import StaffingRequest
+
+        req = StaffingRequest.objects.create(
+            project=self.project, specialization=self.spec, count=1,
+        )
+        self.client.post(reverse("resources:staffing_request_delete", args=[req.pk]))
+        self.assertFalse(StaffingRequest.objects.filter(pk=req.pk).exists())
+
+    def test_archived_project_not_selectable(self):
+        from apps.projects.models import Project
+
+        archived = Project.objects.create(name="Старый", is_archived=True)
+        from apps.resources.views import StaffingRequestForm
+
+        form = StaffingRequestForm()
+        self.assertNotIn(archived, form.fields["project"].queryset)

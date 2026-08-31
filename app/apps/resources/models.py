@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.db import models
 from django.urls import reverse
 
 from apps.common.models import TimeStampedModel
-from apps.projects.models import ProjectType
+from apps.projects.models import Project, ProjectType
 from apps.training.models import Specialization
 
 
@@ -80,3 +81,36 @@ class PlannedProjectNeed(models.Model):
 
     def __str__(self) -> str:
         return f'{self.planned_project}: {self.specialization} × {self.count}'
+
+
+class StaffingRequest(TimeStampedModel):
+    """Запрос на стажёров под конкретный (уже существующий) проект.
+
+    В отличие от PlannedProjectNeed — не про гипотетический будущий
+    проект, а про нехватку людей на реальном текущем.
+    """
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name='staffing_requests',
+        verbose_name='Проект',
+    )
+    specialization = models.ForeignKey(
+        Specialization, on_delete=models.PROTECT, related_name='+',
+        verbose_name='Направление',
+    )
+    count = models.PositiveSmallIntegerField('Сколько человек', default=1)
+    needed_by = models.DateField('Нужны к дате', null=True, blank=True)
+    comment = models.TextField('Комментарий', blank=True)
+    is_closed = models.BooleanField('Закрыт', default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+', verbose_name='Кто запросил',
+    )
+
+    class Meta:
+        verbose_name = 'Запрос на стажёров'
+        verbose_name_plural = 'Запросы на стажёров'
+        ordering = ['is_closed', 'needed_by']
+
+    def __str__(self) -> str:
+        return f'{self.project}: {self.specialization} × {self.count}'
