@@ -13,6 +13,21 @@
     </div>
 </div>
 
+{% if open_requests %}
+    <div class="lead-summary">
+        <div class="lead-summary__item lead-summary__item--total">
+            <span class="lead-summary__value">{{ total_needed }}</span>
+            <span class="lead-summary__label">всего нужно</span>
+        </div>
+        {% for row in by_spec %}
+            <div class="lead-summary__item">
+                <span class="lead-summary__value">{{ row.total }}</span>
+                <span class="lead-summary__label">{{ row.specialization__name }}</span>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
 <div class="panel" style="padding: 0;">
     <div class="table-wrap">
         <table class="data">

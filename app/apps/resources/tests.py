@@ -223,3 +223,34 @@ class StaffingRequestTests(TestCase):
 
         form = StaffingRequestForm()
         self.assertNotIn(archived, form.fields["project"].queryset)
+
+    def test_summary_totals_by_specialization(self):
+        from django.urls import reverse
+        from apps.projects.models import Project
+        from apps.resources.models import StaffingRequest
+
+        frontend = Specialization.objects.create(name="Frontend")
+        other_project = Project.objects.create(name="Умай")
+        StaffingRequest.objects.create(
+            project=self.project, specialization=self.spec, count=2,
+        )
+        StaffingRequest.objects.create(
+            project=other_project, specialization=self.spec, count=1,
+        )
+        StaffingRequest.objects.create(
+            project=other_project, specialization=frontend, count=4,
+        )
+        # закрытый запрос не должен попадать в сумму
+        StaffingRequest.objects.create(
+            project=self.project, specialization=frontend, count=99, is_closed=True,
+        )
+
+        response = self.client.get(reverse("resources:staffing_requests"))
+        self.assertEqual(response.context["total_needed"], 7)
+        by_spec = {
+            row["specialization__name"]: row["total"]
+            for row in response.context["by_spec"]
+        }
+        self.assertEqual(by_spec["Backend"], 3)
+        self.assertEqual(by_spec["Frontend"], 4)
+        self.assertContains(response, "всего нужно")

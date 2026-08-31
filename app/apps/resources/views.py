@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
 from django.forms import inlineformset_factory
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -115,10 +116,18 @@ def staffing_requests(request):
     qs = StaffingRequest.objects.select_related(
         'project', 'specialization', 'created_by',
     )
+    open_requests = qs.filter(is_closed=False)
+    by_spec = (
+        open_requests.values('specialization__name')
+        .annotate(total=Sum('count'))
+        .order_by('-total', 'specialization__name')
+    )
     return render(request, 'resources/staffing_requests.html', {
         'form': form,
-        'open_requests': qs.filter(is_closed=False),
+        'open_requests': open_requests,
         'closed_requests': qs.filter(is_closed=True)[:20],
+        'by_spec': by_spec,
+        'total_needed': sum(row['total'] for row in by_spec),
     })
 
 
