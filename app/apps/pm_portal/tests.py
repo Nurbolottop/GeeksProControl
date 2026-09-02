@@ -298,3 +298,59 @@ class PmEvaluationTests(PmProjectOwnershipTests):
         )
         evaluation = InternEvaluation.objects.get(intern=member_intern)
         self.assertEqual(evaluation.project, self.project_a)
+
+
+class PmDocumentTests(PmProjectOwnershipTests):
+    """Документы — загрузка и просмотр только по своему проекту."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.documents.models import DocumentType
+
+        self.doc_type = DocumentType.objects.create(code="contract", name="Договор")
+
+    def test_can_upload_document_to_own_project(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.documents.models import Document
+
+        upload = SimpleUploadedFile("contract.txt", b"text", content_type="text/plain")
+        self.client.post(
+            reverse("pm_portal:document_upload", args=[self.project_a.pk]),
+            {"doc_type": self.doc_type.pk, "number": "1", "file": upload},
+        )
+        self.assertTrue(Document.objects.filter(project=self.project_a).exists())
+
+    def test_cannot_upload_document_to_foreign_project(self):
+        from apps.documents.models import Document
+
+        response = self.client.post(
+            reverse("pm_portal:document_upload", args=[self.project_b.pk]),
+            {"doc_type": self.doc_type.pk, "number": "1"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Document.objects.filter(project=self.project_b).exists())
+
+    def test_document_locked_to_own_project_even_if_posted(self):
+        from apps.documents.models import Document
+
+        self.client.post(
+            reverse("pm_portal:document_upload", args=[self.project_a.pk]),
+            {"project": self.project_b.pk, "doc_type": self.doc_type.pk, "number": "2"},
+        )
+        document = Document.objects.get(number="2")
+        self.assertEqual(document.project, self.project_a)
+
+    def test_documents_tab_shows_only_own_project_documents(self):
+        from apps.documents.models import Document
+
+        Document.objects.create(
+            project=self.project_a, doc_type=self.doc_type, number="OWN-1",
+        )
+        Document.objects.create(
+            project=self.project_b, doc_type=self.doc_type, number="FOREIGN-1",
+        )
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=documents",
+        )
+        self.assertContains(response, "OWN-1")
+        self.assertNotContains(response, "FOREIGN-1")

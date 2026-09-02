@@ -8,10 +8,11 @@ from django.urls import reverse
 
 from apps.attendance import services as attendance_services
 from apps.attendance.models import GroupMeeting, MeetingKind
+from apps.documents import services as document_services
 from apps.interns.models import Intern, InternEvaluation
 from apps.interns.services import add_evaluation
 from apps.pm_portal import services
-from apps.pm_portal.forms import PMInternEvaluationForm
+from apps.pm_portal.forms import PMDocumentForm, PMInternEvaluationForm
 from apps.projects.models import ProjectReport
 from apps.projects.services import calculate_deadline_status
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
@@ -57,6 +58,9 @@ def project_detail(request, pk):
             InternEvaluation.objects.filter(project=project, intern__in=interns)
             .select_related('intern').order_by('-created_at')[:20]
         )
+    elif tab == 'documents':
+        document_services.ensure_default_types()
+        context['documents'] = project.documents.active().select_related('doc_type')
     return render(request, 'pm_portal/project_detail.html', context)
 
 
@@ -265,4 +269,20 @@ def evaluation_add(request, pk, intern_pk):
         return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=evaluations")
     return render(request, 'pm_portal/evaluation_form.html', {
         'form': form, 'project': project, 'intern': intern,
+    })
+
+
+@login_required
+def document_upload(request, pk):
+    project = services.pm_project_or_404(request.user, pk)
+    document_services.ensure_default_types()
+    form = PMDocumentForm(
+        request.POST or None, request.FILES or None, project=project,
+    )
+    if request.method == 'POST' and form.is_valid():
+        document = form.save()
+        messages.success(request, f'Документ «{document.doc_type}» добавлен.')
+        return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=documents")
+    return render(request, 'pm_portal/document_form.html', {
+        'form': form, 'project': project,
     })

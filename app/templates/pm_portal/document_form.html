@@ -1,0 +1,24 @@
+{% extends 'pm_portal/base.html' %}
+
+{% block title %}Новый документ — Портал ПМ{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'pm_portal:project_detail' project.pk %}?tab=documents">← Документы</a></p>
+<div class="page-head">
+    <div><h1>Новый документ</h1></div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="panel">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="message message--error">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="form-grid">
+        {% include 'partials/form_fields.html' %}
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn">Сохранить</button>
+        <a href="{% url 'pm_portal:project_detail' project.pk %}?tab=documents" class="btn btn--secondary">Отмена</a>
+    </div>
+</form>
+{% endblock %}

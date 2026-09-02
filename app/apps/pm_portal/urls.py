@@ -42,4 +42,5 @@ urlpatterns = [
         '<int:pk>/interns/<int:intern_pk>/evaluate/', views.evaluation_add,
         name='evaluation_add',
     ),
+    path('<int:pk>/documents/upload/', views.document_upload, name='document_upload'),
 ]
