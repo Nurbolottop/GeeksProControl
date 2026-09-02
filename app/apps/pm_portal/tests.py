@@ -66,3 +66,44 @@ class PmProjectOwnershipTests(TestCase):
             reverse("pm_portal:project_detail", args=[self.project_b.pk]),
         )
         self.assertEqual(response.status_code, 404)
+
+
+class PmReportTests(PmProjectOwnershipTests):
+    """Отчёты — доступны только на своём проекте."""
+
+    def test_can_create_report_on_own_project(self):
+        from apps.projects.models import ProjectReport
+
+        self.client.post(
+            reverse("pm_portal:report_create", args=[self.project_a.pk]),
+            {"text": "Сделали бэкенд, начали фронт."},
+        )
+        report = ProjectReport.objects.get(project=self.project_a)
+        self.assertEqual(report.author, self.pm_user)
+
+    def test_cannot_create_report_on_foreign_project(self):
+        from apps.projects.models import ProjectReport
+
+        response = self.client.post(
+            reverse("pm_portal:report_create", args=[self.project_b.pk]),
+            {"text": "Не мой проект."},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(ProjectReport.objects.filter(project=self.project_b).exists())
+
+    def test_cannot_edit_report_by_guessing_id_from_other_project(self):
+        from apps.projects.models import ProjectReport
+
+        foreign_report = ProjectReport.objects.create(
+            project=self.project_b, text="Чужой отчёт",
+        )
+        response = self.client.post(
+            reverse(
+                "pm_portal:report_update",
+                args=[self.project_a.pk, foreign_report.pk],
+            ),
+            {"text": "Подмена"},
+        )
+        self.assertEqual(response.status_code, 404)
+        foreign_report.refresh_from_db()
+        self.assertEqual(foreign_report.text, "Чужой отчёт")
