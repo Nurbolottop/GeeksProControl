@@ -34,11 +34,11 @@ class PMScopeMiddlewareTests(TestCase):
             response = self.client.get(reverse(name))
             self.assertEqual(response.status_code, 200)
 
-    def test_head_can_also_open_pm_portal(self):
-        """Не заблокирован — просто middleware для head ничего не делает."""
+    def test_head_redirected_away_from_pm_portal(self):
+        """Портал ПМ — только для роли pm, остальных уводит на обычный сайт."""
         self.client.force_login(self.head)
         response = self.client.get(reverse("pm_portal:dashboard"))
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, "/")
 
     def test_anonymous_still_redirected_to_login(self):
         response = self.client.get(reverse("projects:list"))
