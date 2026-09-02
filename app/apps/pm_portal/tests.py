@@ -189,8 +189,8 @@ class PmAttendanceTests(TestCase):
         flow = Flow.objects.create(number=1, status=Flow.Status.ACTIVE)
         self.group = Group.objects.create(flow=flow, number=1, project=self.project_a)
         TeamMember.objects.create(
-            project=self.project_a, intern=self.pm_intern, role=TeamRole.PROJECT_MANAGER,
-            status=TeamMember.Status.ACTIVE,
+            project=self.project_a, group=self.group, intern=self.pm_intern,
+            role=TeamRole.PROJECT_MANAGER, status=TeamMember.Status.ACTIVE,
         )
         self.client.force_login(self.pm_user)
 
