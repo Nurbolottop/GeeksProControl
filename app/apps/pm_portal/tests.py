@@ -354,3 +354,18 @@ class PmDocumentTests(PmProjectOwnershipTests):
         )
         self.assertContains(response, "OWN-1")
         self.assertNotContains(response, "FOREIGN-1")
+
+
+class PmPortalExcludedActionsTests(TestCase):
+    """Статус/этап/завершение/«Проблемный» — этих действий в портале ПМ
+    просто нет: не спрятаны, а физически отсутствуют в urls.py."""
+
+    def test_no_status_stage_or_completion_routes_exist(self):
+        from django.urls import NoReverseMatch
+
+        for name in (
+            "pm_portal:stage_update", "pm_portal:project_complete",
+            "pm_portal:project_update", "pm_portal:mark_problematic",
+        ):
+            with self.assertRaises(NoReverseMatch):
+                reverse(name, args=[1])
