@@ -6,6 +6,11 @@ from django.urls import reverse
 from apps.pm_portal import services
 from apps.projects.models import ProjectReport
 from apps.projects.services import calculate_deadline_status
+from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
+from apps.teams.models import TeamMember
+from apps.teams.selectors import group_by_role
+from apps.teams.views import _role_from, _title_for, _with_new_person, people_options
+from apps.training.models import Specialization
 
 
 @login_required
@@ -25,6 +30,10 @@ def project_detail(request, pk):
     context = {'project': project, 'tab': tab}
     if tab == 'report':
         context['reports'] = project.reports.select_related('author')
+    elif tab == 'team':
+        members = project.team_members.select_related('intern__specialization', 'user')
+        context['team_sections'] = group_by_role(members)
+        context['team_members'] = list(members)
     return render(request, 'pm_portal/project_detail.html', context)
 
 
@@ -67,3 +76,74 @@ def report_delete(request, pk, report_pk):
         report.delete()
         messages.success(request, f'Отчёт от {date:%d.%m.%Y} удалён.')
     return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=report")
+
+
+def _team_url(project):
+    return f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=team"
+
+
+@login_required
+def member_add(request, pk):
+    project = services.pm_project_or_404(request.user, pk)
+    role = _role_from(request)
+    form = TeamMemberForm(request.POST or None, role=role)
+    created_person = None
+    if request.method == 'POST':
+        data, created_person = _with_new_person(request, role=role)
+        form = TeamMemberForm(data, role=role)
+    if request.method == 'POST' and form.is_valid():
+        member = form.save(commit=False)
+        member.project = project
+        member.group = getattr(project, 'group', None)
+        member.save()
+        warning = form.overload_warning()
+        if warning:
+            messages.warning(request, warning)
+        if created_person:
+            messages.success(request, f'{created_person} заведён(а) в базе.')
+        messages.success(request, f'{member.person_name} добавлен(а) в команду.')
+        return redirect(_team_url(project))
+    return render(
+        request, 'pm_portal/member_form.html',
+        {'form': form, 'project': project,
+         'people': people_options(form),
+         'specializations': Specialization.objects.order_by('name'),
+         'role': role,
+         'title': _title_for(role)},
+    )
+
+
+@login_required
+def member_edit(request, pk, member_pk):
+    project = services.pm_project_or_404(request.user, pk)
+    member = get_object_or_404(TeamMember, pk=member_pk, project=project)
+    form = TeamMemberEditForm(request.POST or None, instance=member)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        warning = form.overload_warning()
+        if warning:
+            messages.warning(request, warning)
+        messages.success(request, 'Участник обновлён.')
+        return redirect(_team_url(project))
+    return render(
+        request, 'pm_portal/member_form.html',
+        {
+            'form': form, 'project': project,
+            'people': people_options(form),
+            'specializations': Specialization.objects.order_by('name'),
+            'selected_id': member.intern_id,
+            'selected_name': member.person_name,
+            'title': f'Редактирование: {member.person_name}',
+        },
+    )
+
+
+@login_required
+def member_delete(request, pk, member_pk):
+    project = services.pm_project_or_404(request.user, pk)
+    member = get_object_or_404(TeamMember, pk=member_pk, project=project)
+    if request.method == 'POST':
+        name = member.person_name
+        member.delete()
+        messages.success(request, f'{name} убран(а) из команды.')
+    return redirect(_team_url(project))

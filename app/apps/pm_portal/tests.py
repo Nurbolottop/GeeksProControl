@@ -107,3 +107,64 @@ class PmReportTests(PmProjectOwnershipTests):
         self.assertEqual(response.status_code, 404)
         foreign_report.refresh_from_db()
         self.assertEqual(foreign_report.text, "Чужой отчёт")
+
+
+class PmTeamManagementTests(PmProjectOwnershipTests):
+    """Команда: полное управление своим проектом, ничего на чужом."""
+
+    def test_can_add_member_to_own_project(self):
+        other = Intern.objects.create(full_name="Новый Бэкендер")
+        self.client.post(
+            reverse("pm_portal:member_add", args=[self.project_a.pk]),
+            {"intern": other.pk},
+        )
+        self.assertTrue(
+            TeamMember.objects.filter(project=self.project_a, intern=other).exists(),
+        )
+
+    def test_cannot_add_member_to_foreign_project(self):
+        other = Intern.objects.create(full_name="Чужой Бэкендер")
+        response = self.client.post(
+            reverse("pm_portal:member_add", args=[self.project_b.pk]),
+            {"intern": other.pk},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(
+            TeamMember.objects.filter(project=self.project_b, intern=other).exists(),
+        )
+
+    def test_cannot_edit_member_from_other_project_via_own_project_url(self):
+        foreign_intern = Intern.objects.create(full_name="Чужой Участник")
+        foreign_member = TeamMember.objects.create(
+            project=self.project_b, intern=foreign_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse(
+                "pm_portal:member_edit",
+                args=[self.project_a.pk, foreign_member.pk],
+            ),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_can_remove_member_from_own_project(self):
+        intern = Intern.objects.create(full_name="Снимаемый")
+        member = TeamMember.objects.create(
+            project=self.project_a, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.client.post(
+            reverse("pm_portal:member_delete", args=[self.project_a.pk, member.pk]),
+        )
+        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+
+    def test_team_tab_shows_only_own_project_members(self):
+        intern = Intern.objects.create(full_name="Участник А")
+        TeamMember.objects.create(
+            project=self.project_a, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
+        )
+        self.assertContains(response, "Участник А")

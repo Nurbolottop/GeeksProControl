@@ -9,10 +9,13 @@
 <div class="tabs" style="margin-top: 16px">
     <a href="?tab=overview" class="{% if tab == 'overview' %}is-active{% endif %}">Обзор</a>
     <a href="?tab=report" class="{% if tab == 'report' %}is-active{% endif %}">Отчёт</a>
+    <a href="?tab=team" class="{% if tab == 'team' %}is-active{% endif %}">Команда</a>
 </div>
 
 {% if tab == 'report' %}
     {% include 'pm_portal/partials/tab_report.html' %}
+{% elif tab == 'team' %}
+    {% include 'pm_portal/partials/tab_team.html' %}
 {% else %}
     <div class="panel">
         <dl class="def-grid">

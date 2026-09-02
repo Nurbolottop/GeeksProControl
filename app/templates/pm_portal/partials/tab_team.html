@@ -1,0 +1,42 @@
+<div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 14px;">
+    <h2 style="margin:0">Команда ({{ team_members|length }})</h2>
+    <a href="{% url 'pm_portal:member_add' project.pk %}" class="btn btn--sm">+ Участник</a>
+</div>
+{% for section in team_sections %}
+    <div class="panel team-section">
+        <div class="team-section__head">
+            <h2><span class="badge badge--{{ section.tone }}">{{ section.label }}</span></h2>
+            <div style="display:flex; gap:10px; align-items:center">
+                <span class="team-section__count">{{ section.count }} чел.</span>
+                <a href="{% url 'pm_portal:member_add' project.pk %}?role={{ section.role }}"
+                   class="btn btn--secondary btn--sm">+ Добавить</a>
+            </div>
+        </div>
+        <div class="member-list">
+            {% for member in section.members %}
+                <div class="member {% if member.status != 'active' %}member--left{% endif %}">
+                    <div class="member__avatar">{{ member.person_name|first|upper }}</div>
+                    <div class="member__body">
+                        <span class="member__name">{{ member.person_name }}</span>
+                        <div class="member__meta">
+                            {{ member.intern.specialization|default:'—' }}
+                            {% if member.status != 'active' %} · вышел{% endif %}
+                        </div>
+                    </div>
+                    <div class="member__actions">
+                        <a href="{% url 'pm_portal:member_edit' project.pk member.pk %}" class="btn-edit" title="Изменить">✎</a>
+                        <form method="post" action="{% url 'pm_portal:member_delete' project.pk member.pk %}" style="margin:0"
+                              data-confirm="Убрать {{ member.person_name|escapejs }} из команды?">
+                            {% csrf_token %}
+                            <button type="submit" class="btn-edit btn-edit--danger" title="Убрать из команды">✕</button>
+                        </form>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="empty" style="padding: 6px 2px; font-size: 13px">
+                    Пока никого — нажмите «+ Добавить».
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endfor %}
