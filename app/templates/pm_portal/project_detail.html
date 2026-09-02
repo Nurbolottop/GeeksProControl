@@ -1,0 +1,19 @@
+{% extends 'pm_portal/base.html' %}
+
+{% block title %}{{ project.name }} — Портал ПМ{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'pm_portal:dashboard' %}">← Мои проекты</a></p>
+<h1>{{ project.name }}</h1>
+
+<div class="panel" style="margin-top: 16px">
+    <dl class="def-grid">
+        <div class="def"><dt>Статус</dt><dd>{{ project.get_status_display }}</dd></div>
+        <div class="def"><dt>Этап</dt><dd>{% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}</dd></div>
+        <div class="def"><dt>Срок</dt><dd>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</dd></div>
+        <div class="def"><dt>Прогресс</dt><dd>{{ project.progress }}%</dd></div>
+        <div class="def"><dt>Клиент</dt><dd>{{ project.client|default:'—' }}</dd></div>
+        <div class="def"><dt>Плановая дата завершения</dt><dd>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
+    </dl>
+</div>
+{% endblock %}

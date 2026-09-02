@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'apps.flows',
     'apps.attendance',
     'apps.dailycheck',
+    'apps.pm_portal',
 ]
 
 # =============================================================================
@@ -78,6 +79,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.accounts.middleware.PMScopeMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',

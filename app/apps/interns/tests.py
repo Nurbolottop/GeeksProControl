@@ -179,3 +179,60 @@ class InternListProjectColumnTests(TestCase):
             with_more_interns = len(connection.queries)
 
         self.assertLess(with_more_interns, baseline + 10)
+
+
+class GrantPMAccessTests(TestCase):
+    """Выдача логина ПМу со страницы стажёра."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+        self.project = Project.objects.create(name="Балажан")
+        self.pm = Intern.objects.create(full_name="Тестов ПМ")
+        self.dev = Intern.objects.create(full_name="Тестов Бэкендер")
+        TeamMember.objects.create(
+            project=self.project, intern=self.pm, role=TeamRole.PROJECT_MANAGER,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.dev, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+    def test_button_shown_only_for_pm(self):
+        pm_page = self.client.get(self.pm.get_absolute_url())
+        self.assertContains(pm_page, "Выдать доступ")
+        dev_page = self.client.get(self.dev.get_absolute_url())
+        self.assertNotContains(dev_page, "Выдать доступ")
+
+    def test_granting_access_creates_linked_user(self):
+        from apps.accounts.models import User
+
+        self.client.post(reverse("interns:grant_access", args=[self.pm.pk]), {
+            "username": "+996700000099", "password": "somepass123",
+        })
+        self.pm.refresh_from_db()
+        self.assertIsNotNone(self.pm.user)
+        self.assertEqual(self.pm.user.username, "+996700000099")
+        self.assertEqual(self.pm.user.role, User.Role.PROJECT_MANAGER)
+        self.assertTrue(self.pm.user.check_password("somepass123"))
+
+    def test_resetting_password_keeps_same_user(self):
+        self.client.post(reverse("interns:grant_access", args=[self.pm.pk]), {
+            "username": "+996700000099", "password": "firstpass123",
+        })
+        self.pm.refresh_from_db()
+        first_user_id = self.pm.user_id
+
+        self.client.post(reverse("interns:grant_access", args=[self.pm.pk]), {
+            "username": "+996700000099", "password": "secondpass123",
+        })
+        self.pm.refresh_from_db()
+        self.assertEqual(self.pm.user_id, first_user_id)
+        self.assertTrue(self.pm.user.check_password("secondpass123"))

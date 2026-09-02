@@ -94,6 +94,21 @@ h2 {
     max-width: 1520px;
 }
 
+/* ---- Портал ПМ: отдельный лёгкий каркас, без сайдбара ---- */
+.pm-shell { min-height: 100vh; background: var(--bg); }
+.pm-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+.pm-topbar__brand { font-weight: 800; color: var(--text); text-decoration: none; }
+.pm-topbar__brand span { color: var(--primary); }
+.pm-topbar__user { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text-muted); }
+.pm-main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
 /* ---- Sidebar ---- */
 .sidebar {
     width: var(--sidebar-w);

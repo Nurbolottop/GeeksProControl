@@ -1,0 +1,17 @@
+{% extends 'pm_portal/base.html' %}
+
+{% block title %}Мои проекты — Портал ПМ{% endblock %}
+
+{% block content %}
+<h1>Мои проекты</h1>
+<div class="lead-grid" style="margin-top: 16px">
+    {% for project in projects %}
+        <a href="{% url 'pm_portal:project_detail' project.pk %}" class="lead-card" style="text-decoration: none; display: block;">
+            <div class="lead-card__name">{{ project.name }}</div>
+            <div class="lead-card__count">{{ project.get_status_display }}</div>
+        </a>
+    {% empty %}
+        <div class="empty">Вы пока не назначены ПМ ни на один проект.</div>
+    {% endfor %}
+</div>
+{% endblock %}

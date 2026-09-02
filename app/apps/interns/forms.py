@@ -22,6 +22,13 @@ class InternForm(forms.ModelForm):
         }
 
 
+class GrantAccessForm(forms.Form):
+    """Выдать/сбросить доступ ПМу — логином служит телефон."""
+
+    username = forms.CharField(label='Телефон (логин)', max_length=150)
+    password = forms.CharField(label='Пароль', widget=forms.PasswordInput)
+
+
 class InternEvaluationForm(forms.ModelForm):
     class Meta:
         model = InternEvaluation

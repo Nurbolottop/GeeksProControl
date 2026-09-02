@@ -59,6 +59,11 @@ class Intern(TimeStampedModel, ArchivableModel):
         related_name='mentored_interns', verbose_name='Текущий Team Lead',
         null=True, blank=True,
     )
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='intern_profile', verbose_name='Учётная запись',
+        null=True, blank=True,
+    )
     rating = models.DecimalField(
         'Рейтинг', max_digits=3, decimal_places=2, null=True, blank=True,
     )

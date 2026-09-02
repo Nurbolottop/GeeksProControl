@@ -14,6 +14,11 @@
         </div>
     </div>
     <div class="page-actions">
+        {% if is_pm %}
+            <a href="{% url 'interns:grant_access' intern.pk %}" class="btn btn--secondary">
+                {% if intern.user %}Сбросить пароль{% else %}Выдать доступ{% endif %}
+            </a>
+        {% endif %}
         <a href="{% url 'interns:evaluate' intern.pk %}" class="btn">+ Оценка</a>
         <a href="{% url 'interns:update' intern.pk %}" class="btn btn--secondary">Редактировать</a>
         <form method="post" action="{% url 'interns:delete' intern.pk %}" style="margin:0"

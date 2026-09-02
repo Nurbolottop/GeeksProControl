@@ -1,0 +1,35 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Портал ПМ — GeeksPro Control{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <script src="{% static 'js/htmx.min.js' %}" defer></script>
+    <script src="{% static 'js/alpine.min.js' %}" defer></script>
+    <script src="{% static 'js/confirm-modal.js' %}" defer></script>
+</head>
+<body class="page-pm-portal" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<div class="pm-shell">
+    <header class="pm-topbar">
+        <a href="{% url 'pm_portal:dashboard' %}" class="pm-topbar__brand">Geeks<span>Pro</span> · Портал ПМ</a>
+        <div class="pm-topbar__user">
+            {{ request.user.display_name }}
+            <form method="post" action="{% url 'logout' %}" style="display:inline; margin:0">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--ghost btn--sm">Выйти</button>
+            </form>
+        </div>
+    </header>
+    <main class="pm-main">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message message--{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

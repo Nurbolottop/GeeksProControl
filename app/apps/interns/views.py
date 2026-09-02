@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.interns import services
-from apps.interns.forms import InternEvaluationForm, InternForm
+from apps.interns.forms import GrantAccessForm, InternEvaluationForm, InternForm
 from apps.interns.models import Intern, InternEvaluation, InternStatus
 from apps.teams.models import TeamMember
 from apps.training.models import Specialization, TrainingGroup
@@ -109,6 +109,7 @@ def intern_detail(request, pk):
     from apps.teams.models import TeamRole
     roles = {m.role for m in active_memberships}
     is_lead = TeamRole.TEAM_LEAD in roles
+    is_pm = TeamRole.PROJECT_MANAGER in roles
     if is_lead:
         kind, kind_tone = 'Тимлид направления', 'orange'
     else:
@@ -129,6 +130,7 @@ def intern_detail(request, pk):
         'projects_count': len(active_memberships) + len(past_memberships),
         'evaluations': intern.evaluations.select_related('project', 'evaluator'),
         'criteria': InternEvaluation.CRITERIA,
+        'is_pm': is_pm,
     }
     return render(request, 'interns/detail.html', context)
 
@@ -191,3 +193,33 @@ def intern_delete(request, pk):
         messages.success(request, f"{name} удалён(а) из базы{note}.")
         return redirect("interns:list")
     return redirect(intern.get_absolute_url())
+
+
+@login_required
+def grant_pm_access(request, pk):
+    """Выдать (или сбросить) доступ ПМа в его портал — логин по телефону."""
+    from apps.accounts.models import User
+
+    intern = get_object_or_404(Intern, pk=pk)
+    initial = {'username': intern.user.username if intern.user else intern.phone}
+    form = GrantAccessForm(request.POST or None, initial=initial)
+    if request.method == 'POST' and form.is_valid():
+        username = form.cleaned_data['username']
+        password = form.cleaned_data['password']
+        if intern.user:
+            user = intern.user
+            user.username = username
+        else:
+            user = User(username=username, role=User.Role.PROJECT_MANAGER)
+        user.role = User.Role.PROJECT_MANAGER
+        user.phone = intern.phone
+        user.set_password(password)
+        user.save()
+        if not intern.user_id:
+            intern.user = user
+            intern.save(update_fields=['user', 'updated_at'])
+        messages.success(request, f'Доступ выдан: логин «{username}».')
+        return redirect(intern.get_absolute_url())
+    return render(request, 'interns/grant_access_form.html', {
+        'form': form, 'intern': intern,
+    })
