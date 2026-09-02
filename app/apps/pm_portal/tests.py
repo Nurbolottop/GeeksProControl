@@ -247,3 +247,54 @@ class PmAttendanceTests(TestCase):
         self.assertTrue(
             Attendance.objects.filter(meeting=meeting, intern=self.pm_intern).exists(),
         )
+
+
+class PmEvaluationTests(PmProjectOwnershipTests):
+    """Оценки — только для тех, кто в команде своего проекта."""
+
+    def test_can_evaluate_own_team_member(self):
+        from apps.interns.models import InternEvaluation
+
+        member_intern = Intern.objects.create(full_name="Оцениваемый")
+        TeamMember.objects.create(
+            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.client.post(
+            reverse("pm_portal:evaluation_add", args=[self.project_a.pk, member_intern.pk]),
+            {
+                "hard_skills": 5, "quality": 5, "speed": 5, "responsibility": 5,
+                "communication": 5, "teamwork": 5, "independence": 5,
+                "comment": "Молодец",
+            },
+        )
+        evaluation = InternEvaluation.objects.get(intern=member_intern)
+        self.assertEqual(evaluation.project, self.project_a)
+        self.assertEqual(evaluation.evaluator, self.pm_user)
+
+    def test_cannot_evaluate_intern_not_on_own_project(self):
+        outsider = Intern.objects.create(full_name="Не в команде")
+        response = self.client.get(
+            reverse("pm_portal:evaluation_add", args=[self.project_a.pk, outsider.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_evaluation_locked_to_own_project_even_if_posted(self):
+        """Даже если подделать project в POST — сохранится свой проект."""
+        from apps.interns.models import InternEvaluation
+
+        member_intern = Intern.objects.create(full_name="Оцениваемый2")
+        TeamMember.objects.create(
+            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.client.post(
+            reverse("pm_portal:evaluation_add", args=[self.project_a.pk, member_intern.pk]),
+            {
+                "project": self.project_b.pk,
+                "hard_skills": 3, "quality": 3, "speed": 3, "responsibility": 3,
+                "communication": 3, "teamwork": 3, "independence": 3,
+            },
+        )
+        evaluation = InternEvaluation.objects.get(intern=member_intern)
+        self.assertEqual(evaluation.project, self.project_a)

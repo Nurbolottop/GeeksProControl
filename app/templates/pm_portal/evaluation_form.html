@@ -1,0 +1,27 @@
+{% extends 'pm_portal/base.html' %}
+
+{% block title %}Оценка: {{ intern.full_name }} — Портал ПМ{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'pm_portal:project_detail' project.pk %}?tab=evaluations">← Команда</a></p>
+<div class="page-head">
+    <div>
+        <h1>Оценка: {{ intern.full_name }}</h1>
+        <div class="sub">Шкала 1–5 по каждому критерию</div>
+    </div>
+</div>
+
+<form method="post" class="panel">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="message message--error">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="form-grid">
+        {% include 'partials/form_fields.html' %}
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn">Сохранить оценку</button>
+        <a href="{% url 'pm_portal:project_detail' project.pk %}?tab=evaluations" class="btn btn--secondary">Отмена</a>
+    </div>
+</form>
+{% endblock %}

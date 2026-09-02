@@ -1,0 +1,39 @@
+<div class="panel">
+    <div class="panel-head">
+        <h2>Команда</h2>
+    </div>
+    <div class="member-list">
+        {% for intern in team_interns %}
+            <div class="member">
+                <div class="member__avatar">{{ intern.full_name|first|upper }}</div>
+                <div class="member__body">
+                    <span class="member__name">{{ intern.full_name }}</span>
+                    <div class="member__meta">
+                        {% if intern.rating %}★ {{ intern.rating }}{% else %}Без оценок{% endif %}
+                    </div>
+                </div>
+                <a href="{% url 'pm_portal:evaluation_add' project.pk intern.pk %}" class="btn btn--secondary btn--sm">Оценить</a>
+            </div>
+        {% empty %}
+            <div class="empty" style="padding: 6px 2px; font-size: 13px">В команде пока никого нет.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Последние оценки</h2>
+    </div>
+    {% for evaluation in evaluations %}
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <strong>{{ evaluation.intern.full_name }}</strong>
+                <span>★ {{ evaluation.average }}</span>
+                <span style="color:var(--text-muted); font-size:12px">{{ evaluation.created_at|date:'d.m.Y' }}</span>
+            </div>
+            {% if evaluation.comment %}<div style="margin-top:4px">{{ evaluation.comment }}</div>{% endif %}
+        </div>
+    {% empty %}
+        <div class="empty" style="padding: 6px 2px; font-size: 13px">Оценок пока нет.</div>
+    {% endfor %}
+</div>

@@ -8,7 +8,10 @@ from django.urls import reverse
 
 from apps.attendance import services as attendance_services
 from apps.attendance.models import GroupMeeting, MeetingKind
+from apps.interns.models import Intern, InternEvaluation
+from apps.interns.services import add_evaluation
 from apps.pm_portal import services
+from apps.pm_portal.forms import PMInternEvaluationForm
 from apps.projects.models import ProjectReport
 from apps.projects.services import calculate_deadline_status
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
@@ -44,6 +47,16 @@ def project_detail(request, pk):
         context['group'] = group
         if group:
             context['meetings'] = group.meetings.select_related('host').order_by('-date')
+    elif tab == 'evaluations':
+        interns = Intern.objects.filter(
+            team_memberships__project=project,
+            team_memberships__status=TeamMember.Status.ACTIVE,
+        ).distinct().order_by('full_name')
+        context['team_interns'] = interns
+        context['evaluations'] = (
+            InternEvaluation.objects.filter(project=project, intern__in=interns)
+            .select_related('intern').order_by('-created_at')[:20]
+        )
     return render(request, 'pm_portal/project_detail.html', context)
 
 
@@ -228,3 +241,28 @@ def member_delete(request, pk, member_pk):
         member.delete()
         messages.success(request, f'{name} убран(а) из команды.')
     return redirect(_team_url(project))
+
+
+@login_required
+def evaluation_add(request, pk, intern_pk):
+    project = services.pm_project_or_404(request.user, pk)
+    intern = get_object_or_404(
+        Intern,
+        pk=intern_pk,
+        team_memberships__project=project,
+        team_memberships__status=TeamMember.Status.ACTIVE,
+    )
+    form = PMInternEvaluationForm(request.POST or None, project=project)
+    if request.method == 'POST' and form.is_valid():
+        evaluation = form.save(commit=False)
+        evaluation.intern = intern
+        evaluation.project = project
+        evaluation.evaluator = request.user
+        add_evaluation(evaluation)
+        messages.success(
+            request, f'Оценка сохранена. Средний рейтинг: {intern.rating}.',
+        )
+        return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=evaluations")
+    return render(request, 'pm_portal/evaluation_form.html', {
+        'form': form, 'project': project, 'intern': intern,
+    })

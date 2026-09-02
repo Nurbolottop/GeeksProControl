@@ -38,4 +38,8 @@ urlpatterns = [
         '<int:pk>/attendance/<int:meeting_pk>/mark-all/', views.meeting_mark_all,
         name='meeting_mark_all',
     ),
+    path(
+        '<int:pk>/interns/<int:intern_pk>/evaluate/', views.evaluation_add,
+        name='evaluation_add',
+    ),
 ]
