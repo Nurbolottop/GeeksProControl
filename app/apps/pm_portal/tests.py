@@ -316,7 +316,7 @@ class PmDocumentTests(PmProjectOwnershipTests):
         upload = SimpleUploadedFile("contract.txt", b"text", content_type="text/plain")
         self.client.post(
             reverse("pm_portal:document_upload", args=[self.project_a.pk]),
-            {"doc_type": self.doc_type.pk, "number": "1", "file": upload},
+            {"doc_type": self.doc_type.pk, "number": "1", "status": "draft", "file": upload},
         )
         self.assertTrue(Document.objects.filter(project=self.project_a).exists())
 
@@ -325,7 +325,7 @@ class PmDocumentTests(PmProjectOwnershipTests):
 
         response = self.client.post(
             reverse("pm_portal:document_upload", args=[self.project_b.pk]),
-            {"doc_type": self.doc_type.pk, "number": "1"},
+            {"doc_type": self.doc_type.pk, "number": "1", "status": "draft"},
         )
         self.assertEqual(response.status_code, 404)
         self.assertFalse(Document.objects.filter(project=self.project_b).exists())
@@ -335,7 +335,7 @@ class PmDocumentTests(PmProjectOwnershipTests):
 
         self.client.post(
             reverse("pm_portal:document_upload", args=[self.project_a.pk]),
-            {"project": self.project_b.pk, "doc_type": self.doc_type.pk, "number": "2"},
+            {"project": self.project_b.pk, "doc_type": self.doc_type.pk, "number": "2", "status": "draft"},
         )
         document = Document.objects.get(number="2")
         self.assertEqual(document.project, self.project_a)
