@@ -1,0 +1,35 @@
+{% if not group %}
+    <div class="panel empty" style="text-align:center; padding: 26px 20px;">
+        Команда потока ещё не назначена — обратитесь к руководителю.
+    </div>
+{% else %}
+    <div class="panel">
+        <div class="panel-head">
+            <h2>Собрания ({{ meetings|length }})</h2>
+        </div>
+        <form method="post" action="{% url 'pm_portal:meeting_create' project.pk %}" style="display:flex; gap:10px; align-items:flex-end;">
+            {% csrf_token %}
+            <div class="form-field">
+                <label>Дата собрания</label>
+                <input type="date" name="date" required>
+            </div>
+            <button type="submit" class="btn">+ Собрание</button>
+        </form>
+    </div>
+
+    {% for meeting in meetings %}
+        <a href="{% url 'pm_portal:meeting_detail' project.pk meeting.pk %}" class="panel" style="display:flex; justify-content:space-between; align-items:center; text-decoration:none;">
+            <div>
+                <strong>{{ meeting.date|date:'d.m.Y' }}</strong>
+                <span style="color: var(--text-muted); font-size: 13px; margin-left: 8px">{{ meeting.get_kind_display }}</span>
+            </div>
+            <span class="badge {% if meeting.status == 'held' %}badge--green{% else %}badge--gray{% endif %}">
+                {{ meeting.get_status_display }}
+            </span>
+        </a>
+    {% empty %}
+        <div class="panel empty" style="text-align:center; padding: 26px 20px;">
+            Собраний пока нет — добавьте первое выше.
+        </div>
+    {% endfor %}
+{% endif %}

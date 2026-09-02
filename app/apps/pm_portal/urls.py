@@ -25,4 +25,17 @@ urlpatterns = [
         '<int:pk>/team/<int:member_pk>/delete/', views.member_delete,
         name='member_delete',
     ),
+    path('<int:pk>/attendance/create/', views.meeting_create, name='meeting_create'),
+    path(
+        '<int:pk>/attendance/<int:meeting_pk>/', views.meeting_detail,
+        name='meeting_detail',
+    ),
+    path(
+        '<int:pk>/attendance/<int:meeting_pk>/mark/', views.meeting_mark_toggle,
+        name='meeting_mark_toggle',
+    ),
+    path(
+        '<int:pk>/attendance/<int:meeting_pk>/mark-all/', views.meeting_mark_all,
+        name='meeting_mark_all',
+    ),
 ]

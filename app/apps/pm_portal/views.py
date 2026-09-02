@@ -1,8 +1,13 @@
+import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from apps.attendance import services as attendance_services
+from apps.attendance.models import GroupMeeting, MeetingKind
 from apps.pm_portal import services
 from apps.projects.models import ProjectReport
 from apps.projects.services import calculate_deadline_status
@@ -34,7 +39,83 @@ def project_detail(request, pk):
         members = project.team_members.select_related('intern__specialization', 'user')
         context['team_sections'] = group_by_role(members)
         context['team_members'] = list(members)
+    elif tab == 'attendance':
+        group = getattr(project, 'group', None)
+        context['group'] = group
+        if group:
+            context['meetings'] = group.meetings.select_related('host').order_by('-date')
     return render(request, 'pm_portal/project_detail.html', context)
+
+
+def _group_or_404(project):
+    group = getattr(project, 'group', None)
+    if group is None:
+        raise Http404('У проекта ещё нет группы в потоке.')
+    return group
+
+
+@login_required
+def meeting_create(request, pk):
+    project = services.pm_project_or_404(request.user, pk)
+    group = _group_or_404(project)
+    if request.method == 'POST':
+        raw = request.POST.get('date', '').strip()
+        try:
+            date = datetime.date.fromisoformat(raw)
+        except ValueError:
+            messages.error(request, 'Укажите корректную дату.')
+        else:
+            meeting = attendance_services.create_meeting(
+                group, kind=MeetingKind.INTERNAL, date=date,
+            )
+            if meeting:
+                messages.success(request, f'Собрание {date:%d.%m.%Y} добавлено.')
+            else:
+                messages.info(request, 'Такое собрание уже есть.')
+    return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=attendance")
+
+
+@login_required
+def meeting_detail(request, pk, meeting_pk):
+    project = services.pm_project_or_404(request.user, pk)
+    group = _group_or_404(project)
+    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    marks = {mark.intern_id: mark for mark in meeting.attendance.all()}
+    members = list(
+        group.members.select_related('intern__specialization')
+        .filter(intern__isnull=False).order_by('role', 'intern__full_name'),
+    )
+    rows = [
+        {'member': member, 'mark': marks.get(member.intern_id)}
+        for member in members
+    ]
+    return render(request, 'pm_portal/meeting_detail.html', {
+        'project': project, 'group': group, 'meeting': meeting, 'rows': rows,
+    })
+
+
+@login_required
+def meeting_mark_toggle(request, pk, meeting_pk):
+    project = services.pm_project_or_404(request.user, pk)
+    group = _group_or_404(project)
+    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    if request.method == 'POST':
+        intern = get_object_or_404(
+            group.members.filter(intern__isnull=False), intern_id=request.POST.get('intern'),
+        ).intern
+        attendance_services.toggle_mark(meeting, intern, user=request.user)
+    return redirect('pm_portal:meeting_detail', pk=project.pk, meeting_pk=meeting.pk)
+
+
+@login_required
+def meeting_mark_all(request, pk, meeting_pk):
+    project = services.pm_project_or_404(request.user, pk)
+    group = _group_or_404(project)
+    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    if request.method == 'POST':
+        created = attendance_services.mark_all_present(meeting, user=request.user)
+        messages.success(request, f'Отмечено присутствующих: {created}.')
+    return redirect('pm_portal:meeting_detail', pk=project.pk, meeting_pk=meeting.pk)
 
 
 @login_required

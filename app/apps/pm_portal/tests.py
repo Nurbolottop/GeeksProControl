@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -168,3 +170,80 @@ class PmTeamManagementTests(PmProjectOwnershipTests):
             reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
         )
         self.assertContains(response, "Участник А")
+
+
+class PmAttendanceTests(TestCase):
+    """Табель — только по группе своего проекта."""
+
+    def setUp(self):
+        from apps.flows.models import Flow, Group
+
+        self.pm_user = Model.objects.create_user(
+            username="+996700000020", password="x", role=User.Role.PROJECT_MANAGER,
+        )
+        self.pm_intern = Intern.objects.create(
+            full_name="Тестов ПМ2", user=self.pm_user,
+        )
+        self.project_a = Project.objects.create(name="Проект С группой")
+        self.project_b = Project.objects.create(name="Проект без доступа")
+        flow = Flow.objects.create(number=1, status=Flow.Status.ACTIVE)
+        self.group = Group.objects.create(flow=flow, number=1, project=self.project_a)
+        TeamMember.objects.create(
+            project=self.project_a, intern=self.pm_intern, role=TeamRole.PROJECT_MANAGER,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.client.force_login(self.pm_user)
+
+    def test_no_group_shows_empty_state(self):
+        TeamMember.objects.create(
+            project=self.project_b, intern=self.pm_intern, role=TeamRole.PROJECT_MANAGER,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project_b.pk]) + "?tab=attendance",
+        )
+        self.assertContains(response, "ещё не назначена")
+
+    def test_can_create_meeting_for_own_group(self):
+        from apps.attendance.models import GroupMeeting
+
+        self.client.post(
+            reverse("pm_portal:meeting_create", args=[self.project_a.pk]),
+            {"date": "2026-09-10"},
+        )
+        self.assertTrue(GroupMeeting.objects.filter(group=self.group).exists())
+
+    def test_cannot_reach_meeting_from_foreign_group(self):
+        from apps.flows.models import Flow, Group
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import MeetingKind
+
+        other_flow = Flow.objects.create(number=2, status=Flow.Status.ACTIVE)
+        other_group = Group.objects.create(
+            flow=other_flow, number=1, project=self.project_b,
+        )
+        meeting = attendance_services.create_meeting(
+            other_group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
+        response = self.client.get(
+            reverse("pm_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_toggle_mark_creates_attendance(self):
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import Attendance, MeetingKind
+
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
+        self.client.post(
+            reverse(
+                "pm_portal:meeting_mark_toggle",
+                args=[self.project_a.pk, meeting.pk],
+            ),
+            {"intern": self.pm_intern.pk},
+        )
+        self.assertTrue(
+            Attendance.objects.filter(meeting=meeting, intern=self.pm_intern).exists(),
+        )

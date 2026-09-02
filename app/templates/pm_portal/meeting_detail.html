@@ -1,0 +1,39 @@
+{% extends 'pm_portal/base.html' %}
+
+{% block title %}Собрание {{ meeting.date|date:'d.m.Y' }} — Портал ПМ{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'pm_portal:project_detail' project.pk %}?tab=attendance">← Собрания</a></p>
+<h1>Собрание {{ meeting.date|date:'d.m.Y' }}</h1>
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Отметки</h2>
+        <form method="post" action="{% url 'pm_portal:meeting_mark_all' project.pk meeting.pk %}" style="margin:0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--secondary btn--sm">Отметить всех присутствующими</button>
+        </form>
+    </div>
+    <div class="member-list">
+        {% for row in rows %}
+            <div class="member">
+                <div class="member__avatar">{{ row.member.person_name|first|upper }}</div>
+                <div class="member__body">
+                    <span class="member__name">{{ row.member.person_name }}</span>
+                </div>
+                <form method="post" action="{% url 'pm_portal:meeting_mark_toggle' project.pk meeting.pk %}" style="margin:0">
+                    {% csrf_token %}
+                    <input type="hidden" name="intern" value="{{ row.member.intern_id }}">
+                    <button type="submit"
+                        class="badge {% if row.mark.status == 'present' %}badge--green{% elif row.mark.status == 'late' %}badge--yellow{% elif row.mark.status == 'excused' %}badge--blue{% elif row.mark.status == 'absent' %}badge--red{% else %}badge--gray{% endif %}"
+                        style="border: none; cursor: pointer;">
+                        {% if row.mark %}{{ row.mark.get_status_display }}{% else %}Отметить{% endif %}
+                    </button>
+                </form>
+            </div>
+        {% empty %}
+            <div class="empty" style="padding: 6px 2px; font-size: 13px">В команде пока никого нет.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
