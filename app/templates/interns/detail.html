@@ -31,7 +31,6 @@
                 {% if intern.user %}Сбросить пароль{% else %}Выдать доступ{% endif %}
             </a>
         {% endif %}
-        <a href="{% url 'interns:evaluate' intern.pk %}" class="btn">+ Оценка</a>
         <a href="{% url 'interns:update' intern.pk %}" class="btn btn--secondary">Редактировать</a>
         <form method="post" action="{% url 'interns:delete' intern.pk %}" style="margin:0"
               data-confirm="Удалить {{ intern.full_name|escapejs }} из базы? Человек пропадёт из всех команд и табелей.">
