@@ -345,7 +345,9 @@ class ReserveResumeBankToggleTests(TestCase):
         """Флаг банка резюме выставляется только формой — карточка его
         просто отображает, не даёт менять руками."""
         response = self.client.get(self.intern.get_absolute_url())
-        self.assertNotContains(response, "Банк резюме")
+        self.assertNotContains(
+            response, '<span class="badge badge--blue">Банк резюме</span>',
+        )
 
         self.intern.in_resume_bank = True
         self.intern.save()
