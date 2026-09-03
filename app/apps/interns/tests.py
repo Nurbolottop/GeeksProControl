@@ -236,3 +236,78 @@ class GrantPMAccessTests(TestCase):
         self.pm.refresh_from_db()
         self.assertEqual(self.pm.user_id, first_user_id)
         self.assertTrue(self.pm.user.check_password("secondpass123"))
+
+
+class ReserveAndResumeBankTests(TestCase):
+    """«Резерв кадров» / «Банк резюме» — включая тимлидов, в отличие от
+    общего списка стажёров."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+
+    def test_reserve_list_shows_only_flagged(self):
+        in_reserve = Intern.objects.create(full_name="В резерве", in_talent_reserve=True)
+        Intern.objects.create(full_name="Не в резерве")
+        response = self.client.get(reverse("interns:reserve"))
+        names = [p.full_name for p in response.context["people"]]
+        self.assertEqual(names, ["В резерве"])
+        self.assertContains(response, "В резерве")
+
+    def test_resume_bank_list_shows_only_flagged(self):
+        Intern.objects.create(full_name="Без резюме")
+        in_bank = Intern.objects.create(full_name="С резюме", in_resume_bank=True)
+        response = self.client.get(reverse("interns:resume_bank"))
+        names = [p.full_name for p in response.context["people"]]
+        self.assertEqual(names, ["С резюме"])
+
+    def test_team_leads_included_unlike_general_list(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Балажан")
+        lead = Intern.objects.create(full_name="Тимлид Резервный", in_talent_reserve=True)
+        TeamMember.objects.create(
+            project=project, intern=lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        # В общем списке стажёров тимлида не будет
+        general = self.client.get(reverse("interns:list"))
+        self.assertNotContains(general, "Тимлид Резервный")
+        # А в резерве кадров — будет
+        reserve = self.client.get(reverse("interns:reserve"))
+        self.assertContains(reserve, "Тимлид Резервный")
+
+
+class ResumeBankApplyTests(TestCase):
+    """Публичная анкета «Банк резюме» — без входа в систему."""
+
+    def test_anonymous_can_submit(self):
+        response = self.client.post(reverse("resume_bank_apply"), {
+            "full_name": "Новый Человек", "phone": "0700111222",
+            "email": "new@example.com",
+        })
+        self.assertEqual(response.status_code, 200)
+        intern = Intern.objects.get(phone="0700111222")
+        self.assertTrue(intern.in_resume_bank)
+        self.assertEqual(intern.full_name, "Новый Человек")
+
+    def test_existing_person_by_phone_is_updated_not_duplicated(self):
+        Intern.objects.create(full_name="Старое Имя", phone="0700111222")
+        self.client.post(reverse("resume_bank_apply"), {
+            "full_name": "Новое Имя", "phone": "0700111222",
+            "email": "updated@example.com",
+        })
+        self.assertEqual(Intern.objects.filter(phone="0700111222").count(), 1)
+        intern = Intern.objects.get(phone="0700111222")
+        self.assertEqual(intern.full_name, "Новое Имя")
+        self.assertTrue(intern.in_resume_bank)
+
+    def test_phone_is_required(self):
+        response = self.client.post(reverse("resume_bank_apply"), {
+            "full_name": "Без Телефона",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Intern.objects.filter(full_name="Без Телефона").exists())

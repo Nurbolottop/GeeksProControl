@@ -92,7 +92,7 @@
                     <a href="{% url 'resources:forecast' %}"
                        class="{% if request.resolver_match.url_name == 'forecast' %}is-active{% endif %}">По направлениям</a>
                     <a href="{% url 'interns:list' %}"
-                       class="{% if request.resolver_match.namespace == 'interns' %}is-active{% endif %}">Все стажёры</a>
+                       class="{% if request.resolver_match.url_name == 'list' %}is-active{% endif %}">Все стажёры</a>
                     <a href="{% url 'teams:pm_list' %}"
                        class="{% if request.resolver_match.url_name == 'pm_list' %}is-active{% endif %}">ПМ</a>
                     <a href="{% url 'teams:lead_list' %}"
@@ -103,6 +103,22 @@
                        class="{% if request.resolver_match.url_name == 'graduations' %}is-active{% endif %}">Выпуски</a>
                 </div>
             </div>
+
+            <div class="nav-label">Резерв</div>
+            <a href="{% url 'interns:reserve' %}"
+               class="nav-item {% if request.resolver_match.url_name == 'reserve' %}is-active{% endif %}">
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Резерв кадров
+                </span>
+            </a>
+            <a href="{% url 'interns:resume_bank' %}"
+               class="nav-item {% if request.resolver_match.url_name == 'resume_bank' %}is-active{% endif %}">
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                    Банк резюме
+                </span>
+            </a>
 
             <div class="nav-label">Контроль</div>
             <a href="{% url 'meetings:list' %}"

@@ -10,6 +10,7 @@ class InternForm(forms.ModelForm):
             'full_name', 'phone', 'email', 'telegram', 'city', 'branch',
             'specialization', 'education_end_date',
             'internship_start_date', 'status', 'comment',
+            'in_talent_reserve', 'in_resume_bank',
         ]
         widgets = {
             'education_end_date': forms.DateInput(
@@ -20,6 +21,19 @@ class InternForm(forms.ModelForm):
             ),
             'comment': forms.Textarea(attrs={'rows': 2}),
         }
+
+
+class ResumeBankApplyForm(forms.ModelForm):
+    """Публичная анкета «Банк резюме» — человек заполняет сам, без входа."""
+
+    class Meta:
+        model = Intern
+        fields = ['full_name', 'phone', 'email', 'specialization']
+        labels = {'specialization': 'Направление'}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['phone'].required = True
 
 
 class GrantAccessForm(forms.Form):

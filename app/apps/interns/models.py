@@ -64,6 +64,8 @@ class Intern(TimeStampedModel, ArchivableModel):
         related_name='intern_profile', verbose_name='Учётная запись',
         null=True, blank=True,
     )
+    in_resume_bank = models.BooleanField('В банке резюме', default=False)
+    in_talent_reserve = models.BooleanField('В резерве кадров', default=False)
     rating = models.DecimalField(
         'Рейтинг', max_digits=3, decimal_places=2, null=True, blank=True,
     )

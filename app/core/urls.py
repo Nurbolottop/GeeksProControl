@@ -3,8 +3,11 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.interns.views import resume_bank_apply
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('resume-bank/', resume_bank_apply, name='resume_bank_apply'),
     path('', include('apps.accounts.urls')),
     path('', include('apps.dashboard.urls')),
     path('flows/', include('apps.flows.urls')),

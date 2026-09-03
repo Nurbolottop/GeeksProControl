@@ -11,6 +11,8 @@
             <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
             <span class="badge badge--green">{{ intern.get_status_display }}</span>
             {% if intern.rating %}<span class="badge badge--yellow">★ {{ intern.rating }}</span>{% endif %}
+            {% if intern.in_talent_reserve %}<span class="badge badge--blue">Резерв кадров</span>{% endif %}
+            {% if intern.in_resume_bank %}<span class="badge badge--blue">Банк резюме</span>{% endif %}
         </div>
     </div>
     <div class="page-actions">

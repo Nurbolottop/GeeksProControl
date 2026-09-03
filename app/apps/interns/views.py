@@ -5,7 +5,9 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.interns import services
-from apps.interns.forms import GrantAccessForm, InternEvaluationForm, InternForm
+from apps.interns.forms import (
+    GrantAccessForm, InternEvaluationForm, InternForm, ResumeBankApplyForm,
+)
 from apps.interns.models import Intern, InternEvaluation, InternStatus
 from apps.teams.models import TeamMember
 from apps.training.models import Specialization, TrainingGroup
@@ -223,3 +225,47 @@ def grant_pm_access(request, pk):
     return render(request, 'interns/grant_access_form.html', {
         'form': form, 'intern': intern,
     })
+
+
+def _flagged_list(request, field, title):
+    """Резерв кадров / банк резюме — включая тимлидов, в отличие от
+    общего списка стажёров (там тимлиды — уже «сотрудники»)."""
+    people = (
+        Intern.objects.active().filter(**{field: True})
+        .select_related('specialization').order_by('full_name')
+    )
+    return render(request, 'interns/flagged_list.html', {
+        'people': people, 'title': title,
+    })
+
+
+@login_required
+def reserve_list(request):
+    return _flagged_list(request, 'in_talent_reserve', 'Резерв кадров')
+
+
+@login_required
+def resume_bank_list(request):
+    return _flagged_list(request, 'in_resume_bank', 'Банк резюме')
+
+
+def resume_bank_apply(request):
+    """Публичная анкета «Банк резюме» — без входа в систему.
+
+    По телефону ищем уже существующего стажёра, чтобы не плодить
+    дубли, если человек уже есть в базе.
+    """
+    form = ResumeBankApplyForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        phone = form.cleaned_data['phone']
+        intern = Intern.objects.filter(phone=phone).first()
+        if intern is None:
+            intern = form.save(commit=False)
+        else:
+            intern.full_name = form.cleaned_data['full_name']
+            intern.email = form.cleaned_data['email']
+            intern.specialization = form.cleaned_data['specialization']
+        intern.in_resume_bank = True
+        intern.save()
+        return render(request, 'interns/resume_bank_apply_done.html')
+    return render(request, 'interns/resume_bank_apply.html', {'form': form})
