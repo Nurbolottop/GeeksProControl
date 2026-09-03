@@ -311,3 +311,37 @@ class ResumeBankApplyTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Intern.objects.filter(full_name="Без Телефона").exists())
+
+
+class ReserveResumeBankToggleTests(TestCase):
+    """Отметки «Резерв кадров» / «Банк резюме» ставятся прямо с карточки."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head2", password="x")
+        self.client.force_login(self.user)
+        self.intern = Intern.objects.create(full_name="Тестов Тумблер")
+
+    def test_toggle_reserve_flips_flag(self):
+        self.client.post(reverse("interns:toggle_reserve", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertTrue(self.intern.in_talent_reserve)
+
+        self.client.post(reverse("interns:toggle_reserve", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertFalse(self.intern.in_talent_reserve)
+
+    def test_toggle_resume_bank_flips_flag(self):
+        self.client.post(reverse("interns:toggle_resume_bank", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertTrue(self.intern.in_resume_bank)
+
+    def test_detail_page_shows_clickable_toggle(self):
+        response = self.client.get(self.intern.get_absolute_url())
+        self.assertContains(response, "+ Резерв кадров")
+        self.assertContains(response, "+ Банк резюме")
+
+        self.client.post(reverse("interns:toggle_reserve", args=[self.intern.pk]))
+        response = self.client.get(self.intern.get_absolute_url())
+        self.assertContains(response, "✓ Резерв кадров")

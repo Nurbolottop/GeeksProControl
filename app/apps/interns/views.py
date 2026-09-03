@@ -269,3 +269,21 @@ def resume_bank_apply(request):
         intern.save()
         return render(request, 'interns/resume_bank_apply_done.html')
     return render(request, 'interns/resume_bank_apply.html', {'form': form})
+
+
+@login_required
+def toggle_reserve(request, pk):
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        intern.in_talent_reserve = not intern.in_talent_reserve
+        intern.save(update_fields=['in_talent_reserve', 'updated_at'])
+    return redirect(intern.get_absolute_url())
+
+
+@login_required
+def toggle_resume_bank(request, pk):
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        intern.in_resume_bank = not intern.in_resume_bank
+        intern.save(update_fields=['in_resume_bank', 'updated_at'])
+    return redirect(intern.get_absolute_url())
