@@ -17,12 +17,7 @@
                     {% if intern.in_talent_reserve %}✓ Резерв кадров{% else %}+ Резерв кадров{% endif %}
                 </button>
             </form>
-            <form method="post" action="{% url 'interns:toggle_resume_bank' intern.pk %}" style="display:inline; margin:0">
-                {% csrf_token %}
-                <button type="submit" class="badge {% if intern.in_resume_bank %}badge--blue{% else %}badge--gray{% endif %}" style="border:0; cursor:pointer;">
-                    {% if intern.in_resume_bank %}✓ Банк резюме{% else %}+ Банк резюме{% endif %}
-                </button>
-            </form>
+            {% if intern.in_resume_bank %}<span class="badge badge--blue">Банк резюме</span>{% endif %}
         </div>
     </div>
     <div class="page-actions">

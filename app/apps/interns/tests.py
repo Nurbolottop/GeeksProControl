@@ -314,7 +314,8 @@ class ResumeBankApplyTests(TestCase):
 
 
 class ReserveResumeBankToggleTests(TestCase):
-    """Отметки «Резерв кадров» / «Банк резюме» ставятся прямо с карточки."""
+    """«Резерв кадров» ставится прямо с карточки; «Банк резюме» — только
+    через публичную анкету, тут лишь показывается бейджем, без тумблера."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -332,16 +333,21 @@ class ReserveResumeBankToggleTests(TestCase):
         self.intern.refresh_from_db()
         self.assertFalse(self.intern.in_talent_reserve)
 
-    def test_toggle_resume_bank_flips_flag(self):
-        self.client.post(reverse("interns:toggle_resume_bank", args=[self.intern.pk]))
-        self.intern.refresh_from_db()
-        self.assertTrue(self.intern.in_resume_bank)
-
-    def test_detail_page_shows_clickable_toggle(self):
+    def test_detail_page_shows_clickable_reserve_toggle(self):
         response = self.client.get(self.intern.get_absolute_url())
         self.assertContains(response, "+ Резерв кадров")
-        self.assertContains(response, "+ Банк резюме")
 
         self.client.post(reverse("interns:toggle_reserve", args=[self.intern.pk]))
         response = self.client.get(self.intern.get_absolute_url())
         self.assertContains(response, "✓ Резерв кадров")
+
+    def test_resume_bank_shown_as_plain_badge_not_toggle(self):
+        """Флаг банка резюме выставляется только формой — карточка его
+        просто отображает, не даёт менять руками."""
+        response = self.client.get(self.intern.get_absolute_url())
+        self.assertNotContains(response, "Банк резюме")
+
+        self.intern.in_resume_bank = True
+        self.intern.save()
+        response = self.client.get(self.intern.get_absolute_url())
+        self.assertContains(response, '<span class="badge badge--blue">Банк резюме</span>')

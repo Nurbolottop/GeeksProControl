@@ -15,8 +15,4 @@ urlpatterns = [
     path('<int:pk>/delete/', views.intern_delete, name='delete'),
     path('<int:pk>/grant-access/', views.grant_pm_access, name='grant_access'),
     path('<int:pk>/toggle-reserve/', views.toggle_reserve, name='toggle_reserve'),
-    path(
-        '<int:pk>/toggle-resume-bank/', views.toggle_resume_bank,
-        name='toggle_resume_bank',
-    ),
 ]

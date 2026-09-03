@@ -10,7 +10,7 @@ class InternForm(forms.ModelForm):
             'full_name', 'phone', 'email', 'telegram', 'city', 'branch',
             'specialization', 'education_end_date',
             'internship_start_date', 'status', 'comment',
-            'in_talent_reserve', 'in_resume_bank',
+            'in_talent_reserve',
         ]
         widgets = {
             'education_end_date': forms.DateInput(
