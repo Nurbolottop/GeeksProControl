@@ -125,6 +125,33 @@ class CreateProjectTests(TestCase):
         self.assertEqual(project.history.count(), 1)
         self.assertTrue(project.code.startswith('GP-'))
 
+    def test_deadline_defaults_to_60_days_from_start(self):
+        from django.utils import timezone
+
+        project = make_project()
+        create_project(project)
+        today = timezone.localdate()
+        self.assertEqual(project.start_date, today)
+        self.assertEqual(
+            project.planned_end_date, today + datetime.timedelta(days=60),
+        )
+
+    def test_explicit_start_and_deadline_are_kept(self):
+        project = make_project(
+            start_date=datetime.date(2026, 1, 1),
+            planned_end_date=datetime.date(2026, 3, 1),
+        )
+        create_project(project)
+        self.assertEqual(project.start_date, datetime.date(2026, 1, 1))
+        self.assertEqual(project.planned_end_date, datetime.date(2026, 3, 1))
+
+    def test_deadline_computed_from_explicit_start_date(self):
+        project = make_project(start_date=datetime.date(2026, 1, 1))
+        create_project(project)
+        self.assertEqual(
+            project.planned_end_date, datetime.date(2026, 1, 1) + datetime.timedelta(days=60),
+        )
+
 
 class ProjectFormTests(TestCase):
     """Перенос deadline требует причину (ТЗ §21)."""

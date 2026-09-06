@@ -23,6 +23,8 @@ RISK_PROGRESS = getattr(settings, 'DEADLINE_RISK_PROGRESS', 70)
 HIGH_RISK_DAYS = getattr(settings, 'DEADLINE_HIGH_RISK_DAYS', 3)
 HIGH_RISK_PROGRESS = getattr(settings, 'DEADLINE_HIGH_RISK_PROGRESS', 90)
 INACTIVE_DAYS = getattr(settings, 'PROJECT_INACTIVE_DAYS', 3)
+# Дедлайн по умолчанию — если не задан явно, считаем от даты начала проекта.
+DEFAULT_DEADLINE_DAYS = getattr(settings, 'PROJECT_DEFAULT_DEADLINE_DAYS', 60)
 
 # Изменения этих полей проекта фиксируются в истории (ТЗ §27).
 TRACKED_FIELDS = {
@@ -113,7 +115,18 @@ def ensure_group(project: Project):
 
 @transaction.atomic
 def create_project(project: Project, user=None) -> Project:
-    """Сохраняет новый проект и создаёт полный набор этапов жизненного цикла."""
+    """Сохраняет новый проект и создаёт полный набор этапов жизненного цикла.
+
+    Дата начала и дедлайн подставляются сами, если их не задали руками:
+    начало — сегодня, дедлайн — начало + DEFAULT_DEADLINE_DAYS дней.
+    Дальше это обычные редактируемые поля, а не что-то пересчитываемое.
+    """
+    if not project.start_date:
+        project.start_date = timezone.localdate()
+    if not project.planned_end_date:
+        project.planned_end_date = (
+            project.start_date + datetime.timedelta(days=DEFAULT_DEADLINE_DAYS)
+        )
     project.last_activity_at = timezone.now()
     project.save()
     stages = [
