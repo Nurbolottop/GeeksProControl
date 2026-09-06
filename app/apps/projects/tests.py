@@ -862,7 +862,10 @@ class TeamReleasedOnTerminalStatusTests(TestCase):
             "name": self.project.name, "status": ProjectStatus.CANCELLED,
             "current_stage": self.project.current_stage,
             "priority": self.project.priority,
-            "planned_end_date": "", "change_reason": "",
+            # Дедлайн теперь подставляется сам при создании — шлём как есть,
+            # иначе форма сочтёт это переносом срока и потребует причину.
+            "planned_end_date": self.project.planned_end_date,
+            "change_reason": "",
         })
 
         member.refresh_from_db()
