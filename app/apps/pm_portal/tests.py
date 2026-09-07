@@ -403,6 +403,84 @@ class PmDocumentTests(PmProjectOwnershipTests):
         self.assertNotContains(response, "FOREIGN-1")
 
 
+class PmClientTests(PmProjectOwnershipTests):
+    """Данные клиента заполняет ПМ по своему проекту."""
+
+    def test_can_create_client_for_own_project_without_one(self):
+        response = self.client.post(
+            reverse("pm_portal:client_edit", args=[self.project_a.pk]),
+            {
+                "organization": "ОсОО Тестклиент", "contact_name": "Иванов И.",
+                "phone": "0700111222", "email": "client@example.com",
+                "address": "", "city": "Бишкек",
+            },
+        )
+        self.project_a.refresh_from_db()
+        self.assertIsNotNone(self.project_a.client)
+        self.assertEqual(self.project_a.client.organization, "ОсОО Тестклиент")
+        self.assertRedirects(
+            response,
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=client",
+        )
+
+    def test_can_edit_existing_client_of_own_project(self):
+        from apps.clients.models import Client
+
+        client = Client.objects.create(organization="Старое название")
+        self.project_a.client = client
+        self.project_a.save(update_fields=["client"])
+
+        self.client.post(
+            reverse("pm_portal:client_edit", args=[self.project_a.pk]),
+            {
+                "organization": "Новое название", "contact_name": "",
+                "phone": "", "email": "", "address": "", "city": "",
+            },
+        )
+        client.refresh_from_db()
+        self.assertEqual(client.organization, "Новое название")
+
+    def test_cannot_edit_client_of_foreign_project(self):
+        from apps.clients.models import Client
+
+        client = Client.objects.create(organization="Чужой клиент")
+        self.project_b.client = client
+        self.project_b.save(update_fields=["client"])
+
+        response = self.client.post(
+            reverse("pm_portal:client_edit", args=[self.project_b.pk]),
+            {"organization": "Взлом", "contact_name": "", "phone": "",
+             "email": "", "address": "", "city": ""},
+        )
+        self.assertEqual(response.status_code, 404)
+        client.refresh_from_db()
+        self.assertEqual(client.organization, "Чужой клиент")
+
+    def test_requisites_and_comment_not_editable_by_pm(self):
+        from apps.clients.models import Client
+
+        client = Client.objects.create(
+            organization="С реквизитами", requisites="ИНН 000", comment="служебное",
+        )
+        self.project_a.client = client
+        self.project_a.save(update_fields=["client"])
+
+        response = self.client.get(reverse("pm_portal:client_edit", args=[self.project_a.pk]))
+        self.assertNotContains(response, "requisites")
+        self.assertNotContains(response, 'name="comment"')
+
+        self.client.post(
+            reverse("pm_portal:client_edit", args=[self.project_a.pk]),
+            {
+                "organization": "С реквизитами", "contact_name": "",
+                "phone": "", "email": "", "address": "", "city": "",
+            },
+        )
+        client.refresh_from_db()
+        self.assertEqual(client.requisites, "ИНН 000")
+        self.assertEqual(client.comment, "служебное")
+
+
 class PmPortalExcludedActionsTests(TestCase):
     """Статус/этап/завершение/«Проблемный» — этих действий в портале ПМ
     просто нет: не спрятаны, а физически отсутствуют в urls.py."""

@@ -47,4 +47,5 @@ urlpatterns = [
         name='evaluation_add',
     ),
     path('<int:pk>/documents/upload/', views.document_upload, name='document_upload'),
+    path('<int:pk>/client/', views.client_edit, name='client_edit'),
 ]

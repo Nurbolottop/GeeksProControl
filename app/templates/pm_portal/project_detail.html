@@ -13,6 +13,7 @@
     <a href="?tab=attendance" class="{% if tab == 'attendance' %}is-active{% endif %}">Табель</a>
     <a href="?tab=evaluations" class="{% if tab == 'evaluations' %}is-active{% endif %}">Оценки</a>
     <a href="?tab=documents" class="{% if tab == 'documents' %}is-active{% endif %}">Документы</a>
+    <a href="?tab=client" class="{% if tab == 'client' %}is-active{% endif %}">Клиент</a>
 </div>
 
 {% if tab == 'report' %}
@@ -25,6 +26,8 @@
     {% include 'pm_portal/partials/tab_evaluations.html' %}
 {% elif tab == 'documents' %}
     {% include 'pm_portal/partials/tab_documents.html' %}
+{% elif tab == 'client' %}
+    {% include 'pm_portal/partials/tab_client.html' %}
 {% else %}
     <div class="panel">
         <dl class="def-grid">

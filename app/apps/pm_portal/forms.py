@@ -1,6 +1,18 @@
+from apps.clients.forms import ClientForm
 from apps.documents.forms import DocumentForm
 from apps.interns.forms import InternEvaluationForm
 from apps.projects.models import Project
+
+
+class PMClientForm(ClientForm):
+    """Та же карточка клиента, но без реквизитов и внутренних комментариев —
+    это поля для сотрудников, ПМ их не видит и не трогает."""
+
+    class Meta(ClientForm.Meta):
+        fields = [
+            field for field in ClientForm.Meta.fields
+            if field not in ('requisites', 'comment')
+        ]
 
 
 class PMInternEvaluationForm(InternEvaluationForm):

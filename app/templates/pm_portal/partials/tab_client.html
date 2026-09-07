@@ -1,0 +1,22 @@
+<div class="panel">
+    <div class="panel-head">
+        <h2>Клиент</h2>
+        <a href="{% url 'pm_portal:client_edit' project.pk %}" class="btn btn--secondary btn--sm">
+            {% if client %}Редактировать{% else %}+ Заполнить данные{% endif %}
+        </a>
+    </div>
+    {% if client %}
+        <dl class="def-grid">
+            <div class="def"><dt>Организация</dt><dd>{{ client.organization }}</dd></div>
+            <div class="def"><dt>ФИО представителя</dt><dd>{{ client.contact_name|default:'—' }}</dd></div>
+            <div class="def"><dt>Телефон</dt><dd>{{ client.phone|default:'—' }}</dd></div>
+            <div class="def"><dt>Email</dt><dd>{{ client.email|default:'—' }}</dd></div>
+            <div class="def"><dt>Город</dt><dd>{{ client.city|default:'—' }}</dd></div>
+            <div class="def"><dt>Адрес</dt><dd>{{ client.address|default:'—' }}</dd></div>
+        </dl>
+    {% else %}
+        <div class="empty" style="padding: 6px 2px; font-size: 13px">
+            Данные клиента ещё не заполнены — нажмите «+ Заполнить данные».
+        </div>
+    {% endif %}
+</div>

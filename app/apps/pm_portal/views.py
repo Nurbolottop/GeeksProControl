@@ -12,7 +12,7 @@ from apps.documents import services as document_services
 from apps.interns.models import Intern, InternEvaluation
 from apps.interns.services import add_evaluation
 from apps.pm_portal import services
-from apps.pm_portal.forms import PMDocumentForm, PMInternEvaluationForm
+from apps.pm_portal.forms import PMClientForm, PMDocumentForm, PMInternEvaluationForm
 from apps.projects.models import ProjectReport
 from apps.projects.services import calculate_deadline_status
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
@@ -61,6 +61,8 @@ def project_detail(request, pk):
     elif tab == 'documents':
         document_services.ensure_default_types()
         context['documents'] = project.documents.active().select_related('doc_type')
+    elif tab == 'client':
+        context['client'] = project.client
     return render(request, 'pm_portal/project_detail.html', context)
 
 
@@ -359,5 +361,22 @@ def document_upload(request, pk):
         messages.success(request, f'Документ «{document.doc_type}» добавлен.')
         return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=documents")
     return render(request, 'pm_portal/document_form.html', {
+        'form': form, 'project': project,
+    })
+
+
+@login_required
+def client_edit(request, pk):
+    """Данные заказчика этого проекта — заполняет ПМ."""
+    project = services.pm_project_or_404(request.user, pk)
+    form = PMClientForm(request.POST or None, instance=project.client)
+    if request.method == 'POST' and form.is_valid():
+        client = form.save()
+        if project.client_id != client.pk:
+            project.client = client
+            project.save(update_fields=['client', 'updated_at'])
+        messages.success(request, 'Данные клиента сохранены.')
+        return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=client")
+    return render(request, 'pm_portal/client_form.html', {
         'form': form, 'project': project,
     })
