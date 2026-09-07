@@ -4,42 +4,109 @@
 
 {% block content %}
 <p><a href="{% url 'pm_portal:project_detail' project.pk %}?tab=attendance">← Собрания</a></p>
-<h1>Собрание {{ meeting.date|date:'d.m.Y' }}</h1>
-
-<div class="panel-head" style="margin-bottom: 14px;">
-    <h2 style="margin:0">Отметки</h2>
-    <form method="post" action="{% url 'pm_portal:meeting_mark_all' project.pk meeting.pk %}" style="margin:0">
-        {% csrf_token %}
-        <button type="submit" class="btn btn--secondary btn--sm">Отметить всех присутствующими</button>
-    </form>
-</div>
-{% for section in sections %}
-        <div class="panel team-section">
-            <div class="team-section__head">
-                <h2><span class="badge badge--{{ section.tone }}">{{ section.label }}</span></h2>
-                <span class="team-section__count">{{ section.count }} чел.</span>
-            </div>
-            <div class="member-list">
-                {% for member in section.members %}
-                    <div class="member">
-                        <div class="member__avatar">{{ member.person_name|first|upper }}</div>
-                        <div class="member__body">
-                            <span class="member__name">{{ member.person_name }}</span>
-                        </div>
-                        <form method="post" action="{% url 'pm_portal:meeting_mark_toggle' project.pk meeting.pk %}" style="margin:0">
-                            {% csrf_token %}
-                            <input type="hidden" name="intern" value="{{ member.intern_id }}">
-                            <button type="submit"
-                                class="badge {% if member.mark.status == 'present' %}badge--green{% elif member.mark.status == 'late' %}badge--yellow{% elif member.mark.status == 'excused' %}badge--blue{% elif member.mark.status == 'absent' %}badge--red{% else %}badge--gray{% endif %}"
-                                style="border: none; cursor: pointer;">
-                                {% if member.mark %}{{ member.mark.get_status_display }}{% else %}Отметить{% endif %}
-                            </button>
-                        </form>
-                    </div>
-                {% endfor %}
-            </div>
+<div class="page-head">
+    <div>
+        <h1>{{ meeting.get_kind_display }} · {{ meeting.date|date:'d.m.Y' }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            {% if meeting.host %}<span class="badge badge--gray">ведёт {{ meeting.host.full_name }}</span>{% endif %}
+            {% if rate is not None %}
+                <span class="badge badge--{% if rate >= 80 %}green{% elif rate >= 60 %}yellow{% else %}red{% endif %}">
+                    Посещаемость: {{ rate }}%
+                </span>
+            {% endif %}
+            {% if average_score is not None %}
+                <span class="badge badge--{% if average_score >= 8 %}green{% elif average_score >= 5 %}yellow{% else %}red{% endif %}">
+                    Средний балл: {{ average_score }}
+                </span>
+            {% endif %}
         </div>
-    {% empty %}
-    <div class="empty" style="padding: 6px 2px; font-size: 13px">В команде пока никого нет.</div>
-{% endfor %}
+    </div>
+    <div class="page-actions">
+        <form method="post" action="{% url 'pm_portal:meeting_mark_all' project.pk meeting.pk %}" style="margin:0">
+            {% csrf_token %}
+            <button type="submit" class="btn">✓ Отметить всех</button>
+        </form>
+    </div>
+</div>
+
+<div x-data="{ tab: '{{ tab }}' }">
+    <div class="tabs">
+        <a href="#" @click.prevent="tab='marks'" :class="tab === 'marks' && 'is-active'">
+            Посещаемость <span class="tab-count">{{ marked }}/{{ total_people }}</span>
+        </a>
+        <a href="#" @click.prevent="tab='scores'" :class="tab === 'scores' && 'is-active'">
+            Активность <span class="tab-count">{{ scored }}/{{ total_people }}</span>
+        </a>
+    </div>
+
+    <div x-show="tab === 'marks'" x-cloak>
+        {% for section in sections %}
+            <div class="panel team-section">
+                <div class="team-section__head">
+                    <h2><span class="badge badge--{{ section.tone }}">{{ section.label }}</span></h2>
+                    <span class="team-section__count">{{ section.count }} чел.</span>
+                </div>
+                <div class="member-list">
+                    {% for member in section.members %}
+                        <div class="member">
+                            <div class="member__avatar">{{ member.person_name|first|upper }}</div>
+                            <div class="member__body">
+                                <span class="member__name">{{ member.person_name }}</span>
+                            </div>
+                            <form method="post" action="{% url 'pm_portal:meeting_mark_toggle' project.pk meeting.pk %}" style="margin:0">
+                                {% csrf_token %}
+                                <input type="hidden" name="intern" value="{{ member.intern_id }}">
+                                <button type="submit"
+                                    class="badge {% if member.mark.status == 'present' %}badge--green{% elif member.mark.status == 'late' %}badge--yellow{% elif member.mark.status == 'excused' %}badge--blue{% elif member.mark.status == 'absent' %}badge--red{% else %}badge--gray{% endif %}"
+                                    style="border: none; cursor: pointer;">
+                                    {% if member.mark %}{{ member.mark.get_status_display }}{% else %}Отметить{% endif %}
+                                </button>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% empty %}
+            <div class="empty" style="padding: 6px 2px; font-size: 13px">В команде пока никого нет.</div>
+        {% endfor %}
+    </div>
+
+    <div x-show="tab === 'scores'" x-cloak>
+        <div class="score-hint">
+            Кликните по шкале — балл выставится сразу.
+            <strong>0–4</strong> — не тянет, <strong>5–7</strong> — норма, <strong>8–10</strong> — сильно.
+            Неоценённые идут первыми; ✕ снимает балл.
+            {% if period_start %}
+                За период с {{ period_start|date:'d.m.Y' }} по {{ meeting.date|date:'d.m.Y' }} ({{ period_days }} дн.).
+            {% endif %}
+        </div>
+        {% for section in sections %}
+            <div class="panel team-section">
+                <div class="team-section__head">
+                    <h2><span class="badge badge--{{ section.tone }}">{{ section.label }}</span></h2>
+                    <span class="team-section__count">{{ section.count }} чел.</span>
+                </div>
+                <div class="table-wrap">
+                    <table class="data">
+                        <thead>
+                        <tr>
+                            <th>Человек</th>
+                            <th>Активность за период</th>
+                            <th>Прошлый раз</th>
+                            <th>Комментарий</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for member in section.members %}
+                            {% include 'pm_portal/partials/score_row.html' %}
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% empty %}
+            <div class="empty" style="padding: 6px 2px; font-size: 13px">В команде пока никого нет.</div>
+        {% endfor %}
+    </div>
+</div>
 {% endblock %}

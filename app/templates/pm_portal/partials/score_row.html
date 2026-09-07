@@ -1,0 +1,63 @@
+<tr id="score-{{ member.intern.pk }}" class="score-line score-line--{{ member.score.level }}">
+    <td>
+        <strong>{{ member.person_name }}</strong>
+        <div style="font-size:11.5px; color: var(--text-muted)">
+            {{ member.intern.specialization|default:'' }}
+        </div>
+    </td>
+    <td>
+        <div class="score-line__bar">
+            <button type="button" class="score-zero {% if member.score.score == 0 %}is-on{% endif %}"
+                    title="Совсем не работал"
+                    hx-post="{% url 'pm_portal:meeting_score' project.pk meeting.pk %}"
+                    hx-vals='{"intern": "{{ member.intern.pk }}", "score": "{% if member.score.score == 0 %}clear{% else %}0{% endif %}"}'
+                    hx-target="#score-{{ member.intern.pk }}" hx-swap="outerHTML">0</button>
+            <div class="score-bar score-bar--{{ member.score.level }}">
+                {% for segment in member.score.segments %}
+                    <button type="button" class="score-seg {% if segment.on %}is-on{% endif %}"
+                            title="{{ segment.value }} из 10"
+                            hx-post="{% url 'pm_portal:meeting_score' project.pk meeting.pk %}"
+                            hx-vals='{"intern": "{{ member.intern.pk }}", "score": "{% if member.score.score == segment.value %}clear{% else %}{{ segment.value }}{% endif %}"}'
+                            hx-target="#score-{{ member.intern.pk }}" hx-swap="outerHTML"><span>{{ segment.value }}</span></button>
+                {% endfor %}
+            </div>
+            <div class="score-value score-value--{{ member.score.level }}">
+                {% if member.score.score is None %}
+                    <span class="score-value__none">не оценён</span>
+                {% else %}
+                    <strong>{{ member.score.score }}</strong><span>/10</span>
+                {% endif %}
+            </div>
+            {% if member.score.score is not None %}
+                <button type="button" class="score-clear" title="Снять оценку"
+                        hx-post="{% url 'pm_portal:meeting_score' project.pk meeting.pk %}"
+                        hx-vals='{"intern": "{{ member.intern.pk }}", "score": "clear"}'
+                        hx-target="#score-{{ member.intern.pk }}" hx-swap="outerHTML">✕</button>
+            {% endif %}
+        </div>
+    </td>
+    <td class="score-prev">
+        {% if member.score.previous is not None %}
+            <span class="score-prev__was">было {{ member.score.previous }}</span>
+            {% if member.score.delta > 0 %}
+                <span class="score-delta score-delta--up">↑ +{{ member.score.delta }}</span>
+            {% elif member.score.delta < 0 %}
+                <span class="score-delta score-delta--down">↓ {{ member.score.delta }}</span>
+            {% elif member.score.delta == 0 %}
+                <span class="score-delta score-delta--same">= без изменений</span>
+            {% endif %}
+        {% else %}
+            <span class="score-prev__none">—</span>
+        {% endif %}
+    </td>
+    <td style="min-width: 200px">
+        <input type="text" class="score-note" placeholder="за что балл"
+               value="{{ member.score.score_comment }}" maxlength="255"
+               hx-post="{% url 'pm_portal:meeting_score' project.pk meeting.pk %}"
+               hx-trigger="change"
+               hx-include="this"
+               hx-vals='{"intern": "{{ member.intern.pk }}"}'
+               name="comment"
+               hx-target="#score-{{ member.intern.pk }}" hx-swap="outerHTML">
+    </td>
+</tr>

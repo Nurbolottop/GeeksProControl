@@ -248,6 +248,53 @@ class PmAttendanceTests(TestCase):
             Attendance.objects.filter(meeting=meeting, intern=self.pm_intern).exists(),
         )
 
+    def test_score_person_creates_work_score(self):
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import MeetingKind, WorkScore
+
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
+        response = self.client.post(
+            reverse("pm_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
+            {"intern": self.pm_intern.pk, "score": "8"},
+        )
+        self.assertEqual(response.status_code, 200)
+        score = WorkScore.objects.get(meeting=meeting, intern=self.pm_intern)
+        self.assertEqual(score.score, 8)
+
+    def test_cannot_score_on_foreign_project(self):
+        from apps.flows.models import Flow, Group
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import MeetingKind, WorkScore
+
+        other_flow = Flow.objects.create(number=3, status=Flow.Status.ACTIVE)
+        other_group = Group.objects.create(
+            flow=other_flow, number=1, project=self.project_b,
+        )
+        meeting = attendance_services.create_meeting(
+            other_group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
+        response = self.client.post(
+            reverse("pm_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
+            {"intern": self.pm_intern.pk, "score": "8"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(WorkScore.objects.filter(meeting=meeting).exists())
+
+    def test_meeting_detail_shows_grouped_scores_tab(self):
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import MeetingKind
+
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
+        response = self.client.get(
+            reverse("pm_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
+        )
+        self.assertContains(response, "Активность")
+        self.assertContains(response, "Project Manager")
+
 
 class PmEvaluationTests(PmProjectOwnershipTests):
     """Оценки — только для тех, кто в команде своего проекта."""

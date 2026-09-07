@@ -7,7 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from apps.attendance import services as attendance_services
-from apps.attendance.models import GroupMeeting, MeetingKind
+from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
 from apps.documents import services as document_services
 from apps.interns.models import Intern, InternEvaluation
 from apps.interns.services import add_evaluation
@@ -98,18 +98,91 @@ def meeting_detail(request, pk, meeting_pk):
     group = _group_or_404(project)
     meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
     marks = {mark.intern_id: mark for mark in meeting.attendance.all()}
+    scores = {score.intern_id: score for score in meeting.scores.all()}
+    previous = attendance_services.previous_scores(meeting)
     members = list(
         group.members.select_related('intern__specialization')
         .filter(intern__isnull=False).order_by('role', 'intern__full_name'),
     )
     for member in members:
         member.mark = marks.get(member.intern_id)
+        score = scores.get(member.intern_id)
+        value = score.score if score else None
+        member.score = attendance_services.score_row(
+            meeting, member.intern, score=value,
+            comment=score.comment if score else '',
+            previous=previous.get(member.intern_id),
+        )
     sections = [
         section for section in group_by_role(members) if section['members']
     ]
+    attended = sum(
+        1 for m in members if m.mark and m.mark.status in ('present', 'late')
+    )
+    marked = sum(1 for m in members if m.mark)
+    given = [m.score['score'] for m in members if m.score['score'] is not None]
     return render(request, 'pm_portal/meeting_detail.html', {
         'project': project, 'group': group, 'meeting': meeting,
         'sections': sections,
+        'marked': marked, 'attended': attended, 'total_people': len(members),
+        'rate': round(attended / marked * 100) if marked else None,
+        'scored': len(given),
+        'average_score': round(sum(given) / len(given), 1) if given else None,
+        'period_start': meeting.period_start, 'period_days': meeting.period_days,
+        'tab': 'scores' if request.GET.get('tab') == 'scores' else 'marks',
+    })
+
+
+@login_required
+def meeting_score(request, pk, meeting_pk):
+    """Клик по шкале «Активность» — балл (0–10) или комментарий за период."""
+    project = services.pm_project_or_404(request.user, pk)
+    group = _group_or_404(project)
+    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    if request.method != 'POST':
+        raise Http404
+    member = get_object_or_404(
+        group.members.select_related('intern__specialization').filter(intern__isnull=False),
+        intern_id=request.POST.get('intern'),
+    )
+    intern = member.intern
+    entry = WorkScore.objects.filter(meeting=meeting, intern=intern).first()
+
+    if 'comment' in request.POST:
+        comment = request.POST.get('comment', '').strip()[:255]
+        if entry:
+            entry.comment = comment
+            entry.save(update_fields=['comment', 'marked_by', 'updated_at'])
+        elif comment:
+            entry = WorkScore.objects.create(
+                meeting=meeting, intern=intern,
+                score=0, comment=comment, marked_by=request.user,
+            )
+    else:
+        raw = request.POST.get('score', '')
+        if raw.isdigit() and 0 <= int(raw) <= WorkScore.MAX:
+            value = int(raw)
+            if entry:
+                entry.score = value
+                entry.marked_by = request.user
+                entry.save(update_fields=['score', 'marked_by', 'updated_at'])
+            else:
+                entry = WorkScore.objects.create(
+                    meeting=meeting, intern=intern, score=value,
+                    marked_by=request.user,
+                )
+        elif entry:
+            entry.delete()
+            entry = None
+
+    member.score = attendance_services.score_row(
+        meeting, intern,
+        score=entry.score if entry else None,
+        comment=entry.comment if entry else '',
+        previous=attendance_services.previous_scores(meeting).get(intern.pk),
+    )
+    return render(request, 'pm_portal/partials/score_row.html', {
+        'project': project, 'meeting': meeting, 'member': member,
     })
 
 
