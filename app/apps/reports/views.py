@@ -84,6 +84,26 @@ def kpi_view(request):
 
 
 @login_required
+def presentation(request):
+    """«До / после» — показатели компании на две даты, для презентации."""
+    today = timezone.localdate()
+    try:
+        before = datetime.date.fromisoformat(request.GET.get('before', ''))
+    except ValueError:
+        before = services.earliest_project_date()
+
+    before_stats = services.presentation_snapshot(before)
+    after_stats = services.presentation_snapshot(today)
+    cards = [
+        {'label': label, 'before': before_stats[key], 'after': after_stats[key]}
+        for label, key in services.PRESENTATION_ROWS
+    ]
+    return render(request, 'reports/presentation.html', {
+        'cards': cards, 'before': before, 'today': today,
+    })
+
+
+@login_required
 def weekly_delete(request, pk):
     """Удаление недельного отчёта вместе с написанным текстом."""
     report = get_object_or_404(WeeklyReport, pk=pk)

@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}Презентация — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Показатели: до и после</h1>
+        <div class="sub">Сравнение состояния компании на две даты</div>
+    </div>
+</div>
+
+<form method="get" class="filters">
+    <label for="before-date" style="align-self:center; font-size:13px; color:var(--text-muted)">До:</label>
+    <input type="date" id="before-date" name="before" value="{{ before|date:'Y-m-d' }}">
+    <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+</form>
+
+<div class="present-grid">
+    {% for card in cards %}
+        <div class="present-card">
+            <div class="present-card__label">{{ card.label }}</div>
+            <div class="present-card__row">
+                <div class="present-card__stat">
+                    <span class="present-card__value present-card__value--before">{{ card.before }}</span>
+                    <span class="present-card__tag">{{ before|date:'d.m.Y' }}</span>
+                </div>
+                <span class="present-card__arrow">→</span>
+                <div class="present-card__stat">
+                    <span class="present-card__value present-card__value--after">{{ card.after }}</span>
+                    <span class="present-card__tag">{{ today|date:'d.m.Y' }}</span>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

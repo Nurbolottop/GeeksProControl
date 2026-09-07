@@ -429,3 +429,62 @@ class BackwardWeekTests(TestCase):
             response.context["last_week"], this_week - datetime.timedelta(days=7),
         )
         self.assertContains(response, "за прошедшую неделю")
+
+
+class PresentationSnapshotTests(TestCase):
+    """«До/после»: показатели считаются по датам событий, не по статусу."""
+
+    def test_snapshot_counts_only_up_to_date(self):
+        from apps.reports.services import presentation_snapshot
+
+        old = Project.objects.create(name="Старый")
+        old.created_at = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+        old.save(update_fields=["created_at"])
+        new = Project.objects.create(name="Новый")
+        new.created_at = datetime.datetime(2026, 6, 1, tzinfo=datetime.UTC)
+        new.save(update_fields=["created_at"])
+
+        before = presentation_snapshot(datetime.date(2026, 3, 1))
+        after = presentation_snapshot(datetime.date(2026, 12, 31))
+        self.assertEqual(before["projects_total"], 1)
+        self.assertEqual(after["projects_total"], 2)
+
+    def test_completed_counted_by_actual_end_date(self):
+        from apps.reports.services import presentation_snapshot
+
+        project = Project.objects.create(
+            name="Сдан", status=ProjectStatus.COMPLETED,
+            actual_end_date=datetime.date(2026, 5, 1),
+        )
+        before = presentation_snapshot(datetime.date(2026, 4, 1))
+        after = presentation_snapshot(datetime.date(2026, 6, 1))
+        self.assertEqual(before["projects_completed"], 0)
+        self.assertEqual(after["projects_completed"], 1)
+
+
+class PresentationViewTests(TestCase):
+    """Страница «Презентация» под /reports/presentation/."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head3", password="x")
+        self.client.force_login(self.user)
+
+    def test_page_loads_with_default_before_date(self):
+        Project.objects.create(name="Первый")
+        response = self.client.get(reverse("reports:presentation"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(len(response.context["cards"]) > 0)
+
+    def test_before_date_from_query_param(self):
+        response = self.client.get(
+            reverse("reports:presentation"), {"before": "2026-01-01"},
+        )
+        self.assertEqual(response.context["before"], datetime.date(2026, 1, 1))
+
+    def test_invalid_before_falls_back_to_earliest_project(self):
+        response = self.client.get(
+            reverse("reports:presentation"), {"before": "not-a-date"},
+        )
+        self.assertEqual(response.status_code, 200)
