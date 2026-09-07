@@ -181,50 +181,6 @@ def snapshot_kpi(period_type: str = KPISnapshot.Period.WEEK) -> KPISnapshot:
     return snapshot
 
 
-# Показатели презентации «до/после»: подпись → ключ в presentation_snapshot()
-PRESENTATION_ROWS = [
-    ('Проектов всего', 'projects_total'),
-    ('Завершено проектов', 'projects_completed'),
-    ('Стажёров заведено', 'interns_total'),
-    ('Вышло на стажировку', 'interns_started'),
-    ('Клиентов', 'clients_total'),
-    ('Потоков запущено', 'flows_started'),
-]
-
-
-def presentation_snapshot(as_of: datetime.date) -> dict:
-    """Показатели компании «по состоянию на дату» — для страницы «до/после».
-
-    Считается по датам самих событий (создание, выход на стажировку,
-    фактическое завершение), а не по текущему статусу — иначе прошлое
-    посчитать нельзя: статус отражает только «сейчас».
-    """
-    from apps.clients.models import Client
-    from apps.flows.models import Flow
-
-    return {
-        'projects_total': Project.objects.filter(
-            created_at__date__lte=as_of,
-        ).count(),
-        'projects_completed': Project.objects.filter(
-            actual_end_date__isnull=False, actual_end_date__lte=as_of,
-        ).count(),
-        'interns_total': Intern.objects.filter(
-            created_at__date__lte=as_of,
-        ).count(),
-        'interns_started': Intern.objects.filter(
-            internship_start_date__isnull=False,
-            internship_start_date__lte=as_of,
-        ).count(),
-        'clients_total': Client.objects.filter(
-            created_at__date__lte=as_of,
-        ).count(),
-        'flows_started': Flow.objects.filter(
-            start_date__isnull=False, start_date__lte=as_of,
-        ).count(),
-    }
-
-
 def earliest_project_date() -> datetime.date:
     """Дата первого проекта в системе — разумное значение «до» по умолчанию."""
     first = Project.objects.order_by('created_at').values_list(

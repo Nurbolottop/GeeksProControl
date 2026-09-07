@@ -6,7 +6,7 @@
 <div class="page-head">
     <div>
         <h1>Показатели: до и после</h1>
-        <div class="sub">Сравнение состояния компании на две даты</div>
+        <div class="sub">Те же вопросы, что и в недельном отчёте — значения на две даты рядом</div>
     </div>
 </div>
 
@@ -16,21 +16,31 @@
     <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
 </form>
 
-<div class="present-grid">
-    {% for card in cards %}
-        <div class="present-card">
-            <div class="present-card__label">{{ card.label }}</div>
-            <div class="present-card__row">
-                <div class="present-card__stat">
-                    <span class="present-card__value present-card__value--before">{{ card.before }}</span>
-                    <span class="present-card__tag">{{ before|date:'d.m.Y' }}</span>
-                </div>
-                <span class="present-card__arrow">→</span>
-                <div class="present-card__stat">
-                    <span class="present-card__value present-card__value--after">{{ card.after }}</span>
-                    <span class="present-card__tag">{{ today|date:'d.m.Y' }}</span>
-                </div>
-            </div>
+<div class="present-legend">
+    <span><span class="present-dot present-dot--before"></span> До — {{ before|date:'d.m.Y' }}</span>
+    <span><span class="present-dot present-dot--after"></span> После — {{ today|date:'d.m.Y' }}</span>
+</div>
+
+<div class="kpi-grid" style="grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));">
+    {% for section in sections %}
+        <div class="panel">
+            <h2>{{ section.title }}</h2>
+            <table class="data" style="margin-top:8px">
+                <tbody>
+                {% for row in section.rows %}
+                    <tr>
+                        <td>{{ row.label }}</td>
+                        <td style="text-align:right; white-space:nowrap; color:var(--text-muted)">
+                            {% if row.before is not None %}{{ row.before }}{{ row.suffix }}{% else %}—{% endif %}
+                        </td>
+                        <td style="text-align:center; color:var(--border-strong)">→</td>
+                        <td style="text-align:right; white-space:nowrap; font-weight:700; color:var(--primary)">
+                            {% if row.after is not None %}{{ row.after }}{{ row.suffix }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
         </div>
     {% endfor %}
 </div>

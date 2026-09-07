@@ -85,21 +85,35 @@ def kpi_view(request):
 
 @login_required
 def presentation(request):
-    """«До / после» — показатели компании на две даты, для презентации."""
+    """«До / после»: те же вопросы недельного отчёта, только значения на
+    две даты рядом — что было и что стало."""
     today = timezone.localdate()
     try:
         before = datetime.date.fromisoformat(request.GET.get('before', ''))
     except ValueError:
         before = services.earliest_project_date()
 
-    before_stats = services.presentation_snapshot(before)
-    after_stats = services.presentation_snapshot(today)
-    cards = [
-        {'label': label, 'before': before_stats[key], 'after': after_stats[key]}
-        for label, key in services.PRESENTATION_ROWS
-    ]
+    before_week, _ = weekly_form.week_bounds(before)
+    after_week, _ = weekly_form.week_bounds(today)
+    before_sections = weekly_form.as_sections(weekly_form.build(before_week))
+    after_sections = weekly_form.as_sections(weekly_form.build(after_week))
+
+    sections = []
+    for before_section, after_section in zip(before_sections, after_sections):
+        rows = []
+        for before_row, after_row in zip(
+            before_section['rows'], after_section['rows'],
+        ):
+            rows.append({
+                'label': before_row['label'],
+                'suffix': before_row['suffix'],
+                'before': before_row['value'] if not before_row['no_data'] else None,
+                'after': after_row['value'] if not after_row['no_data'] else None,
+            })
+        sections.append({'title': before_section['title'], 'rows': rows})
+
     return render(request, 'reports/presentation.html', {
-        'cards': cards, 'before': before, 'today': today,
+        'sections': sections, 'before': before, 'today': today,
     })
 
 

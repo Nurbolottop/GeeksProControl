@@ -431,39 +431,9 @@ class BackwardWeekTests(TestCase):
         self.assertContains(response, "за прошедшую неделю")
 
 
-class PresentationSnapshotTests(TestCase):
-    """«До/после»: показатели считаются по датам событий, не по статусу."""
-
-    def test_snapshot_counts_only_up_to_date(self):
-        from apps.reports.services import presentation_snapshot
-
-        old = Project.objects.create(name="Старый")
-        old.created_at = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
-        old.save(update_fields=["created_at"])
-        new = Project.objects.create(name="Новый")
-        new.created_at = datetime.datetime(2026, 6, 1, tzinfo=datetime.UTC)
-        new.save(update_fields=["created_at"])
-
-        before = presentation_snapshot(datetime.date(2026, 3, 1))
-        after = presentation_snapshot(datetime.date(2026, 12, 31))
-        self.assertEqual(before["projects_total"], 1)
-        self.assertEqual(after["projects_total"], 2)
-
-    def test_completed_counted_by_actual_end_date(self):
-        from apps.reports.services import presentation_snapshot
-
-        project = Project.objects.create(
-            name="Сдан", status=ProjectStatus.COMPLETED,
-            actual_end_date=datetime.date(2026, 5, 1),
-        )
-        before = presentation_snapshot(datetime.date(2026, 4, 1))
-        after = presentation_snapshot(datetime.date(2026, 6, 1))
-        self.assertEqual(before["projects_completed"], 0)
-        self.assertEqual(after["projects_completed"], 1)
-
-
 class PresentationViewTests(TestCase):
-    """Страница «Презентация» под /reports/presentation/."""
+    """Страница «Презентация» — те же вопросы недельного отчёта, значения
+    на две даты рядом (что было / что стало)."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -471,11 +441,28 @@ class PresentationViewTests(TestCase):
         self.user = get_user_model().objects.create_user(username="head3", password="x")
         self.client.force_login(self.user)
 
-    def test_page_loads_with_default_before_date(self):
-        Project.objects.create(name="Первый")
+    def test_page_uses_same_sections_as_weekly_report(self):
         response = self.client.get(reverse("reports:presentation"))
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(len(response.context["cards"]) > 0)
+        titles = [section["title"] for section in response.context["sections"]]
+        self.assertIn("Проекты в разработке", titles)
+        self.assertIn("Внутренние собрания за неделю", titles)
+
+    def test_before_and_after_values_differ_by_date(self):
+        monday = datetime.date(2026, 8, 17)
+        Project.objects.create(name="Старый", contract_date=monday)
+
+        response = self.client.get(
+            reverse("reports:presentation"), {"before": monday.isoformat()},
+        )
+        sections = {s["title"]: s for s in response.context["sections"]}
+        rows = {
+            row["label"]: row
+            for row in sections["Проекты в разработке"]["rows"]
+        }
+        self.assertEqual(rows["Подписано договоров за неделю"]["before"], 1)
+        # к сегодняшней неделе этот договор уже не «за неделю» — 0, не 1
+        self.assertEqual(rows["Подписано договоров за неделю"]["after"], 0)
 
     def test_before_date_from_query_param(self):
         response = self.client.get(
@@ -488,3 +475,13 @@ class PresentationViewTests(TestCase):
             reverse("reports:presentation"), {"before": "not-a-date"},
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_no_data_hint_shown_as_dash_not_zero(self):
+        response = self.client.get(reverse("reports:presentation"))
+        sections = {s["title"]: s for s in response.context["sections"]}
+        graduates_row = {
+            row["label"]: row
+            for row in sections["Выпускники — на конец недели"]["rows"]
+        }["Успешно завершившие стажировку"]
+        self.assertIsNone(graduates_row["before"])
+        self.assertIsNone(graduates_row["after"])
