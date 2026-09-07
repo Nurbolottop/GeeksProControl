@@ -249,6 +249,15 @@ def resume_bank_list(request):
     return _flagged_list(request, 'in_resume_bank', 'Банк резюме')
 
 
+@login_required
+def graduates_list(request):
+    """Стажёры с завершённых проектов — кандидаты в резерв/банк резюме."""
+    people = services.graduated_interns()
+    return render(request, 'interns/graduates_list.html', {
+        'people': people, 'title': 'Выпускники',
+    })
+
+
 def resume_bank_apply(request):
     """Публичная анкета «Банк резюме» — без входа в систему.
 

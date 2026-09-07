@@ -353,3 +353,67 @@ class ReserveResumeBankToggleTests(TestCase):
         self.intern.save()
         response = self.client.get(self.intern.get_absolute_url())
         self.assertContains(response, '<span class="badge badge--blue">Банк резюме</span>')
+
+
+class GraduatesListTests(TestCase):
+    """«Выпускники»: стажёры, вышедшие из команды завершённого проекта."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head3", password="x")
+        self.client.force_login(self.user)
+
+    def test_shows_intern_from_completed_project_only(self):
+        import datetime
+
+        from apps.projects.models import Project, ProjectStatus
+        from apps.teams.models import TeamMember, TeamRole
+
+        finished = Project.objects.create(
+            name="Завершённый", status=ProjectStatus.COMPLETED,
+            actual_end_date=datetime.date(2026, 1, 15),
+        )
+        active = Project.objects.create(name="Активный", status=ProjectStatus.ACTIVE)
+
+        graduate = Intern.objects.create(full_name="Выпускник Один")
+        TeamMember.objects.create(
+            project=finished, intern=graduate, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT, left_at=datetime.date(2026, 1, 15),
+        )
+        still_working = Intern.objects.create(full_name="Ещё Работает")
+        TeamMember.objects.create(
+            project=active, intern=still_working, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        response = self.client.get(reverse("interns:graduates"))
+        names = [p.full_name for p in response.context["people"]]
+        self.assertEqual(names, ["Выпускник Один"])
+        self.assertContains(response, "Завершённый")
+
+    def test_reserve_togglable_but_resume_bank_is_read_only(self):
+        import datetime
+
+        from apps.projects.models import Project, ProjectStatus
+        from apps.teams.models import TeamMember, TeamRole
+
+        finished = Project.objects.create(
+            name="Завершённый", status=ProjectStatus.COMPLETED,
+            actual_end_date=datetime.date(2026, 1, 15),
+        )
+        graduate = Intern.objects.create(full_name="Выпускник Два", in_resume_bank=True)
+        TeamMember.objects.create(
+            project=finished, intern=graduate, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT, left_at=datetime.date(2026, 1, 15),
+        )
+
+        response = self.client.get(reverse("interns:graduates"))
+        self.assertContains(response, "В банке резюме")
+        self.assertContains(
+            response, reverse("interns:toggle_reserve", args=[graduate.pk]),
+        )
+
+        self.client.post(reverse("interns:toggle_reserve", args=[graduate.pk]))
+        graduate.refresh_from_db()
+        self.assertTrue(graduate.in_talent_reserve)

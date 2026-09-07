@@ -102,12 +102,14 @@ def meeting_detail(request, pk, meeting_pk):
         group.members.select_related('intern__specialization')
         .filter(intern__isnull=False).order_by('role', 'intern__full_name'),
     )
-    rows = [
-        {'member': member, 'mark': marks.get(member.intern_id)}
-        for member in members
+    for member in members:
+        member.mark = marks.get(member.intern_id)
+    sections = [
+        section for section in group_by_role(members) if section['members']
     ]
     return render(request, 'pm_portal/meeting_detail.html', {
-        'project': project, 'group': group, 'meeting': meeting, 'rows': rows,
+        'project': project, 'group': group, 'meeting': meeting,
+        'sections': sections,
     })
 
 
