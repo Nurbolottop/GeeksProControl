@@ -186,6 +186,74 @@ class InternListProjectColumnTests(TestCase):
         self.assertLess(with_more_interns, baseline + 10)
 
 
+class InternProjectAddRemoveTests(TestCase):
+    """С карточки стажёра можно назначить/снять проект напрямую."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.training.models import Specialization
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+        self.spec = Specialization.objects.create(name="Backend")
+        self.intern = Intern.objects.create(
+            full_name="Аскар Тестов", specialization=self.spec,
+        )
+
+    def test_add_to_project_creates_membership_with_role_from_specialization(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember
+
+        project = Project.objects.create(name="Балажан")
+        response = self.client.post(
+            reverse("interns:project_add", args=[self.intern.pk]),
+            {"project": project.pk, "comment": ""},
+        )
+        member = TeamMember.objects.get(intern=self.intern, project=project)
+        self.assertEqual(member.role, "backend")
+        self.assertEqual(member.status, TeamMember.Status.ACTIVE)
+        self.assertRedirects(response, self.intern.get_absolute_url())
+
+    def test_detail_page_has_add_button(self):
+        response = self.client.get(self.intern.get_absolute_url())
+        self.assertContains(
+            response, reverse("interns:project_add", args=[self.intern.pk]),
+        )
+
+    def test_remove_from_project(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Балажан")
+        member = TeamMember.objects.create(
+            project=project, intern=self.intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.post(
+            reverse("interns:project_remove", args=[self.intern.pk, member.pk]),
+        )
+        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        self.assertRedirects(response, self.intern.get_absolute_url())
+
+    def test_cannot_remove_membership_belonging_to_another_intern(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        other = Intern.objects.create(full_name="Другой Стажёр")
+        project = Project.objects.create(name="Балажан")
+        member = TeamMember.objects.create(
+            project=project, intern=other, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.post(
+            reverse("interns:project_remove", args=[self.intern.pk, member.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(TeamMember.objects.filter(pk=member.pk).exists())
+
+
 class GrantPMAccessTests(TestCase):
     """Выдача логина ПМу со страницы стажёра."""
 
@@ -426,11 +494,6 @@ class ReserveResumeBankToggleTests(TestCase):
         self.client.force_login(self.user)
         self.intern = Intern.objects.create(full_name="Тестов Тумблер")
 
-    def test_detail_page_links_to_reserve_create_prefilled(self):
-        response = self.client.get(self.intern.get_absolute_url())
-        self.assertContains(response, "+ В резерв кадров")
-        self.assertContains(response, reverse("interns:reserve_create"))
-
     def test_resume_bank_shown_as_plain_badge_not_toggle(self):
         """Флаг банка резюме выставляется только формой — карточка его
         просто отображает, не даёт менять руками."""
@@ -482,7 +545,7 @@ class GraduatesListTests(TestCase):
         self.assertEqual(names, ["Выпускник Один"])
         self.assertContains(response, "Завершённый")
 
-    def test_resume_bank_read_only_and_reserve_links_out(self):
+    def test_resume_bank_shown_read_only(self):
         import datetime
 
         from apps.projects.models import Project, ProjectStatus
@@ -500,7 +563,7 @@ class GraduatesListTests(TestCase):
 
         response = self.client.get(reverse("interns:graduates"))
         self.assertContains(response, "В банке резюме")
-        self.assertContains(response, reverse("interns:reserve_create"))
+        self.assertNotContains(response, reverse("interns:reserve_create"))
 
 
 class TalentReserveStaffTests(TestCase):

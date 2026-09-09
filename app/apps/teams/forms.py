@@ -119,6 +119,27 @@ class TeamMemberForm(forms.ModelForm):
         return None
 
 
+class InternProjectAddForm(forms.ModelForm):
+    """Добавление проекта прямо с карточки стажёра — обратная сторона
+    TeamMemberForm: там из проекта выбирают человека, здесь наоборот,
+    стажёр уже известен (фиксируется во view), выбирается только проект."""
+
+    class Meta:
+        model = TeamMember
+        fields = ['project', 'comment']
+        widgets = {
+            'comment': forms.Textarea(attrs={'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['project'].required = True
+        self.fields['project'].queryset = (
+            self.fields['project'].queryset.active().order_by('name')
+        )
+        self.fields['project'].empty_label = 'Выберите проект'
+
+
 class TeamMemberEditForm(TeamMemberForm):
     """Редактирование участника: добавляются статус и даты участия.
 

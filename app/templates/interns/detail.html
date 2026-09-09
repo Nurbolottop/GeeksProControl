@@ -12,8 +12,6 @@
             <span class="badge badge--green">{{ intern.get_status_display }}</span>
             {% if intern.rating %}<span class="badge badge--yellow">★ {{ intern.rating }}</span>{% endif %}
             {% if intern.in_resume_bank %}<span class="badge badge--blue">Банк резюме</span>{% endif %}
-            <a href="{% url 'interns:reserve_create' %}?full_name={{ intern.full_name|urlencode }}&phone={{ intern.phone|urlencode }}&email={{ intern.email|urlencode }}&city={{ intern.city|urlencode }}"
-               class="badge badge--gray" style="text-decoration:none;">+ В резерв кадров</a>
         </div>
     </div>
     <div class="page-actions">
@@ -70,22 +68,32 @@
 {% endif %}
 
 <div class="panel">
-    <h2>Текущие проекты ({{ active_memberships|length }})</h2>
+    <div class="panel-head">
+        <h2>Текущие проекты ({{ active_memberships|length }})</h2>
+        <a href="{% url 'interns:project_add' intern.pk %}" class="btn btn--secondary btn--sm">+ Добавить в проект</a>
+    </div>
     {% for member in active_memberships %}
         <div style="padding: 6px 0; border-bottom: 1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
             <div>
                 <a href="{{ member.project.get_absolute_url }}">{{ member.project.name }}</a>
                 — {{ member.get_role_display }}
             </div>
-            {% if member.role != 'team_lead' %}
-                <form method="post" action="{% url 'teams:lead_add' %}" style="margin:0">
+            <div style="display:flex; gap:8px; align-items:center">
+                {% if member.role != 'team_lead' %}
+                    <form method="post" action="{% url 'teams:lead_add' %}" style="margin:0">
+                        {% csrf_token %}
+                        <input type="hidden" name="project" value="{{ member.project_id }}">
+                        <input type="hidden" name="intern" value="{{ intern.pk }}">
+                        <input type="hidden" name="next" value="{{ intern.get_absolute_url }}">
+                        <button type="submit" class="btn btn--secondary btn--sm">Сделать тимлидом</button>
+                    </form>
+                {% endif %}
+                <form method="post" action="{% url 'interns:project_remove' intern.pk member.pk %}" style="margin:0"
+                      data-confirm="Убрать {{ intern.full_name|escapejs }} с проекта «{{ member.project.name|escapejs }}»?">
                     {% csrf_token %}
-                    <input type="hidden" name="project" value="{{ member.project_id }}">
-                    <input type="hidden" name="intern" value="{{ intern.pk }}">
-                    <input type="hidden" name="next" value="{{ intern.get_absolute_url }}">
-                    <button type="submit" class="btn btn--secondary btn--sm">Сделать тимлидом</button>
+                    <button type="submit" class="btn-edit btn-edit--danger" title="Убрать с проекта">✕</button>
                 </form>
-            {% endif %}
+            </div>
         </div>
     {% empty %}
         <div class="empty">Сейчас не назначен(а) на проекты.</div>

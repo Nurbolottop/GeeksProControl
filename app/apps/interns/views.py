@@ -4,6 +4,7 @@ from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from apps.interns import services
 from apps.interns.forms import (
@@ -14,7 +15,8 @@ from apps.interns.models import (
     Intern, InternEvaluation, InternStatus, ProfileFormLink,
     ProfileFormSubmission, TalentReserveCandidate,
 )
-from apps.teams.models import TeamMember
+from apps.teams.forms import ROLE_BY_SPECIALIZATION, InternProjectAddForm
+from apps.teams.models import TeamMember, TeamRole
 from apps.training.models import Specialization, TrainingGroup
 
 
@@ -173,7 +175,6 @@ def intern_detail(request, pk):
     past_memberships = [
         m for m in memberships if m.status == TeamMember.Status.LEFT
     ]
-    from apps.teams.models import TeamRole
     roles = {m.role for m in active_memberships}
     is_lead = TeamRole.TEAM_LEAD in roles
     is_pm = TeamRole.PROJECT_MANAGER in roles
@@ -200,6 +201,42 @@ def intern_detail(request, pk):
         'is_pm': is_pm,
     }
     return render(request, 'interns/detail.html', context)
+
+
+@login_required
+def intern_project_add(request, pk):
+    """Добавить стажёра на проект прямо с его карточки."""
+    intern = get_object_or_404(Intern, pk=pk)
+    form = InternProjectAddForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        member = form.save(commit=False)
+        member.intern = intern
+        member.group = getattr(member.project, 'group', None)
+        spec = intern.specialization
+        member.role = ROLE_BY_SPECIALIZATION.get(
+            spec.name if spec else '', TeamRole.OTHER,
+        )
+        member.joined_at = timezone.localdate()
+        member.save()
+        messages.success(
+            request, f'{intern.full_name} добавлен(а) в «{member.project.name}».',
+        )
+        return redirect(intern.get_absolute_url())
+    return render(request, 'interns/project_add_form.html', {
+        'form': form, 'intern': intern,
+    })
+
+
+@login_required
+def intern_project_remove(request, pk, member_pk):
+    """Убрать стажёра с проекта прямо с его карточки."""
+    intern = get_object_or_404(Intern, pk=pk)
+    member = get_object_or_404(TeamMember, pk=member_pk, intern=intern)
+    if request.method == 'POST':
+        name = member.project.name if member.project_id else 'проекта'
+        member.delete()
+        messages.success(request, f'Убран(а) с «{name}».')
+    return redirect(intern.get_absolute_url())
 
 
 @login_required
