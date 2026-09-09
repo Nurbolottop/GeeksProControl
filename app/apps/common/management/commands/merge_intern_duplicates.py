@@ -1,5 +1,6 @@
 """Разовая склейка дублей стажёров, возникших из-за анкеты самозаполнения:
-номер без +996 или ФИО в другом порядке не совпал с существующей записью.
+имя ввели по-английски и оно не совпало по ФИО со старой кириллической
+записью.
 
 Каждая пара — (сохраняемый id, дубль-id). Сохраняемая запись уже привязана
 к проектам (TeamMember), поэтому в неё донабираются только пустые поля из
@@ -16,17 +17,20 @@ from apps.interns.models import Intern
 
 # (keep_pk, duplicate_pk, {поле: значение из дубля, которое нужно донабрать})
 MERGES = [
-    (679, 812, {'branch': 'Ош'}),
-    (568, 809, {}),
-    (757, 810, {'branch': 'Ош'}),
-    (778, 819, {
-        'phone': '0556060726',
-        'email': 'amantayjumabaev707@gmail.com',
-        'telegram': '@Amantai_07',
-        'city': 'Бишкек',
+    (760, 822, {
+        'phone': '+996552160269',
+        'email': 'umaralapaev99@gmail.com',
+        'telegram': '@iloverayka',
         'branch': 'Бишкек',
-        'education_end_date': datetime.date(2025, 3, 25),
-        'internship_start_date': datetime.date(2026, 4, 13),
+        'education_end_date': datetime.date(2026, 4, 30),
+        'internship_start_date': datetime.date(2026, 5, 6),
+    }),
+    (717, 808, {
+        'phone': '0777787406',
+        'email': 'bknade6@gmail.com',
+        'branch': 'Бишкек',
+        'education_end_date': datetime.date(2025, 10, 1),
+        'internship_start_date': datetime.date(2025, 12, 1),
     }),
 ]
 
