@@ -24,6 +24,13 @@ class InternStatus(models.TextChoices):
 WORKING_STATUSES = (InternStatus.INTERNSHIP, InternStatus.ACTIVE)
 
 
+class Branch(models.TextChoices):
+    """Филиал — сейчас у студии их два."""
+
+    BISHKEK = 'Бишкек', 'Бишкек'
+    OSH = 'Ош', 'Ош'
+
+
 class Intern(TimeStampedModel, ArchivableModel):
     """Карточка стажёра (ТЗ §12)."""
 
@@ -32,7 +39,9 @@ class Intern(TimeStampedModel, ArchivableModel):
     email = models.EmailField('Email', blank=True)
     telegram = models.CharField('Telegram', max_length=100, blank=True)
     city = models.CharField('Город', max_length=100, blank=True)
-    branch = models.CharField('Филиал', max_length=100, blank=True)
+    branch = models.CharField(
+        'Филиал', max_length=20, choices=Branch.choices, blank=True,
+    )
     specialization = models.ForeignKey(
         Specialization, on_delete=models.PROTECT, related_name='interns',
         verbose_name='Направление', null=True, blank=True, db_index=True,

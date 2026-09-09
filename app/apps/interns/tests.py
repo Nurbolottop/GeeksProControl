@@ -320,13 +320,14 @@ class ProfileApplyTests(TestCase):
         response = self.client.post(reverse("intern_profile_apply"), {
             "full_name": "Новый Стажёр", "phone": "0700333444",
             "email": "n@example.com", "telegram": "@newintern",
-            "city": "Бишкек", "branch": "Центральный",
+            "city": "Бишкек", "branch": "Ош",
             "internship_attempt": "2",
         })
         self.assertEqual(response.status_code, 200)
         intern = Intern.objects.get(phone="0700333444")
         self.assertEqual(intern.full_name, "Новый Стажёр")
         self.assertEqual(intern.telegram, "@newintern")
+        self.assertEqual(intern.branch, "Ош")
         self.assertEqual(intern.internship_attempt, 2)
 
     def test_existing_person_by_phone_is_updated_not_duplicated(self):
@@ -350,6 +351,14 @@ class ProfileApplyTests(TestCase):
     def test_default_internship_attempt_is_one(self):
         intern = Intern.objects.create(full_name="Дефолтный")
         self.assertEqual(intern.internship_attempt, 1)
+
+    def test_branch_only_accepts_the_two_offices(self):
+        response = self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Тест Филиал", "phone": "0700999888",
+            "branch": "Какой-то другой офис", "internship_attempt": "1",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Intern.objects.filter(phone="0700999888").exists())
 
 
 class ReserveResumeBankToggleTests(TestCase):
