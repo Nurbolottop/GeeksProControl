@@ -1,6 +1,8 @@
 from django.contrib import admin
 
-from apps.interns.models import Intern, InternEvaluation, TalentReserveCandidate
+from apps.interns.models import (
+    Intern, InternEvaluation, ProfileFormLink, TalentReserveCandidate,
+)
 
 
 class InternEvaluationInline(admin.TabularInline):
@@ -28,3 +30,10 @@ class TalentReserveCandidateAdmin(admin.ModelAdmin):
     list_filter = ('specialization', 'city', 'is_archived')
     search_fields = ('full_name', 'phone', 'email')
     ordering = ('-priority', '-created_at')
+
+
+@admin.register(ProfileFormLink)
+class ProfileFormLinkAdmin(admin.ModelAdmin):
+    list_display = ('token', 'is_active', 'submissions', 'created_by', 'created_at')
+    list_filter = ('is_active',)
+    readonly_fields = ('token', 'submissions', 'created_at', 'updated_at')

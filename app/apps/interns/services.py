@@ -1,7 +1,7 @@
 """Бизнес-логика стажёров: пересчёт рейтинга (ТЗ §12.1)."""
 from decimal import Decimal
 
-from apps.interns.models import Intern, InternEvaluation
+from apps.interns.models import Intern, InternEvaluation, ProfileFormLink
 
 
 def add_evaluation(evaluation: InternEvaluation) -> InternEvaluation:
@@ -51,3 +51,24 @@ def graduated_interns() -> list[Intern]:
         interns.append(intern)
     interns.sort(key=lambda i: i.graduated_at or i.created_at.date(), reverse=True)
     return interns
+
+
+def issue_profile_form_link(user=None) -> ProfileFormLink:
+    """Выпускает новую ссылку на анкету, гася все прежние.
+
+    Активной может быть только одна ссылка: как только выпустили новую,
+    старая перестаёт открываться — в этом и смысл «непостоянной» ссылки.
+    """
+    from django.utils import timezone
+
+    ProfileFormLink.objects.filter(is_active=True).update(
+        is_active=False, deactivated_at=timezone.now(),
+    )
+    return ProfileFormLink.objects.create(
+        created_by=user if user and user.is_authenticated else None,
+    )
+
+
+def active_profile_form_link() -> ProfileFormLink | None:
+    """Действующая ссылка на анкету или None, если её ещё не выпускали."""
+    return ProfileFormLink.objects.filter(is_active=True).first()

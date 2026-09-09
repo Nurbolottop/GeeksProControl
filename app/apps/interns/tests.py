@@ -3,7 +3,11 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 
-from apps.interns.models import Intern, InternEvaluation, TalentReserveCandidate
+from apps.accounts.models import User
+from apps.interns import services
+from apps.interns.models import (
+    Intern, InternEvaluation, ProfileFormLink, TalentReserveCandidate,
+)
 from apps.interns.services import add_evaluation
 
 
@@ -313,10 +317,17 @@ class ResumeBankApplyTests(TestCase):
 
 
 class ProfileApplyTests(TestCase):
-    """Публичная анкета профиля стажёра — без входа в систему."""
+    """Публичная анкета профиля стажёра — без входа в систему.
+
+    Анкета живёт по сменяемой ссылке: перед каждым тестом выпускаем её.
+    """
+
+    def setUp(self):
+        self.link = services.issue_profile_form_link()
+        self.url = reverse("intern_profile_apply", args=[self.link.token])
 
     def test_anonymous_can_submit_full_profile(self):
-        response = self.client.post(reverse("intern_profile_apply"), {
+        response = self.client.post(self.url, {
             "full_name": "Новый Стажёр", "phone": "0700333444",
             "email": "n@example.com", "telegram": "@newintern",
             "city": "Бишкек", "branch": "Ош",
@@ -331,7 +342,7 @@ class ProfileApplyTests(TestCase):
 
     def test_existing_person_by_phone_is_updated_not_duplicated(self):
         Intern.objects.create(full_name="Старое Имя", phone="0700333444")
-        self.client.post(reverse("intern_profile_apply"), {
+        self.client.post(self.url, {
             "full_name": "Новое Имя", "phone": "0700333444",
             "city": "Ош", "internship_attempt": "1",
         })
@@ -344,7 +355,7 @@ class ProfileApplyTests(TestCase):
         """У старой карточки (только ФИО, телефон не заполнен) не должно
         появиться дубля, когда стажёр сам заполняет анкету."""
         old = Intern.objects.create(full_name="Асан Асанов")
-        self.client.post(reverse("intern_profile_apply"), {
+        self.client.post(self.url, {
             "full_name": "Асан Асанов", "phone": "0700555666",
             "city": "Бишкек", "internship_attempt": "1",
         })
@@ -355,7 +366,7 @@ class ProfileApplyTests(TestCase):
 
     def test_name_match_is_case_insensitive(self):
         Intern.objects.create(full_name="асан асанов")
-        self.client.post(reverse("intern_profile_apply"), {
+        self.client.post(self.url, {
             "full_name": "Асан Асанов", "phone": "0700555666",
             "internship_attempt": "1",
         })
@@ -365,14 +376,14 @@ class ProfileApplyTests(TestCase):
         """Если у старой записи уже есть телефон, совпадение по ФИО не
         используется — не хотим случайно склеить двух разных людей."""
         Intern.objects.create(full_name="Асан Асанов", phone="0700111111")
-        self.client.post(reverse("intern_profile_apply"), {
+        self.client.post(self.url, {
             "full_name": "Асан Асанов", "phone": "0700555666",
             "internship_attempt": "1",
         })
         self.assertEqual(Intern.objects.filter(full_name="Асан Асанов").count(), 2)
 
     def test_phone_is_required(self):
-        response = self.client.post(reverse("intern_profile_apply"), {
+        response = self.client.post(self.url, {
             "full_name": "Без Телефона", "internship_attempt": "1",
         })
         self.assertEqual(response.status_code, 200)
@@ -383,7 +394,7 @@ class ProfileApplyTests(TestCase):
         self.assertEqual(intern.internship_attempt, 1)
 
     def test_branch_only_accepts_the_two_offices(self):
-        response = self.client.post(reverse("intern_profile_apply"), {
+        response = self.client.post(self.url, {
             "full_name": "Тест Филиал", "phone": "0700999888",
             "branch": "Какой-то другой офис", "internship_attempt": "1",
         })
@@ -391,11 +402,11 @@ class ProfileApplyTests(TestCase):
         self.assertFalse(Intern.objects.filter(phone="0700999888").exists())
 
     def test_second_submission_in_same_session_is_blocked(self):
-        self.client.post(reverse("intern_profile_apply"), {
+        self.client.post(self.url, {
             "full_name": "Первый", "phone": "0700111333",
             "internship_attempt": "1",
         })
-        self.client.post(reverse("intern_profile_apply"), {
+        self.client.post(self.url, {
             "full_name": "Второй", "phone": "0700111444",
             "internship_attempt": "1",
         })
@@ -617,3 +628,57 @@ class TalentReserveApplyTests(TestCase):
         self.assertFalse(
             TalentReserveCandidate.objects.filter(phone="0700111444").exists(),
         )
+
+
+class ProfileFormLinkTests(TestCase):
+    """Ссылка на анкету — непостоянная: новая гасит предыдущую."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="pm", password="pass12345")
+        self.client.force_login(self.user)
+
+    def test_old_permanent_url_no_longer_opens_the_form(self):
+        response = self.client.get("/intern-profile/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_new_link_deactivates_the_previous_one(self):
+        old = services.issue_profile_form_link(self.user)
+        self.client.post(reverse("interns:profile_link_create"))
+        old.refresh_from_db()
+        self.assertFalse(old.is_active)
+        self.assertEqual(ProfileFormLink.objects.filter(is_active=True).count(), 1)
+
+    def test_form_opens_only_by_active_link(self):
+        link = services.issue_profile_form_link(self.user)
+        self.client.logout()
+        url = reverse("intern_profile_apply", args=[link.token])
+        self.assertEqual(self.client.get(url).status_code, 200)
+        link.deactivate()
+        self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_submission_by_dead_link_is_ignored(self):
+        link = services.issue_profile_form_link(self.user)
+        url = reverse("intern_profile_apply", args=[link.token])
+        link.deactivate()
+        self.client.logout()
+        self.client.post(url, {
+            "full_name": "Мимо Кассы", "phone": "0700777111",
+            "internship_attempt": "1",
+        })
+        self.assertFalse(Intern.objects.filter(phone="0700777111").exists())
+
+    def test_submission_counter_grows(self):
+        link = services.issue_profile_form_link(self.user)
+        self.client.logout()
+        self.client.post(reverse("intern_profile_apply", args=[link.token]), {
+            "full_name": "Считаемый", "phone": "0700777222",
+            "internship_attempt": "1",
+        })
+        link.refresh_from_db()
+        self.assertEqual(link.submissions, 1)
+
+    def test_disable_link_from_the_list_page(self):
+        link = services.issue_profile_form_link(self.user)
+        self.client.post(reverse("interns:profile_link_disable"))
+        link.refresh_from_db()
+        self.assertFalse(link.is_active)

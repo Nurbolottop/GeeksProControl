@@ -9,8 +9,47 @@
         <div class="sub">Всего: {{ page.paginator.count }}</div>
     </div>
     <div class="page-actions">
+        <form method="post" action="{% url 'interns:profile_link_create' %}" style="display: inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--secondary"
+                    onclick="return confirm('Создать новую ссылку на анкету? Прежняя перестанет работать.')">
+                + Новая ссылка на анкету
+            </button>
+        </form>
         <a href="{% url 'interns:create' %}" class="btn">+ Новый стажёр</a>
     </div>
+</div>
+
+<div class="panel" style="margin-bottom: 16px;">
+    {% if profile_link %}
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div>
+                <div class="sub">Действующая ссылка на анкету стажёра</div>
+                <a id="profile-link-url" href="{{ profile_link.get_absolute_url }}" target="_blank">{{ request.scheme }}://{{ request.get_host }}{{ profile_link.get_absolute_url }}</a>
+                <div class="sub">Создана {{ profile_link.created_at|date:'d.m.Y H:i' }}{% if profile_link.created_by %}, {{ profile_link.created_by }}{% endif %} · заполнений: {{ profile_link.submissions }}</div>
+            </div>
+            <div style="margin-left: auto; display: flex; gap: 8px;">
+                <button type="button" class="btn btn--secondary btn--sm" onclick="copyProfileLink(this)">Копировать</button>
+                <form method="post" action="{% url 'interns:profile_link_disable' %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--secondary btn--sm"
+                            onclick="return confirm('Отключить ссылку? Анкета перестанет открываться.')">Отключить</button>
+                </form>
+            </div>
+        </div>
+        <script>
+            function copyProfileLink(button) {
+                const url = document.getElementById('profile-link-url').href;
+                navigator.clipboard.writeText(url).then(function () {
+                    const label = button.textContent;
+                    button.textContent = 'Скопировано';
+                    setTimeout(function () { button.textContent = label; }, 1500);
+                });
+            }
+        </script>
+    {% else %}
+        <div class="sub">Активной ссылки на анкету нет — создайте новую кнопкой выше.</div>
+    {% endif %}
 </div>
 
 {% if balance %}

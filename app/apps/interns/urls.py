@@ -7,6 +7,14 @@ app_name = 'interns'
 urlpatterns = [
     path('', views.intern_list, name='list'),
     path('create/', views.intern_create, name='create'),
+    path(
+        'profile-link/new/', views.profile_link_create,
+        name='profile_link_create',
+    ),
+    path(
+        'profile-link/disable/', views.profile_link_disable,
+        name='profile_link_disable',
+    ),
     path('reserve/', views.reserve_list, name='reserve'),
     path('reserve/add/', views.reserve_create, name='reserve_create'),
     path('reserve/<int:pk>/edit/', views.reserve_update, name='reserve_update'),

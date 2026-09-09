@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import models
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -10,7 +11,8 @@ from apps.interns.forms import (
     ResumeBankApplyForm, TalentReserveApplyForm, TalentReserveForm,
 )
 from apps.interns.models import (
-    Intern, InternEvaluation, InternStatus, TalentReserveCandidate,
+    Intern, InternEvaluation, InternStatus, ProfileFormLink,
+    TalentReserveCandidate,
 )
 from apps.teams.models import TeamMember
 from apps.training.models import Specialization, TrainingGroup
@@ -92,8 +94,33 @@ def intern_list(request):
         'statuses': InternStatus.choices,
         'cities': Intern.objects.active().exclude(city='')
                   .values_list('city', flat=True).distinct().order_by('city'),
+        'profile_link': services.active_profile_form_link(),
     }
     return render(request, 'interns/list.html', context)
+
+
+@login_required
+def profile_link_create(request):
+    """Выпустить новую ссылку на публичную анкету (старая перестаёт работать)."""
+    if request.method == 'POST':
+        link = services.issue_profile_form_link(request.user)
+        messages.success(
+            request,
+            'Новая ссылка на анкету создана, прежняя больше не открывается: '
+            f'{request.build_absolute_uri(link.get_absolute_url())}',
+        )
+    return redirect('interns:list')
+
+
+@login_required
+def profile_link_disable(request):
+    """Отключить действующую ссылку, не выпуская новую."""
+    if request.method == 'POST':
+        link = services.active_profile_form_link()
+        if link is not None:
+            link.deactivate()
+            messages.success(request, 'Ссылка на анкету отключена.')
+    return redirect('interns:list')
 
 
 @login_required
@@ -343,16 +370,29 @@ def resume_bank_apply(request):
     return render(request, 'interns/resume_bank_apply.html', {'form': form})
 
 
-def profile_apply(request):
+def profile_link_expired(request):
+    """Старый постоянный адрес анкеты — только сообщение, что ссылка мертва."""
+    return render(request, 'interns/profile_apply_expired.html', status=404)
+
+
+def profile_apply(request, token):
     """Публичная анкета: стажёр сам заполняет/обновляет свой профиль.
+
+    Открывается только по действующей ссылке (`token`): постоянного
+    адреса у анкеты нет, ПМ выпускает новую ссылку и старые умирают.
 
     Сначала ищем по телефону. У многих текущих записей телефон ещё не
     заполнен (карточку когда-то завели по одному ФИО) — тогда, чтобы не
     плодить дубль, ищем среди записей без телефона точное совпадение по
     имени. Если и это не помогло — считаем человека новым. Одна анкета
-    на браузер — после отправки повторно её не откроешь (защита от спама).
+    на браузер и ссылку — после отправки повторно её не откроешь
+    (защита от спама).
     """
-    if request.session.get('profile_submitted'):
+    link = ProfileFormLink.objects.filter(token=token, is_active=True).first()
+    if link is None:
+        return render(request, 'interns/profile_apply_expired.html', status=404)
+    session_key = f'profile_submitted:{token}'
+    if request.session.get(session_key):
         return render(request, 'interns/profile_apply_done.html')
     form = ProfileApplyForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
@@ -369,7 +409,10 @@ def profile_apply(request):
             for field in ProfileApplyForm.Meta.fields:
                 setattr(intern, field, form.cleaned_data[field])
         intern.save()
-        request.session['profile_submitted'] = True
+        ProfileFormLink.objects.filter(pk=link.pk).update(
+            submissions=models.F('submissions') + 1,
+        )
+        request.session[session_key] = True
         return render(request, 'interns/profile_apply_done.html')
     return render(request, 'interns/profile_apply.html', {'form': form})
 

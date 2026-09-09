@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -183,3 +185,48 @@ class InternEvaluation(TimeStampedModel):
     def average(self) -> float:
         scores = [getattr(self, key) for key, _ in self.CRITERIA]
         return round(sum(scores) / len(scores), 2)
+
+
+def generate_form_token() -> str:
+    """Случайный токен для ссылки на анкету."""
+    return secrets.token_urlsafe(16)
+
+
+class ProfileFormLink(TimeStampedModel):
+    """Сменяемая ссылка на публичную анкету стажёра.
+
+    Постоянного адреса у анкеты нет: ПМ выпускает новую ссылку, и все
+    прежние сразу перестают работать — чтобы форма не гуляла по чатам
+    вечно и её не заполняли посторонние.
+    """
+
+    token = models.CharField(
+        'Токен', max_length=64, unique=True, default=generate_form_token,
+    )
+    is_active = models.BooleanField('Активна', default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Создал', null=True, blank=True,
+    )
+    submissions = models.PositiveIntegerField('Заполнений', default=0)
+    deactivated_at = models.DateTimeField(
+        'Отключена', null=True, blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Ссылка на анкету стажёра'
+        verbose_name_plural = 'Ссылки на анкету стажёра'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f'Анкета стажёра /{self.token}/'
+
+    def get_absolute_url(self) -> str:
+        return reverse('intern_profile_apply', args=[self.token])
+
+    def deactivate(self) -> None:
+        from django.utils import timezone
+
+        self.is_active = False
+        self.deactivated_at = timezone.now()
+        self.save(update_fields=['is_active', 'deactivated_at', 'updated_at'])
