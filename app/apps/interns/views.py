@@ -207,10 +207,11 @@ def intern_detail(request, pk):
 def intern_project_add(request, pk):
     """Добавить стажёра на проект прямо с его карточки."""
     intern = get_object_or_404(Intern, pk=pk)
-    form = InternProjectAddForm(request.POST or None)
+    form = InternProjectAddForm(
+        request.POST or None, instance=TeamMember(intern=intern),
+    )
     if request.method == 'POST' and form.is_valid():
         member = form.save(commit=False)
-        member.intern = intern
         member.group = getattr(member.project, 'group', None)
         spec = intern.specialization
         member.role = ROLE_BY_SPECIALIZATION.get(
