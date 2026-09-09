@@ -321,8 +321,11 @@ def resume_bank_apply(request):
     """Публичная анкета «Банк резюме» — без входа в систему.
 
     По телефону ищем уже существующего стажёра, чтобы не плодить
-    дубли, если человек уже есть в базе.
+    дубли, если человек уже есть в базе. Одна анкета на браузер —
+    после отправки повторно её не откроешь (защита от спама).
     """
+    if request.session.get('resume_bank_submitted'):
+        return render(request, 'interns/resume_bank_apply_done.html')
     form = ResumeBankApplyForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         phone = form.cleaned_data['phone']
@@ -335,6 +338,7 @@ def resume_bank_apply(request):
             intern.specialization = form.cleaned_data['specialization']
         intern.in_resume_bank = True
         intern.save()
+        request.session['resume_bank_submitted'] = True
         return render(request, 'interns/resume_bank_apply_done.html')
     return render(request, 'interns/resume_bank_apply.html', {'form': form})
 
@@ -345,8 +349,11 @@ def profile_apply(request):
     Сначала ищем по телефону. У многих текущих записей телефон ещё не
     заполнен (карточку когда-то завели по одному ФИО) — тогда, чтобы не
     плодить дубль, ищем среди записей без телефона точное совпадение по
-    имени. Если и это не помогло — считаем человека новым.
+    имени. Если и это не помогло — считаем человека новым. Одна анкета
+    на браузер — после отправки повторно её не откроешь (защита от спама).
     """
+    if request.session.get('profile_submitted'):
+        return render(request, 'interns/profile_apply_done.html')
     form = ProfileApplyForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         phone = form.cleaned_data['phone']
@@ -362,6 +369,7 @@ def profile_apply(request):
             for field in ProfileApplyForm.Meta.fields:
                 setattr(intern, field, form.cleaned_data[field])
         intern.save()
+        request.session['profile_submitted'] = True
         return render(request, 'interns/profile_apply_done.html')
     return render(request, 'interns/profile_apply.html', {'form': form})
 
@@ -371,7 +379,11 @@ def talent_reserve_apply(request):
 
     Тот же принцип поиска, что и в анкете профиля: сначала точное
     совпадение по телефону, иначе — по ФИО среди записей без телефона.
+    Одна анкета на браузер — после отправки повторно её не откроешь
+    (защита от спама).
     """
+    if request.session.get('talent_reserve_submitted'):
+        return render(request, 'interns/reserve_apply_done.html')
     form = TalentReserveApplyForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         phone = form.cleaned_data['phone']
@@ -387,5 +399,6 @@ def talent_reserve_apply(request):
             for field in TalentReserveApplyForm.Meta.fields:
                 setattr(candidate, field, form.cleaned_data[field])
         candidate.save()
+        request.session['talent_reserve_submitted'] = True
         return render(request, 'interns/reserve_apply_done.html')
     return render(request, 'interns/reserve_apply.html', {'form': form})

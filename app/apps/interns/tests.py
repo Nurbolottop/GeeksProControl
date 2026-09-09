@@ -302,6 +302,15 @@ class ResumeBankApplyTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Intern.objects.filter(full_name="Без Телефона").exists())
 
+    def test_second_submission_in_same_session_is_blocked(self):
+        self.client.post(reverse("resume_bank_apply"), {
+            "full_name": "Первый", "phone": "0700111333",
+        })
+        self.client.post(reverse("resume_bank_apply"), {
+            "full_name": "Второй", "phone": "0700111444",
+        })
+        self.assertFalse(Intern.objects.filter(phone="0700111444").exists())
+
 
 class ProfileApplyTests(TestCase):
     """Публичная анкета профиля стажёра — без входа в систему."""
@@ -380,6 +389,17 @@ class ProfileApplyTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Intern.objects.filter(phone="0700999888").exists())
+
+    def test_second_submission_in_same_session_is_blocked(self):
+        self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Первый", "phone": "0700111333",
+            "internship_attempt": "1",
+        })
+        self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Второй", "phone": "0700111444",
+            "internship_attempt": "1",
+        })
+        self.assertFalse(Intern.objects.filter(phone="0700111444").exists())
 
 
 class ReserveResumeBankToggleTests(TestCase):
@@ -586,3 +606,14 @@ class TalentReserveApplyTests(TestCase):
 
         self.assertNotIn("priority", TalentReserveApplyForm.Meta.fields)
         self.assertNotIn("comment", TalentReserveApplyForm.Meta.fields)
+
+    def test_second_submission_in_same_session_is_blocked(self):
+        self.client.post(reverse("talent_reserve_apply"), {
+            "full_name": "Первый", "phone": "0700111333",
+        })
+        self.client.post(reverse("talent_reserve_apply"), {
+            "full_name": "Второй", "phone": "0700111444",
+        })
+        self.assertFalse(
+            TalentReserveCandidate.objects.filter(phone="0700111444").exists(),
+        )
