@@ -2208,3 +2208,38 @@ body.cmodal-open { overflow: hidden; }
 .btn--danger-solid { background: var(--red); border-color: var(--red); box-shadow: 0 1px 2px rgba(194, 47, 47, .3); }
 .btn--danger-solid:hover { background: #a82626; box-shadow: 0 4px 12px rgba(194, 47, 47, .3); }
 .btn--danger-solid:disabled, .cmodal__ok:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+
+/* --- Ссылка на публичную анкету стажёра (страница «Стажёры») --- */
+.form-link {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 18px;
+}
+.form-link--off { border-left-color: var(--border-strong); }
+.form-link__body { min-width: 0; flex: 1; }
+.form-link__label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+.form-link__url {
+    display: inline-block;
+    max-width: 100%;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 14px;
+    color: var(--primary);
+    word-break: break-all;
+}
+.form-link__meta { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
+.form-link__actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
