@@ -103,8 +103,8 @@
                     Выпускники
                 </span>
             </a>
-            <a href="{% url 'interns:reserve' %}"
-               class="nav-item {% if request.resolver_match.url_name == 'reserve' %}is-active{% endif %}">
+            <a href="{% url 'reserve:list' %}"
+               class="nav-item {% if request.resolver_match.namespace == 'reserve' %}is-active{% endif %}">
                 <span class="nav-item__label">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     Резерв кадров

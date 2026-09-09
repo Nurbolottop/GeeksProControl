@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ title }}</h1>
+        <div class="sub">Анкетные поля кандидата и внутренняя учебная информация. Оценки — на отдельной странице.</div>
+    </div>
+</div>
+
+<form method="post" class="panel" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+        <div class="message message--error">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <div class="form-grid">
+        {% include 'partials/form_fields.html' %}
+    </div>
+    <div class="form-actions">
+        <button type="submit" class="btn">Сохранить</button>
+        <a href="{% if candidate %}{{ candidate.get_absolute_url }}{% else %}{% url 'reserve:list' %}{% endif %}" class="btn btn--secondary">Отмена</a>
+    </div>
+</form>
+{% endblock %}

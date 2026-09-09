@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.reserve.views import apply_form as reserve_apply
 from apps.interns.views import (
     profile_apply, profile_link_expired, resume_bank_apply,
     talent_reserve_apply,
@@ -19,6 +20,9 @@ urlpatterns = [
         name='intern_profile_apply',
     ),
     path('talent-reserve/', talent_reserve_apply, name='talent_reserve_apply'),
+    # Анкета кандидата в резерв — только по персональной ссылке,
+    # доступа к платформе она не даёт.
+    path('reserve-profile/<str:token>/', reserve_apply, name='reserve_apply'),
     path('', include('apps.accounts.urls')),
     path('', include('apps.dashboard.urls')),
     path('flows/', include('apps.flows.urls')),
@@ -29,6 +33,7 @@ urlpatterns = [
     path('tasks/', include('apps.tasks.urls')),
     path('teams/', include('apps.teams.urls')),
     path('interns/', include('apps.interns.urls')),
+    path('reserve/', include('apps.reserve.urls')),
     path('documents/', include('apps.documents.urls')),
     path('meetings/', include('apps.meetings.urls')),
     path('notifications/', include('apps.notifications.urls')),

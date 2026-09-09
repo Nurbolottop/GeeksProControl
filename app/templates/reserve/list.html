@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}Резерв кадров — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Резерв кадров</h1>
+        <div class="sub">Проверенные стажёры и выпускники, которых мы рекомендуем компаниям. Всего: {{ page.paginator.count }}</div>
+    </div>
+    {% if can_edit %}
+        <div class="page-actions">
+            <form method="post" action="{% url 'reserve:from_intern' %}" style="margin: 0; display: flex; gap: 8px;">
+                {% csrf_token %}
+                <select name="intern" class="form-link__ttl" required>
+                    <option value="">Добавить из стажёров…</option>
+                    {% for intern in free_interns %}
+                        <option value="{{ intern.pk }}">{{ intern.full_name }}{% if intern.specialization %} — {{ intern.specialization }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn--secondary">Взять в резерв</button>
+            </form>
+            <a href="{% url 'reserve:create' %}" class="btn">+ Новый кандидат</a>
+        </div>
+    {% endif %}
+</div>
+
+{% if can_edit %}
+    <div class="form-link">
+        <div class="form-link__body">
+            <div class="form-link__label">Персональная ссылка на анкету</div>
+            {% if open_invites %}
+                <div class="form-link__meta">Действующие приглашения — кандидат заполняет свою часть сам:</div>
+                <table class="data data--tight" style="margin-top: 6px;">
+                    {% for invite in open_invites %}
+                        <tr>
+                            <td style="width: 40%;">
+                                <a class="form-link__url" href="{{ invite.get_absolute_url }}" target="_blank" rel="noopener" id="invite-url-{{ invite.pk }}">{{ request.scheme }}://{{ request.get_host }}{{ invite.get_absolute_url }}</a>
+                            </td>
+                            <td>{% if invite.candidate %}<a href="{{ invite.candidate.get_absolute_url }}">{{ invite.candidate.full_name }}</a>{% else %}{{ invite.recipient|default:'Новый кандидат' }}{% endif %}</td>
+                            <td class="sub">{% if invite.expires_at %}до {{ invite.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}</td>
+                            <td style="text-align: right; white-space: nowrap;">
+                                <button type="button" class="btn btn--secondary btn--sm" data-copy="invite-url-{{ invite.pk }}">Копировать</button>
+                                <form method="post" action="{% url 'reserve:invite_disable' invite.pk %}" style="display: inline; margin: 0;"
+                                      data-confirm="Отключить ссылку на анкету?" data-confirm-ok="Отключить">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <div class="form-link__meta">Действующих приглашений нет. Создайте ссылку и отправьте её кандидату — он заполнит анкету сам, к платформе доступа не получит.</div>
+            {% endif %}
+        </div>
+        <form method="post" action="{% url 'reserve:invite_create' %}" class="form-link__actions" style="align-items: flex-end;">
+            {% csrf_token %}
+            <input type="text" name="recipient" placeholder="Кому (ФИО/контакт)" class="form-link__ttl" style="width: 190px;">
+            <select name="ttl_days" class="form-link__ttl" title="Срок действия">
+                {% for value, label in invite_form.fields.ttl_days.choices %}
+                    <option value="{{ value }}" {% if value == '7' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn--secondary btn--sm">Создать ссылку</button>
+        </form>
+    </div>
+{% endif %}
+
+<form method="get" class="filters">
+    <input type="text" name="q" placeholder="Поиск: ФИО, телефон, email, telegram" value="{{ params.q|default:'' }}">
+    <select name="specialization">
+        <option value="">Направление: все</option>
+        {% for spec in specializations %}
+            <option value="{{ spec.pk }}" {% if params.specialization == spec.pk|stringformat:'s' %}selected{% endif %}>{{ spec.name }}</option>
+        {% endfor %}
+    </select>
+    <select name="level">
+        <option value="">Уровень: все</option>
+        {% for value, label in levels %}
+            <option value="{{ value }}" {% if params.level == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <input type="text" name="skill" placeholder="Технология" value="{{ params.skill|default:'' }}" style="max-width: 150px;">
+    <select name="city">
+        <option value="">Город: все</option>
+        {% for city in cities %}
+            <option value="{{ city }}" {% if params.city == city %}selected{% endif %}>{{ city }}</option>
+        {% endfor %}
+    </select>
+    <select name="work_format">
+        <option value="">Формат: любой</option>
+        {% for value, label in work_formats %}
+            <option value="{{ value }}" {% if params.work_format == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="employment">
+        <option value="">Занятость: любая</option>
+        {% for value, label in employments %}
+            <option value="{{ value }}" {% if params.employment == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="readiness">
+        <option value="">Готовность: все</option>
+        {% for value, label in readiness_options %}
+            <option value="{{ value }}" {% if params.readiness == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="status">
+        <option value="">Статус: все</option>
+        {% for value, label in statuses %}
+            <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="rating">
+        <option value="">Рейтинг: любой</option>
+        {% for value, label in rating_options %}
+            <option value="{{ value }}" {% if params.rating == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select name="sort">
+        {% for value, label in sort_options %}
+            <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+    <a href="{% url 'reserve:list' %}" class="btn btn--secondary btn--sm">Сбросить</a>
+</form>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>Кандидат</th>
+                    <th>Направление</th>
+                    <th>Уровень</th>
+                    <th>Технологии</th>
+                    <th>Город</th>
+                    <th>Поиск работы</th>
+                    <th>Рейтинг</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for candidate in page.object_list %}
+                    <tr>
+                        <td>
+                            <div class="person">
+                                {% if candidate.photo %}
+                                    <img src="{{ candidate.photo.url }}" alt="" class="person__photo">
+                                {% else %}
+                                    <span class="person__photo person__photo--empty">{{ candidate.full_name|slice:':1' }}</span>
+                                {% endif %}
+                                <span>
+                                    <a href="{{ candidate.get_absolute_url }}"><strong>{{ candidate.full_name }}</strong></a>
+                                    <div class="sub">{{ candidate.desired_position|default:candidate.recommended_position|default:'—' }}</div>
+                                </span>
+                            </div>
+                        </td>
+                        <td>{{ candidate.direction }}</td>
+                        <td>{% if candidate.geekspro_level %}<span class="badge badge--blue">{{ candidate.get_geekspro_level_display }}</span>{% else %}—{% endif %}</td>
+                        <td class="reserve-skills">
+                            {% for skill in candidate.skills_list|slice:':4' %}<span class="chip">{{ skill }}</span>{% empty %}—{% endfor %}
+                        </td>
+                        <td>{{ candidate.city|default:'—' }}</td>
+                        <td>
+                            {% if candidate.is_looking_for_job %}
+                                <span class="badge badge--green">Ищет работу</span>
+                            {% else %}
+                                <span class="badge badge--gray">Не ищет</span>
+                            {% endif %}
+                        </td>
+                        <td>{% if candidate.rating %}<strong>{{ candidate.rating }}</strong> / 10{% else %}—{% endif %}</td>
+                        <td><span class="badge badge--{{ candidate.status_tone }}">{{ candidate.get_status_display }}</span></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="empty" style="text-align:center; padding: 24px;">Кандидатов не найдено.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page.paginator.num_pages > 1 %}
+    <div class="pagination">
+        {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}">‹</a>{% endif %}
+        <span class="current">{{ page.number }} / {{ page.paginator.num_pages }}</span>
+        {% if page.has_next %}<a href="?page={{ page.next_page_number }}">›</a>{% endif %}
+    </div>
+{% endif %}
+
+<script>
+    document.querySelectorAll('[data-copy]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var url = document.getElementById(button.dataset.copy).href;
+            navigator.clipboard.writeText(url).then(function () {
+                button.textContent = 'Скопировано';
+                setTimeout(function () { button.textContent = 'Копировать'; }, 1500);
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анкета кандидата — GeeksPro</title>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<div class="apply-page">
+    <div class="apply-card">
+        <h1>Geeks<span style="background: linear-gradient(120deg,#5b6cf9,#8b7cf9); -webkit-background-clip: text; background-clip: text; color: transparent;">Pro</span></h1>
+        <p class="sub">Анкета для резерва кадров. Заполните её — мы рекомендуем проверенных выпускников компаниям-работодателям.</p>
+        {% if form.non_field_errors %}
+            <div class="message message--error">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-grid">
+                {% include 'partials/form_fields.html' %}
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">Отправить анкету</button>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>

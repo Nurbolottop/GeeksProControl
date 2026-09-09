@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'apps.tasks',
     'apps.teams',
     'apps.interns',
+    'apps.reserve',
     'apps.training',
     'apps.documents',
     'apps.meetings',
