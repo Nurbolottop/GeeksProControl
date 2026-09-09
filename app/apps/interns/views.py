@@ -6,7 +6,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.interns import services
 from apps.interns.forms import (
-    GrantAccessForm, InternEvaluationForm, InternForm, ResumeBankApplyForm,
+    GrantAccessForm, InternEvaluationForm, InternForm, ProfileApplyForm,
+    ResumeBankApplyForm,
 )
 from apps.interns.models import Intern, InternEvaluation, InternStatus
 from apps.teams.models import TeamMember
@@ -278,6 +279,26 @@ def resume_bank_apply(request):
         intern.save()
         return render(request, 'interns/resume_bank_apply_done.html')
     return render(request, 'interns/resume_bank_apply.html', {'form': form})
+
+
+def profile_apply(request):
+    """Публичная анкета: стажёр сам заполняет/обновляет свой профиль.
+
+    По телефону ищем уже существующего стажёра, чтобы не плодить дубли,
+    если человек уже есть в базе.
+    """
+    form = ProfileApplyForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        phone = form.cleaned_data['phone']
+        intern = Intern.objects.filter(phone=phone).first()
+        if intern is None:
+            intern = form.save(commit=False)
+        else:
+            for field in ProfileApplyForm.Meta.fields:
+                setattr(intern, field, form.cleaned_data[field])
+        intern.save()
+        return render(request, 'interns/profile_apply_done.html')
+    return render(request, 'interns/profile_apply.html', {'form': form})
 
 
 @login_required

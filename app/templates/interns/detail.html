@@ -44,6 +44,7 @@
         <div class="def"><dt>Город</dt><dd>{{ intern.city|default:'—' }}</dd></div>
         <div class="def"><dt>Филиал</dt><dd>{{ intern.branch|default:'—' }}</dd></div>
         <div class="def"><dt>Начало стажировки</dt><dd>{{ intern.internship_start_date|date:'d.m.Y'|default:'—' }}</dd></div>
+        <div class="def"><dt>Стажировка по счёту</dt><dd>{{ intern.internship_attempt }}-й раз</dd></div>
         <div class="def"><dt>Кто в команде</dt><dd>{{ kind }}</dd></div>
         <div class="def"><dt>Количество проектов</dt><dd>{{ projects_count }}</dd></div>
     </dl>

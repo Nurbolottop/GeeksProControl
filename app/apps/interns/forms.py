@@ -9,7 +9,7 @@ class InternForm(forms.ModelForm):
         fields = [
             'full_name', 'phone', 'email', 'telegram', 'city', 'branch',
             'specialization', 'education_end_date',
-            'internship_start_date', 'status', 'comment',
+            'internship_start_date', 'internship_attempt', 'status', 'comment',
             'in_talent_reserve',
         ]
         widgets = {
@@ -30,6 +30,31 @@ class ResumeBankApplyForm(forms.ModelForm):
         model = Intern
         fields = ['full_name', 'phone', 'email', 'specialization']
         labels = {'specialization': 'Направление'}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['phone'].required = True
+
+
+class ProfileApplyForm(forms.ModelForm):
+    """Публичная анкета: стажёр сам заполняет/обновляет свой профиль."""
+
+    class Meta:
+        model = Intern
+        fields = [
+            'full_name', 'phone', 'email', 'telegram', 'city', 'branch',
+            'specialization', 'education_end_date',
+            'internship_start_date', 'internship_attempt',
+        ]
+        labels = {'specialization': 'Направление'}
+        widgets = {
+            'education_end_date': forms.DateInput(
+                attrs={'type': 'date'}, format='%Y-%m-%d',
+            ),
+            'internship_start_date': forms.DateInput(
+                attrs={'type': 'date'}, format='%Y-%m-%d',
+            ),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

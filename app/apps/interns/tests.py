@@ -313,6 +313,45 @@ class ResumeBankApplyTests(TestCase):
         self.assertFalse(Intern.objects.filter(full_name="Без Телефона").exists())
 
 
+class ProfileApplyTests(TestCase):
+    """Публичная анкета профиля стажёра — без входа в систему."""
+
+    def test_anonymous_can_submit_full_profile(self):
+        response = self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Новый Стажёр", "phone": "0700333444",
+            "email": "n@example.com", "telegram": "@newintern",
+            "city": "Бишкек", "branch": "Центральный",
+            "internship_attempt": "2",
+        })
+        self.assertEqual(response.status_code, 200)
+        intern = Intern.objects.get(phone="0700333444")
+        self.assertEqual(intern.full_name, "Новый Стажёр")
+        self.assertEqual(intern.telegram, "@newintern")
+        self.assertEqual(intern.internship_attempt, 2)
+
+    def test_existing_person_by_phone_is_updated_not_duplicated(self):
+        Intern.objects.create(full_name="Старое Имя", phone="0700333444")
+        self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Новое Имя", "phone": "0700333444",
+            "city": "Ош", "internship_attempt": "1",
+        })
+        self.assertEqual(Intern.objects.filter(phone="0700333444").count(), 1)
+        intern = Intern.objects.get(phone="0700333444")
+        self.assertEqual(intern.full_name, "Новое Имя")
+        self.assertEqual(intern.city, "Ош")
+
+    def test_phone_is_required(self):
+        response = self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Без Телефона", "internship_attempt": "1",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Intern.objects.filter(full_name="Без Телефона").exists())
+
+    def test_default_internship_attempt_is_one(self):
+        intern = Intern.objects.create(full_name="Дефолтный")
+        self.assertEqual(intern.internship_attempt, 1)
+
+
 class ReserveResumeBankToggleTests(TestCase):
     """«Резерв кадров» ставится прямо с карточки; «Банк резюме» — только
     через публичную анкету, тут лишь показывается бейджем, без тумблера."""

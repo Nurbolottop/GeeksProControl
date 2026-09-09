@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.urls import reverse
 
@@ -49,6 +50,10 @@ class Intern(TimeStampedModel, ArchivableModel):
     )
     internship_start_date = models.DateField(
         'Дата начала стажировки', null=True, blank=True,
+    )
+    internship_attempt = models.PositiveSmallIntegerField(
+        'Какая по счёту стажировка', default=1,
+        validators=[MinValueValidator(1)],
     )
     status = models.CharField(
         'Статус', max_length=20,
