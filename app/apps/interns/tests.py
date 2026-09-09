@@ -6,7 +6,8 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.interns import services
 from apps.interns.models import (
-    Intern, InternEvaluation, ProfileFormLink, TalentReserveCandidate,
+    Intern, InternEvaluation, ProfileFormLink, ProfileFormSubmission,
+    TalentReserveCandidate,
 )
 from apps.interns.services import add_evaluation
 
@@ -682,3 +683,45 @@ class ProfileFormLinkTests(TestCase):
         self.client.post(reverse("interns:profile_link_disable"))
         link.refresh_from_db()
         self.assertFalse(link.is_active)
+
+    def test_link_with_ttl_dies_after_its_term(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self.client.post(reverse("interns:profile_link_create"), {"ttl_days": "1"})
+        link = ProfileFormLink.objects.get(is_active=True)
+        self.assertIsNotNone(link.expires_at)
+        url = reverse("intern_profile_apply", args=[link.token])
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+        ProfileFormLink.objects.filter(pk=link.pk).update(
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.assertIsNone(services.active_profile_form_link())
+
+    def test_link_without_ttl_has_no_expiry(self):
+        self.client.post(reverse("interns:profile_link_create"), {"ttl_days": ""})
+        self.assertIsNone(ProfileFormLink.objects.get(is_active=True).expires_at)
+
+    def test_submission_is_written_to_the_answers_log(self):
+        link = services.issue_profile_form_link(self.user)
+        self.client.logout()
+        self.client.post(reverse("intern_profile_apply", args=[link.token]), {
+            "full_name": "Журнальный", "phone": "0700777333",
+            "internship_attempt": "1",
+        })
+        entry = ProfileFormSubmission.objects.get()
+        self.assertEqual(entry.full_name, "Журнальный")
+        self.assertTrue(entry.is_new)
+        self.assertEqual(entry.intern, Intern.objects.get(phone="0700777333"))
+
+    def test_answers_page_lists_submissions(self):
+        link = services.issue_profile_form_link(self.user)
+        ProfileFormSubmission.objects.create(
+            link=link, full_name="Кто-то", phone="0700000000", is_new=True,
+        )
+        response = self.client.get(reverse("interns:profile_link_answers"))
+        self.assertContains(response, "Кто-то")

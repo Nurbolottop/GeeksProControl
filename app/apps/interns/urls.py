@@ -15,6 +15,10 @@ urlpatterns = [
         'profile-link/disable/', views.profile_link_disable,
         name='profile_link_disable',
     ),
+    path(
+        'profile-link/answers/', views.profile_link_answers,
+        name='profile_link_answers',
+    ),
     path('reserve/', views.reserve_list, name='reserve'),
     path('reserve/add/', views.reserve_create, name='reserve_create'),
     path('reserve/<int:pk>/edit/', views.reserve_update, name='reserve_update'),

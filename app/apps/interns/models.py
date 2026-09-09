@@ -204,6 +204,10 @@ class ProfileFormLink(TimeStampedModel):
         'Токен', max_length=64, unique=True, default=generate_form_token,
     )
     is_active = models.BooleanField('Активна', default=True)
+    expires_at = models.DateTimeField(
+        'Действует до', null=True, blank=True,
+        help_text='Пусто — ссылка живёт, пока её не заменят или не отключат.',
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         related_name='+', verbose_name='Создал', null=True, blank=True,
@@ -230,3 +234,43 @@ class ProfileFormLink(TimeStampedModel):
         self.is_active = False
         self.deactivated_at = timezone.now()
         self.save(update_fields=['is_active', 'deactivated_at', 'updated_at'])
+
+    @property
+    def is_expired(self) -> bool:
+        from django.utils import timezone
+
+        return bool(self.expires_at and self.expires_at <= timezone.now())
+
+    @property
+    def is_open(self) -> bool:
+        """Анкета по ссылке открывается только пока она активна и не истекла."""
+        return self.is_active and not self.is_expired
+
+
+class ProfileFormSubmission(TimeStampedModel):
+    """Журнал заполнений анкеты — «ответы» по каждой ссылке.
+
+    Сами данные уходят в карточку стажёра, здесь остаётся след: кто,
+    когда и по какой ссылке прошёл анкету, завели новую карточку или
+    обновили существующую.
+    """
+
+    link = models.ForeignKey(
+        ProfileFormLink, on_delete=models.CASCADE, related_name='submissions_log',
+        verbose_name='Ссылка',
+    )
+    intern = models.ForeignKey(
+        Intern, on_delete=models.SET_NULL, related_name='form_submissions',
+        verbose_name='Стажёр', null=True, blank=True,
+    )
+    full_name = models.CharField('ФИО', max_length=255)
+    phone = models.CharField('Телефон', max_length=32, blank=True)
+    is_new = models.BooleanField('Новая карточка', default=False)
+
+    class Meta:
+        verbose_name = 'Заполнение анкеты'
+        verbose_name_plural = 'Заполнения анкеты'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f'{self.full_name} — {self.created_at:%d.%m.%Y %H:%M}'

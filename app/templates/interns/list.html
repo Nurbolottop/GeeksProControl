@@ -9,10 +9,15 @@
         <div class="sub">Всего: {{ page.paginator.count }}</div>
     </div>
     <div class="page-actions">
-        <form method="post" action="{% url 'interns:profile_link_create' %}"
+        <form method="post" id="profile-link-form" action="{% url 'interns:profile_link_create' %}"
               data-confirm="Создать новую ссылку на анкету? Прежняя перестанет работать."
-              data-confirm-ok="Создать ссылку" style="margin: 0;">
+              data-confirm-ok="Создать ссылку" style="margin: 0; display: flex; gap: 8px;">
             {% csrf_token %}
+            <select name="ttl_days" class="form-link__ttl" title="Срок действия ссылки">
+                {% for value, label in profile_link_ttls %}
+                    <option value="{{ value }}" {% if value == '7' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
             <button type="submit" class="btn btn--secondary">Новая ссылка на анкету</button>
         </form>
         <a href="{% url 'interns:create' %}" class="btn">+ Новый стажёр</a>
@@ -25,14 +30,20 @@
         {% if profile_link %}
             <a class="form-link__url" id="profile-link-url" href="{{ profile_link.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ profile_link.get_absolute_url }}</a>
             <div class="form-link__meta">
-                Создана {{ profile_link.created_at|date:'d.m.Y H:i' }}{% if profile_link.created_by %} · {{ profile_link.created_by }}{% endif %} · заполнений: {{ profile_link.submissions }}
+                Создана {{ profile_link.created_at|date:'d.m.Y H:i' }}{% if profile_link.created_by %} · {{ profile_link.created_by }}{% endif %}
+                · {% if profile_link.expires_at %}действует до {{ profile_link.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
+                · <a href="{% url 'interns:profile_link_answers' %}?link={{ profile_link.token }}">заполнений: {{ profile_link.submissions }}</a>
             </div>
         {% else %}
-            <div class="form-link__meta">Активной ссылки нет — анкету сейчас никто не откроет. Создайте новую кнопкой выше.</div>
+            <div class="form-link__meta">
+                Активной ссылки нет — анкету сейчас никто не откроет. Создайте новую кнопкой выше.
+                {% if answers_count %}<a href="{% url 'interns:profile_link_answers' %}">Ответы: {{ answers_count }}</a>{% endif %}
+            </div>
         {% endif %}
     </div>
     {% if profile_link %}
         <div class="form-link__actions">
+            <a href="{% url 'interns:profile_link_answers' %}" class="btn btn--secondary btn--sm">Ответы</a>
             <button type="button" class="btn btn--secondary btn--sm" data-copy-link>Копировать</button>
             <form method="post" action="{% url 'interns:profile_link_disable' %}"
                   data-confirm="Отключить ссылку? Анкета перестанет открываться, пока не создадите новую."

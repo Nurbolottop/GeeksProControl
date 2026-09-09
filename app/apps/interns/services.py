@@ -53,22 +53,40 @@ def graduated_interns() -> list[Intern]:
     return interns
 
 
-def issue_profile_form_link(user=None) -> ProfileFormLink:
+def issue_profile_form_link(user=None, ttl_days: int | None = None) -> ProfileFormLink:
     """Выпускает новую ссылку на анкету, гася все прежние.
 
     Активной может быть только одна ссылка: как только выпустили новую,
     старая перестаёт открываться — в этом и смысл «непостоянной» ссылки.
+    `ttl_days` — через сколько дней ссылка закроется сама; None — бессрочно,
+    до замены или ручного отключения.
     """
+    from datetime import timedelta
+
     from django.utils import timezone
 
+    now = timezone.now()
     ProfileFormLink.objects.filter(is_active=True).update(
-        is_active=False, deactivated_at=timezone.now(),
+        is_active=False, deactivated_at=now,
     )
     return ProfileFormLink.objects.create(
         created_by=user if user and user.is_authenticated else None,
+        expires_at=now + timedelta(days=ttl_days) if ttl_days else None,
     )
 
 
 def active_profile_form_link() -> ProfileFormLink | None:
-    """Действующая ссылка на анкету или None, если её ещё не выпускали."""
-    return ProfileFormLink.objects.filter(is_active=True).first()
+    """Действующая ссылка на анкету или None.
+
+    Истёкшую по сроку гасим на месте, чтобы список и анкета одинаково
+    считали её мёртвой и в панели не висела ссылка-призрак.
+    """
+    from django.utils import timezone
+
+    link = ProfileFormLink.objects.filter(is_active=True).first()
+    if link is not None and link.is_expired:
+        link.is_active = False
+        link.deactivated_at = link.deactivated_at or timezone.now()
+        link.save(update_fields=['is_active', 'deactivated_at', 'updated_at'])
+        return None
+    return link

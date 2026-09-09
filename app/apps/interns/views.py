@@ -12,7 +12,7 @@ from apps.interns.forms import (
 )
 from apps.interns.models import (
     Intern, InternEvaluation, InternStatus, ProfileFormLink,
-    TalentReserveCandidate,
+    ProfileFormSubmission, TalentReserveCandidate,
 )
 from apps.teams.models import TeamMember
 from apps.training.models import Specialization, TrainingGroup
@@ -95,21 +95,56 @@ def intern_list(request):
         'cities': Intern.objects.active().exclude(city='')
                   .values_list('city', flat=True).distinct().order_by('city'),
         'profile_link': services.active_profile_form_link(),
+        'profile_link_ttls': PROFILE_LINK_TTL_CHOICES,
+        'answers_count': ProfileFormSubmission.objects.count(),
     }
     return render(request, 'interns/list.html', context)
+
+
+# Сроки жизни ссылки на анкету: значение для формы → подпись
+PROFILE_LINK_TTL_CHOICES = [
+    ('1', 'Сутки'),
+    ('3', '3 дня'),
+    ('7', '7 дней'),
+    ('30', '30 дней'),
+    ('', 'Без срока'),
+]
 
 
 @login_required
 def profile_link_create(request):
     """Выпустить новую ссылку на публичную анкету (старая перестаёт работать)."""
     if request.method == 'POST':
-        link = services.issue_profile_form_link(request.user)
+        raw_ttl = request.POST.get('ttl_days', '')
+        ttl_days = int(raw_ttl) if raw_ttl.isdigit() else None
+        link = services.issue_profile_form_link(request.user, ttl_days)
+        term = f'на {ttl_days} дн.' if ttl_days else 'без срока'
         messages.success(
             request,
-            'Новая ссылка на анкету создана, прежняя больше не открывается: '
-            f'{request.build_absolute_uri(link.get_absolute_url())}',
+            f'Новая ссылка на анкету создана ({term}), прежняя больше не '
+            f'открывается: {request.build_absolute_uri(link.get_absolute_url())}',
         )
     return redirect('interns:list')
+
+
+@login_required
+def profile_link_answers(request):
+    """Журнал заполнений анкеты — кто и по какой ссылке её прошёл."""
+    submissions = (
+        ProfileFormSubmission.objects
+        .select_related('intern', 'link')
+        .order_by('-created_at')
+    )
+    token = request.GET.get('link', '')
+    if token:
+        submissions = submissions.filter(link__token=token)
+    paginator = Paginator(submissions, 50)
+    return render(request, 'interns/profile_link_answers.html', {
+        'page': paginator.get_page(request.GET.get('page')),
+        'links': ProfileFormLink.objects.all()[:50],
+        'token': token,
+        'total': paginator.count,
+    })
 
 
 @login_required
@@ -388,8 +423,8 @@ def profile_apply(request, token):
     на браузер и ссылку — после отправки повторно её не откроешь
     (защита от спама).
     """
-    link = ProfileFormLink.objects.filter(token=token, is_active=True).first()
-    if link is None:
+    link = ProfileFormLink.objects.filter(token=token).first()
+    if link is None or not link.is_open:
         return render(request, 'interns/profile_apply_expired.html', status=404)
     session_key = f'profile_submitted:{token}'
     if request.session.get(session_key):
@@ -403,7 +438,8 @@ def profile_apply(request, token):
             intern = Intern.objects.filter(
                 phone='', full_name__iexact=full_name,
             ).first()
-        if intern is None:
+        is_new = intern is None
+        if is_new:
             intern = form.save(commit=False)
         else:
             for field in ProfileApplyForm.Meta.fields:
@@ -411,6 +447,10 @@ def profile_apply(request, token):
         intern.save()
         ProfileFormLink.objects.filter(pk=link.pk).update(
             submissions=models.F('submissions') + 1,
+        )
+        ProfileFormSubmission.objects.create(
+            link=link, intern=intern, full_name=intern.full_name,
+            phone=intern.phone, is_new=is_new,
         )
         request.session[session_key] = True
         return render(request, 'interns/profile_apply_done.html')
