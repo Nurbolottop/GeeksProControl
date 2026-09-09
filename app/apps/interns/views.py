@@ -284,13 +284,20 @@ def resume_bank_apply(request):
 def profile_apply(request):
     """Публичная анкета: стажёр сам заполняет/обновляет свой профиль.
 
-    По телефону ищем уже существующего стажёра, чтобы не плодить дубли,
-    если человек уже есть в базе.
+    Сначала ищем по телефону. У многих текущих записей телефон ещё не
+    заполнен (карточку когда-то завели по одному ФИО) — тогда, чтобы не
+    плодить дубль, ищем среди записей без телефона точное совпадение по
+    имени. Если и это не помогло — считаем человека новым.
     """
     form = ProfileApplyForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         phone = form.cleaned_data['phone']
+        full_name = form.cleaned_data['full_name']
         intern = Intern.objects.filter(phone=phone).first()
+        if intern is None:
+            intern = Intern.objects.filter(
+                phone='', full_name__iexact=full_name,
+            ).first()
         if intern is None:
             intern = form.save(commit=False)
         else:

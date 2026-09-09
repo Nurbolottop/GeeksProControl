@@ -341,6 +341,37 @@ class ProfileApplyTests(TestCase):
         self.assertEqual(intern.full_name, "Новое Имя")
         self.assertEqual(intern.city, "Ош")
 
+    def test_existing_person_without_phone_matched_by_full_name(self):
+        """У старой карточки (только ФИО, телефон не заполнен) не должно
+        появиться дубля, когда стажёр сам заполняет анкету."""
+        old = Intern.objects.create(full_name="Асан Асанов")
+        self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Асан Асанов", "phone": "0700555666",
+            "city": "Бишкек", "internship_attempt": "1",
+        })
+        self.assertEqual(Intern.objects.filter(full_name="Асан Асанов").count(), 1)
+        old.refresh_from_db()
+        self.assertEqual(old.phone, "0700555666")
+        self.assertEqual(old.city, "Бишкек")
+
+    def test_name_match_is_case_insensitive(self):
+        Intern.objects.create(full_name="асан асанов")
+        self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Асан Асанов", "phone": "0700555666",
+            "internship_attempt": "1",
+        })
+        self.assertEqual(Intern.objects.filter(phone="0700555666").count(), 1)
+
+    def test_name_match_skipped_when_existing_record_has_a_phone(self):
+        """Если у старой записи уже есть телефон, совпадение по ФИО не
+        используется — не хотим случайно склеить двух разных людей."""
+        Intern.objects.create(full_name="Асан Асанов", phone="0700111111")
+        self.client.post(reverse("intern_profile_apply"), {
+            "full_name": "Асан Асанов", "phone": "0700555666",
+            "internship_attempt": "1",
+        })
+        self.assertEqual(Intern.objects.filter(full_name="Асан Асанов").count(), 2)
+
     def test_phone_is_required(self):
         response = self.client.post(reverse("intern_profile_apply"), {
             "full_name": "Без Телефона", "internship_attempt": "1",
