@@ -11,13 +11,9 @@
             <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
             <span class="badge badge--green">{{ intern.get_status_display }}</span>
             {% if intern.rating %}<span class="badge badge--yellow">★ {{ intern.rating }}</span>{% endif %}
-            <form method="post" action="{% url 'interns:toggle_reserve' intern.pk %}" style="display:inline; margin:0">
-                {% csrf_token %}
-                <button type="submit" class="badge {% if intern.in_talent_reserve %}badge--blue{% else %}badge--gray{% endif %}" style="border:0; cursor:pointer;">
-                    {% if intern.in_talent_reserve %}✓ Резерв кадров{% else %}+ Резерв кадров{% endif %}
-                </button>
-            </form>
             {% if intern.in_resume_bank %}<span class="badge badge--blue">Банк резюме</span>{% endif %}
+            <a href="{% url 'interns:reserve_create' %}?full_name={{ intern.full_name|urlencode }}&phone={{ intern.phone|urlencode }}&email={{ intern.email|urlencode }}&city={{ intern.city|urlencode }}"
+               class="badge badge--gray" style="text-decoration:none;">+ В резерв кадров</a>
         </div>
     </div>
     <div class="page-actions">

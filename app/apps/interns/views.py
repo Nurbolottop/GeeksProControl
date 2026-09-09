@@ -7,9 +7,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from apps.interns import services
 from apps.interns.forms import (
     GrantAccessForm, InternEvaluationForm, InternForm, ProfileApplyForm,
-    ResumeBankApplyForm,
+    ResumeBankApplyForm, TalentReserveApplyForm, TalentReserveForm,
 )
-from apps.interns.models import Intern, InternEvaluation, InternStatus
+from apps.interns.models import (
+    Intern, InternEvaluation, InternStatus, TalentReserveCandidate,
+)
 from apps.teams.models import TeamMember
 from apps.training.models import Specialization, TrainingGroup
 
@@ -229,8 +231,8 @@ def grant_pm_access(request, pk):
 
 
 def _flagged_list(request, field, title):
-    """Резерв кадров / банк резюме — включая тимлидов, в отличие от
-    общего списка стажёров (там тимлиды — уже «сотрудники»)."""
+    """Банк резюме — включая тимлидов, в отличие от общего списка
+    стажёров (там тимлиды — уже «сотрудники»)."""
     people = (
         Intern.objects.active().filter(**{field: True})
         .select_related('specialization').order_by('full_name')
@@ -242,7 +244,63 @@ def _flagged_list(request, field, title):
 
 @login_required
 def reserve_list(request):
-    return _flagged_list(request, 'in_talent_reserve', 'Резерв кадров')
+    """Резерв кадров — отдельный пул, не привязан к карточкам стажёров."""
+    candidates = TalentReserveCandidate.objects.active().select_related('specialization')
+    return render(request, 'interns/reserve_list.html', {
+        'candidates': candidates,
+    })
+
+
+@login_required
+def reserve_create(request):
+    initial = {
+        'full_name': request.GET.get('full_name', ''),
+        'phone': request.GET.get('phone', ''),
+        'email': request.GET.get('email', ''),
+        'city': request.GET.get('city', ''),
+    }
+    form = TalentReserveForm(request.POST or None, initial=initial)
+    if request.method == 'POST' and form.is_valid():
+        candidate = form.save()
+        messages.success(request, f'«{candidate.full_name}» добавлен(а) в резерв.')
+        return redirect('interns:reserve')
+    return render(request, 'interns/reserve_form.html', {
+        'form': form, 'title': 'Новый кандидат в резерве',
+    })
+
+
+@login_required
+def reserve_update(request, pk):
+    candidate = get_object_or_404(TalentReserveCandidate, pk=pk)
+    form = TalentReserveForm(request.POST or None, instance=candidate)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Кандидат обновлён.')
+        return redirect('interns:reserve')
+    return render(request, 'interns/reserve_form.html', {
+        'form': form, 'title': f'Резерв: {candidate.full_name}',
+    })
+
+
+@login_required
+def reserve_delete(request, pk):
+    candidate = get_object_or_404(TalentReserveCandidate, pk=pk)
+    if request.method == 'POST':
+        name = candidate.full_name
+        candidate.delete()
+        messages.success(request, f'{name} удалён(а) из резерва.')
+    return redirect('interns:reserve')
+
+
+@login_required
+def reserve_set_priority(request, pk):
+    candidate = get_object_or_404(TalentReserveCandidate, pk=pk)
+    if request.method == 'POST':
+        raw = request.POST.get('priority', '')
+        if raw.isdigit():
+            candidate.priority = int(raw)
+            candidate.save(update_fields=['priority', 'updated_at'])
+    return redirect('interns:reserve')
 
 
 @login_required
@@ -308,10 +366,26 @@ def profile_apply(request):
     return render(request, 'interns/profile_apply.html', {'form': form})
 
 
-@login_required
-def toggle_reserve(request, pk):
-    intern = get_object_or_404(Intern, pk=pk)
-    if request.method == 'POST':
-        intern.in_talent_reserve = not intern.in_talent_reserve
-        intern.save(update_fields=['in_talent_reserve', 'updated_at'])
-    return redirect(intern.get_absolute_url())
+def talent_reserve_apply(request):
+    """Публичная анкета «Резерв кадров» — без входа в систему.
+
+    Тот же принцип поиска, что и в анкете профиля: сначала точное
+    совпадение по телефону, иначе — по ФИО среди записей без телефона.
+    """
+    form = TalentReserveApplyForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        phone = form.cleaned_data['phone']
+        full_name = form.cleaned_data['full_name']
+        candidate = TalentReserveCandidate.objects.filter(phone=phone).first()
+        if candidate is None:
+            candidate = TalentReserveCandidate.objects.filter(
+                phone='', full_name__iexact=full_name,
+            ).first()
+        if candidate is None:
+            candidate = form.save(commit=False)
+        else:
+            for field in TalentReserveApplyForm.Meta.fields:
+                setattr(candidate, field, form.cleaned_data[field])
+        candidate.save()
+        return render(request, 'interns/reserve_apply_done.html')
+    return render(request, 'interns/reserve_apply.html', {'form': form})

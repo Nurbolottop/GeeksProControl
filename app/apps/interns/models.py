@@ -79,7 +79,6 @@ class Intern(TimeStampedModel, ArchivableModel):
         null=True, blank=True,
     )
     in_resume_bank = models.BooleanField('В банке резюме', default=False)
-    in_talent_reserve = models.BooleanField('В резерве кадров', default=False)
     rating = models.DecimalField(
         'Рейтинг', max_digits=3, decimal_places=2, null=True, blank=True,
     )
@@ -101,6 +100,40 @@ class Intern(TimeStampedModel, ArchivableModel):
         return [
             m for m in self.team_memberships.all() if m.status == 'active'
         ]
+
+
+class TalentReserveCandidate(TimeStampedModel, ArchivableModel):
+    """Резерв кадров — отдельный пул людей, не привязан к карточке стажёра.
+
+    По факту сюда обычно попадают наши же бывшие стажёры/тимлиды, но
+    запись самостоятельная: нет связи с Intern, свой набор полей.
+    """
+
+    full_name = models.CharField('ФИО', max_length=255)
+    phone = models.CharField('Телефон', max_length=32, blank=True)
+    email = models.EmailField('Email', blank=True)
+    telegram = models.CharField('Telegram', max_length=100, blank=True)
+    city = models.CharField('Город', max_length=100, blank=True)
+    specialization = models.ForeignKey(
+        Specialization, on_delete=models.PROTECT, related_name='reserve_candidates',
+        verbose_name='Направление', null=True, blank=True,
+    )
+    desired_role = models.CharField('Желаемая роль/позиция', max_length=255, blank=True)
+    experience = models.TextField('О себе / опыт', blank=True)
+    portfolio_link = models.URLField('Портфолио / резюме — ссылка', blank=True)
+    priority = models.PositiveIntegerField(
+        'Приоритет', default=0,
+        help_text='Чем больше число, тем выше в списке.',
+    )
+    comment = models.TextField('Комментарий', blank=True)
+
+    class Meta:
+        verbose_name = 'Кандидат в резерве'
+        verbose_name_plural = 'Резерв кадров'
+        ordering = ['-priority', '-created_at']
+
+    def __str__(self) -> str:
+        return self.full_name
 
 
 class InternEvaluation(TimeStampedModel):

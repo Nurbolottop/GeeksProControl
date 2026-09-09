@@ -1,6 +1,6 @@
 from django import forms
 
-from apps.interns.models import Intern, InternEvaluation
+from apps.interns.models import Intern, InternEvaluation, TalentReserveCandidate
 
 
 class InternForm(forms.ModelForm):
@@ -10,7 +10,6 @@ class InternForm(forms.ModelForm):
             'full_name', 'phone', 'email', 'telegram', 'city', 'branch',
             'specialization', 'education_end_date',
             'internship_start_date', 'internship_attempt', 'status', 'comment',
-            'in_talent_reserve',
         ]
         widgets = {
             'education_end_date': forms.DateInput(
@@ -59,6 +58,41 @@ class ProfileApplyForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['phone'].required = True
+
+
+class TalentReserveApplyForm(forms.ModelForm):
+    """Публичная анкета «Резерв кадров» — человек заполняет сам, без входа."""
+
+    class Meta:
+        model = TalentReserveCandidate
+        fields = [
+            'full_name', 'phone', 'email', 'telegram', 'city',
+            'specialization', 'desired_role', 'experience', 'portfolio_link',
+        ]
+        labels = {'specialization': 'Направление'}
+        widgets = {
+            'experience': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['phone'].required = True
+
+
+class TalentReserveForm(forms.ModelForm):
+    """Карточка кандидата в резерве — заполняет/правит сотрудник."""
+
+    class Meta:
+        model = TalentReserveCandidate
+        fields = [
+            'full_name', 'phone', 'email', 'telegram', 'city',
+            'specialization', 'desired_role', 'experience', 'portfolio_link',
+            'priority', 'comment',
+        ]
+        widgets = {
+            'experience': forms.Textarea(attrs={'rows': 3}),
+            'comment': forms.Textarea(attrs={'rows': 2}),
+        }
 
 
 class GrantAccessForm(forms.Form):

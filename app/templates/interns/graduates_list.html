@@ -31,12 +31,8 @@
                     <td>{{ person.graduated_project|default:'—' }}</td>
                     <td>{{ person.graduated_at|date:'d.m.Y'|default:'—' }}</td>
                     <td>
-                        <form method="post" action="{% url 'interns:toggle_reserve' person.pk %}" style="margin:0">
-                            {% csrf_token %}
-                            <button type="submit" class="badge {% if person.in_talent_reserve %}badge--blue{% else %}badge--gray{% endif %}" style="border:0; cursor:pointer;">
-                                {% if person.in_talent_reserve %}✓ В резерве{% else %}+ В резерв{% endif %}
-                            </button>
-                        </form>
+                        <a href="{% url 'interns:reserve_create' %}?full_name={{ person.full_name|urlencode }}&phone={{ person.phone|urlencode }}&email={{ person.email|urlencode }}&city={{ person.city|urlencode }}"
+                           class="badge badge--gray" style="text-decoration:none;">+ В резерв</a>
                     </td>
                     <td>
                         {% if person.in_resume_bank %}

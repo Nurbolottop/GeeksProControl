@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 
-from apps.interns.models import Intern, InternEvaluation
+from apps.interns.models import Intern, InternEvaluation, TalentReserveCandidate
 from apps.interns.services import add_evaluation
 
 
@@ -238,23 +238,15 @@ class GrantPMAccessTests(TestCase):
         self.assertTrue(self.pm.user.check_password("secondpass123"))
 
 
-class ReserveAndResumeBankTests(TestCase):
-    """«Резерв кадров» / «Банк резюме» — включая тимлидов, в отличие от
-    общего списка стажёров."""
+class ResumeBankListTests(TestCase):
+    """«Банк резюме» — включая тимлидов, в отличие от общего списка
+    стажёров."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
 
         self.user = get_user_model().objects.create_user(username="head", password="x")
         self.client.force_login(self.user)
-
-    def test_reserve_list_shows_only_flagged(self):
-        in_reserve = Intern.objects.create(full_name="В резерве", in_talent_reserve=True)
-        Intern.objects.create(full_name="Не в резерве")
-        response = self.client.get(reverse("interns:reserve"))
-        names = [p.full_name for p in response.context["people"]]
-        self.assertEqual(names, ["В резерве"])
-        self.assertContains(response, "В резерве")
 
     def test_resume_bank_list_shows_only_flagged(self):
         Intern.objects.create(full_name="Без резюме")
@@ -268,17 +260,15 @@ class ReserveAndResumeBankTests(TestCase):
         from apps.teams.models import TeamMember, TeamRole
 
         project = Project.objects.create(name="Балажан")
-        lead = Intern.objects.create(full_name="Тимлид Резервный", in_talent_reserve=True)
+        lead = Intern.objects.create(full_name="Тимлид Резюмешный", in_resume_bank=True)
         TeamMember.objects.create(
             project=project, intern=lead, role=TeamRole.TEAM_LEAD,
             status=TeamMember.Status.ACTIVE,
         )
-        # В общем списке стажёров тимлида не будет
         general = self.client.get(reverse("interns:list"))
-        self.assertNotContains(general, "Тимлид Резервный")
-        # А в резерве кадров — будет
-        reserve = self.client.get(reverse("interns:reserve"))
-        self.assertContains(reserve, "Тимлид Резервный")
+        self.assertNotContains(general, "Тимлид Резюмешный")
+        bank = self.client.get(reverse("interns:resume_bank"))
+        self.assertContains(bank, "Тимлид Резюмешный")
 
 
 class ResumeBankApplyTests(TestCase):
@@ -393,8 +383,9 @@ class ProfileApplyTests(TestCase):
 
 
 class ReserveResumeBankToggleTests(TestCase):
-    """«Резерв кадров» ставится прямо с карточки; «Банк резюме» — только
-    через публичную анкету, тут лишь показывается бейджем, без тумблера."""
+    """Карточка стажёра: «В резерв кадров» — только ссылка в отдельный
+    пул (без тумблера на самом Intern); «Банк резюме» — только через
+    публичную анкету, тут лишь показывается бейджем."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -403,22 +394,10 @@ class ReserveResumeBankToggleTests(TestCase):
         self.client.force_login(self.user)
         self.intern = Intern.objects.create(full_name="Тестов Тумблер")
 
-    def test_toggle_reserve_flips_flag(self):
-        self.client.post(reverse("interns:toggle_reserve", args=[self.intern.pk]))
-        self.intern.refresh_from_db()
-        self.assertTrue(self.intern.in_talent_reserve)
-
-        self.client.post(reverse("interns:toggle_reserve", args=[self.intern.pk]))
-        self.intern.refresh_from_db()
-        self.assertFalse(self.intern.in_talent_reserve)
-
-    def test_detail_page_shows_clickable_reserve_toggle(self):
+    def test_detail_page_links_to_reserve_create_prefilled(self):
         response = self.client.get(self.intern.get_absolute_url())
-        self.assertContains(response, "+ Резерв кадров")
-
-        self.client.post(reverse("interns:toggle_reserve", args=[self.intern.pk]))
-        response = self.client.get(self.intern.get_absolute_url())
-        self.assertContains(response, "✓ Резерв кадров")
+        self.assertContains(response, "+ В резерв кадров")
+        self.assertContains(response, reverse("interns:reserve_create"))
 
     def test_resume_bank_shown_as_plain_badge_not_toggle(self):
         """Флаг банка резюме выставляется только формой — карточка его
@@ -471,7 +450,7 @@ class GraduatesListTests(TestCase):
         self.assertEqual(names, ["Выпускник Один"])
         self.assertContains(response, "Завершённый")
 
-    def test_reserve_togglable_but_resume_bank_is_read_only(self):
+    def test_resume_bank_read_only_and_reserve_links_out(self):
         import datetime
 
         from apps.projects.models import Project, ProjectStatus
@@ -489,10 +468,121 @@ class GraduatesListTests(TestCase):
 
         response = self.client.get(reverse("interns:graduates"))
         self.assertContains(response, "В банке резюме")
-        self.assertContains(
-            response, reverse("interns:toggle_reserve", args=[graduate.pk]),
+        self.assertContains(response, reverse("interns:reserve_create"))
+
+
+class TalentReserveStaffTests(TestCase):
+    """Резерв кадров — отдельная сущность, сотрудник ведёт карточки и
+    приоритет вручную."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head4", password="x")
+        self.client.force_login(self.user)
+
+    def test_create_candidate(self):
+        response = self.client.post(reverse("interns:reserve_create"), {
+            "full_name": "Кандидат Один", "phone": "0700123123",
+            "email": "", "telegram": "", "city": "Бишкек",
+            "desired_role": "Backend разработчик", "experience": "",
+            "portfolio_link": "", "priority": "0", "comment": "",
+        })
+        self.assertTrue(
+            TalentReserveCandidate.objects.filter(full_name="Кандидат Один").exists(),
+        )
+        self.assertRedirects(response, reverse("interns:reserve"))
+
+    def test_create_prefills_from_query_params(self):
+        response = self.client.get(
+            reverse("interns:reserve_create") + "?full_name=Иван+Иванов&phone=0700000001",
+        )
+        self.assertContains(response, "Иван Иванов")
+        self.assertContains(response, "0700000001")
+
+    def test_update_candidate(self):
+        candidate = TalentReserveCandidate.objects.create(full_name="Старое Имя")
+        self.client.post(reverse("interns:reserve_update", args=[candidate.pk]), {
+            "full_name": "Новое Имя", "phone": "", "email": "", "telegram": "",
+            "city": "", "desired_role": "", "experience": "",
+            "portfolio_link": "", "priority": "5", "comment": "",
+        })
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.full_name, "Новое Имя")
+        self.assertEqual(candidate.priority, 5)
+
+    def test_delete_candidate(self):
+        candidate = TalentReserveCandidate.objects.create(full_name="Удаляемый")
+        self.client.post(reverse("interns:reserve_delete", args=[candidate.pk]))
+        self.assertFalse(TalentReserveCandidate.objects.filter(pk=candidate.pk).exists())
+
+    def test_set_priority(self):
+        candidate = TalentReserveCandidate.objects.create(full_name="Приоритетный")
+        self.client.post(
+            reverse("interns:reserve_set_priority", args=[candidate.pk]),
+            {"priority": "10"},
+        )
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.priority, 10)
+
+    def test_list_ordered_by_priority_descending(self):
+        low = TalentReserveCandidate.objects.create(full_name="Низкий", priority=1)
+        high = TalentReserveCandidate.objects.create(full_name="Высокий", priority=10)
+        response = self.client.get(reverse("interns:reserve"))
+        names = [c.full_name for c in response.context["candidates"]]
+        self.assertEqual(names, ["Высокий", "Низкий"])
+
+
+class TalentReserveApplyTests(TestCase):
+    """Публичная анкета «Резерв кадров» — без входа в систему."""
+
+    def test_anonymous_can_submit(self):
+        response = self.client.post(reverse("talent_reserve_apply"), {
+            "full_name": "Новый Кандидат", "phone": "0700444555",
+            "email": "cand@example.com", "desired_role": "QA",
+        })
+        self.assertEqual(response.status_code, 200)
+        candidate = TalentReserveCandidate.objects.get(phone="0700444555")
+        self.assertEqual(candidate.full_name, "Новый Кандидат")
+        self.assertEqual(candidate.desired_role, "QA")
+
+    def test_existing_person_by_phone_is_updated_not_duplicated(self):
+        TalentReserveCandidate.objects.create(
+            full_name="Старое Имя", phone="0700444555",
+        )
+        self.client.post(reverse("talent_reserve_apply"), {
+            "full_name": "Новое Имя", "phone": "0700444555",
+        })
+        self.assertEqual(
+            TalentReserveCandidate.objects.filter(phone="0700444555").count(), 1,
+        )
+        candidate = TalentReserveCandidate.objects.get(phone="0700444555")
+        self.assertEqual(candidate.full_name, "Новое Имя")
+
+    def test_existing_person_without_phone_matched_by_full_name(self):
+        old = TalentReserveCandidate.objects.create(full_name="Асан Асанов")
+        self.client.post(reverse("talent_reserve_apply"), {
+            "full_name": "Асан Асанов", "phone": "0700666777",
+        })
+        self.assertEqual(
+            TalentReserveCandidate.objects.filter(full_name="Асан Асанов").count(), 1,
+        )
+        old.refresh_from_db()
+        self.assertEqual(old.phone, "0700666777")
+
+    def test_phone_is_required(self):
+        response = self.client.post(reverse("talent_reserve_apply"), {
+            "full_name": "Без Телефона",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            TalentReserveCandidate.objects.filter(full_name="Без Телефона").exists(),
         )
 
-        self.client.post(reverse("interns:toggle_reserve", args=[graduate.pk]))
-        graduate.refresh_from_db()
-        self.assertTrue(graduate.in_talent_reserve)
+    def test_priority_and_comment_not_settable_from_public_form(self):
+        """Публичная анкета не даёт кандидату выставить себе приоритет —
+        это только для сотрудников."""
+        from apps.interns.forms import TalentReserveApplyForm
+
+        self.assertNotIn("priority", TalentReserveApplyForm.Meta.fields)
+        self.assertNotIn("comment", TalentReserveApplyForm.Meta.fields)
