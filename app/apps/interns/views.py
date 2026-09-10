@@ -219,6 +219,9 @@ def intern_project_add(request, pk):
         )
         member.joined_at = timezone.localdate()
         member.save()
+        if intern.status in (InternStatus.WAITING, InternStatus.READY):
+            intern.status = InternStatus.ACTIVE
+            intern.save(update_fields=['status', 'updated_at'])
         messages.success(
             request, f'{intern.full_name} добавлен(а) в «{member.project.name}».',
         )

@@ -6,8 +6,8 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.interns import services
 from apps.interns.models import (
-    Intern, InternEvaluation, ProfileFormLink, ProfileFormSubmission,
-    TalentReserveCandidate,
+    Intern, InternEvaluation, InternStatus, ProfileFormLink,
+    ProfileFormSubmission, TalentReserveCandidate,
 )
 from apps.interns.services import add_evaluation
 
@@ -221,6 +221,36 @@ class InternProjectAddRemoveTests(TestCase):
         self.assertContains(
             response, reverse("interns:project_add", args=[self.intern.pk]),
         )
+
+    def test_add_to_project_moves_waiting_status_to_active(self):
+        """Раньше проект назначался, а статус «Ожидает стажировки» так и
+        оставался висеть — человек по факту на проекте, но по статусу
+        числится ещё не начавшим."""
+        from apps.projects.models import Project
+
+        self.assertEqual(self.intern.status, InternStatus.WAITING)
+        project = Project.objects.create(name="Балажан")
+        self.client.post(
+            reverse("interns:project_add", args=[self.intern.pk]),
+            {"project": project.pk, "comment": ""},
+        )
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, InternStatus.ACTIVE)
+
+    def test_add_to_project_does_not_override_other_status(self):
+        """Если статус уже осмысленный (например «Приостановлен»), не
+        затираем его молча."""
+        from apps.projects.models import Project
+
+        self.intern.status = InternStatus.PAUSED
+        self.intern.save(update_fields=["status", "updated_at"])
+        project = Project.objects.create(name="Балажан")
+        self.client.post(
+            reverse("interns:project_add", args=[self.intern.pk]),
+            {"project": project.pk, "comment": ""},
+        )
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, InternStatus.PAUSED)
 
     def test_remove_from_project(self):
         from apps.projects.models import Project
