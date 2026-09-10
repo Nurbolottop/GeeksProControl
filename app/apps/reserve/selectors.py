@@ -74,6 +74,22 @@ def candidates(params) -> tuple:
     return qs.order_by(*SORT_EXPRESSIONS[sort]), sort
 
 
+# Основные фильтры живут в строке поиска, остальные — под кнопкой «Ещё»
+EXTRA_FILTERS = ['level', 'skill', 'city', 'work_format', 'employment', 'readiness', 'rating']
+
+
+def extra_filters_used(params) -> int:
+    """Сколько дополнительных фильтров сейчас включено."""
+    return sum(1 for key in EXTRA_FILTERS if params.get(key))
+
+
+def any_filter_used(params) -> bool:
+    return bool(
+        params.get('q') or params.get('specialization') or params.get('status')
+        or extra_filters_used(params),
+    )
+
+
 def cities() -> list[str]:
     return list(
         ReserveCandidate.objects.active().exclude(city='')

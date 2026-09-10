@@ -47,6 +47,8 @@ def candidate_list(request):
         'work_formats': WorkFormat.choices,
         'employments': Employment.choices,
         'cities': selectors.cities(),
+        'extra_filters': selectors.extra_filters_used(request.GET),
+        'has_filters': selectors.any_filter_used(request.GET),
         'open_invites': open_invites,
         'invite_form': InviteForm(),
         'can_edit': can_edit_reserve(request.user),
