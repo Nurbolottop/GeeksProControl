@@ -56,27 +56,10 @@ class ReserveApplyForm(forms.ModelForm):
         fields = PUBLIC_FIELDS + ['consent_given']
         widgets = TEXT_WIDGETS
 
-    # Варианты с коротким списком показываем радиокнопками, как в
-    # гугл-формах: кандидату видно всё сразу, а не спрятано в select.
-    RADIO_FIELDS = [
-        'specialization', 'expected_level', 'work_format', 'employment_type',
-    ]
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['phone'].required = True
         self.fields['specialization'].empty_label = 'Другое / не из списка'
-        for name in self.RADIO_FIELDS:
-            self.fields[name].widget = forms.RadioSelect(
-                choices=self.fields[name].choices,
-            )
-        for field in self.fields.values():
-            widget = field.widget
-            if isinstance(widget, (
-                forms.TextInput, forms.EmailInput, forms.URLInput,
-                forms.NumberInput, forms.Textarea,
-            )):
-                widget.attrs.setdefault('placeholder', 'Ваш ответ')
 
 
 class ReserveCandidateForm(forms.ModelForm):

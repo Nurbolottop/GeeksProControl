@@ -244,4 +244,5 @@ def apply_form(request, token):
     return render(request, 'reserve/apply.html', {
         'form': form, 'invite': invite,
         'direction_groups': json.dumps(services.direction_groups_map()),
+        'mark_optional': True,
     })
