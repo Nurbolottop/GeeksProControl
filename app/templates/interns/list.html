@@ -138,7 +138,7 @@
                         {% empty %}—{% endfor %}
                     </td>
                     <td>
-                        {% if intern.status == 'active' or intern.status == 'internship' %}
+                        {% if intern.status == 'active' %}
                             <span class="badge badge--green">{{ intern.get_status_display }}</span>
                         {% elif intern.status == 'employable' or intern.status == 'ready' %}
                             <span class="badge badge--blue">{{ intern.get_status_display }}</span>

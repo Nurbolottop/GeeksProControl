@@ -139,7 +139,7 @@ class Command(BaseCommand):
 
         interns_data = [
             ('Айбек Токтосунов', 'Backend', InternStatus.ACTIVE, group_backend),
-            ('Нурайым Эсенова', 'Frontend', InternStatus.INTERNSHIP, None),
+            ('Нурайым Эсенова', 'Frontend', InternStatus.ACTIVE, None),
             ('Эмир Джолдошев', 'Backend', InternStatus.READY, group_backend),
             ('Айгерим Мамытова', 'UX/UI', InternStatus.ACTIVE, None),
             ('Бекзат Ибраев', 'Testing/QA', InternStatus.EMPLOYABLE, None),

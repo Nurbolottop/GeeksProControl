@@ -14,7 +14,6 @@ class InternStatus(models.TextChoices):
 
     WAITING = 'waiting', 'Ожидает стажировки'
     READY = 'ready', 'Готов к распределению'
-    INTERNSHIP = 'internship', 'На стажировке'
     ACTIVE = 'active', 'Активный'
     PAUSED = 'paused', 'Приостановлен'
     EMPLOYABLE = 'employable', 'Готов к трудоустройству'
@@ -23,7 +22,7 @@ class InternStatus(models.TextChoices):
 
 
 # Статусы, при которых стажёр считается работающим в GeeksPro
-WORKING_STATUSES = (InternStatus.INTERNSHIP, InternStatus.ACTIVE)
+WORKING_STATUSES = (InternStatus.ACTIVE,)
 
 
 class Branch(models.TextChoices):

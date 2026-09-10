@@ -86,7 +86,7 @@
                             <td><a href="{{ intern.get_absolute_url }}"><strong>{{ intern.full_name }}</strong></a></td>
                             <td>
                                 {% if intern.status == 'dropped' %}<span class="badge badge--red">Выбыл</span>
-                                {% elif intern.status == 'active' or intern.status == 'internship' %}<span class="badge badge--green">{{ intern.get_status_display }}</span>
+                                {% elif intern.status == 'active' %}<span class="badge badge--green">{{ intern.get_status_display }}</span>
                                 {% else %}<span class="badge badge--gray">{{ intern.get_status_display }}</span>{% endif %}
                             </td>
                             <td>{{ intern.branch|default:intern.city|default:'—' }}</td>
