@@ -391,7 +391,7 @@ class PmInternDetailTests(PmProjectOwnershipTests):
         response = self.client.get(
             reverse("pm_portal:intern_detail", args=[self.project_a.pk, member_intern.pk]),
         )
-        self.assertContains(response, "Активность: 8.0")
+        self.assertContains(response, "Активность: 8,0")
         self.assertContains(response, "8/10")
 
 
