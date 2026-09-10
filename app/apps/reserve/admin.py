@@ -24,9 +24,11 @@ class ReserveCandidateAdmin(admin.ModelAdmin):
 
 @admin.register(ReserveInvite)
 class ReserveInviteAdmin(admin.ModelAdmin):
-    list_display = ('token', 'candidate', 'recipient', 'is_active', 'expires_at', 'used_at')
+    list_display = (
+        'token', 'recipient', 'is_active', 'expires_at', 'submissions', 'used_at',
+    )
     list_filter = ('is_active',)
-    readonly_fields = ('token', 'used_at')
+    readonly_fields = ('token', 'submissions', 'used_at')
 
 
 @admin.register(ReserveEvent)

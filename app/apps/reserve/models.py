@@ -324,26 +324,24 @@ class ReserveCandidate(TimeStampedModel, ArchivableModel):
 
 
 class ReserveInvite(TimeStampedModel):
-    """Персональная ссылка на анкету кандидата.
+    """Ссылка на анкету кандидата.
 
-    Ссылка ведёт только на публичную форму — ни списка кандидатов, ни
-    внутренних оценок по ней не видно. Может быть привязана к уже
-    заведённой карточке (кандидат дополняет свою анкету) или пустой —
-    тогда карточка создаётся при отправке.
+    Обычная ссылка на публичную форму: создали, отправили кому нужно,
+    при необходимости отключили. К конкретному человеку она не привязана
+    — по одной ссылке анкету может заполнить сколько угодно людей, и
+    каждое заполнение заводит свою карточку. Ни списка кандидатов, ни
+    внутренних оценок по ссылке не видно.
     """
 
     token = models.CharField('Токен', max_length=64, unique=True, default=generate_token)
-    candidate = models.ForeignKey(
-        ReserveCandidate, on_delete=models.CASCADE, related_name='invites',
-        verbose_name='Кандидат', null=True, blank=True,
-    )
     recipient = models.CharField(
-        'Кому отправлено', max_length=255, blank=True,
-        help_text='ФИО или контакт — чтобы помнить, кому ушла ссылка.',
+        'Заметка', max_length=255, blank=True,
+        help_text='Для кого создана ссылка — чтобы не путать несколько ссылок.',
     )
     is_active = models.BooleanField('Активна', default=True)
     expires_at = models.DateTimeField('Действует до', null=True, blank=True)
-    used_at = models.DateTimeField('Анкета заполнена', null=True, blank=True)
+    submissions = models.PositiveIntegerField('Заполнений', default=0)
+    used_at = models.DateTimeField('Последнее заполнение', null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name='+',
         verbose_name='Создал', null=True, blank=True,

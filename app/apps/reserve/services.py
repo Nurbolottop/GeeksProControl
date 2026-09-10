@@ -7,6 +7,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.db import models
 from django.utils import timezone
 
 from apps.reserve.models import (
@@ -105,48 +106,51 @@ def save_evaluation(candidate: ReserveCandidate, user=None) -> ReserveCandidate:
     return candidate
 
 
-def issue_invite(
-    candidate=None, *, user=None, ttl_days: int | None = 7, recipient='',
-) -> ReserveInvite:
-    """Персональная ссылка на анкету.
+def issue_invite(*, user=None, ttl_days: int | None = 7, recipient='') -> ReserveInvite:
+    """Новая ссылка на анкету.
 
-    Для кандидата активной может быть только одна ссылка: выпуск новой
-    гасит прежние, чтобы старое приглашение не гуляло по чатам.
+    Ссылок может быть сколько угодно и живут они независимо: каждую
+    отключают отдельно, а срок задаётся при создании.
     """
-    if candidate is not None:
-        ReserveInvite.objects.filter(
-            candidate=candidate, is_active=True,
-        ).update(is_active=False)
-    invite = ReserveInvite.objects.create(
-        candidate=candidate,
-        recipient=recipient or (candidate.full_name if candidate else ''),
+    return ReserveInvite.objects.create(
+        recipient=recipient,
         created_by=user if user and user.is_authenticated else None,
         expires_at=timezone.now() + timedelta(days=ttl_days) if ttl_days else None,
     )
-    if candidate is not None:
-        log_event(
-            candidate, EventKind.INVITED, 'Отправлена ссылка на анкету',
-            detail=invite.get_absolute_url(), user=user,
-        )
-    return invite
 
 
-def accept_application(invite: ReserveInvite, candidate: ReserveCandidate):
-    """Кандидат отправил анкету: карточка «На проверке».
+def accept_application(invite: ReserveInvite, form) -> ReserveCandidate:
+    """Кандидат отправил анкету по ссылке.
 
-    Ссылка при этом не гаснет — она персональная и живёт до своего срока
-    (или пока её не отключат вручную), чтобы человек мог вернуться и
-    дополнить анкету. Повторная отправка обновляет ту же карточку.
+    Каждое заполнение — отдельный человек и отдельная карточка. Дубли
+    ловим по телефону: если человек с таким номером уже есть, обновляем
+    его карточку, а не заводим вторую.
     """
+    from apps.reserve.forms import PUBLIC_FIELDS
+
     now = timezone.now()
+    data = form.cleaned_data
+    phone = (data.get('phone') or '').strip()
+    candidate = ReserveCandidate.objects.filter(phone=phone).first() if phone else None
+    is_new = candidate is None
+
+    if is_new:
+        candidate = form.save(commit=False)
+    else:
+        for field in PUBLIC_FIELDS:
+            value = data.get(field)
+            # файлы затираем только если человек прислал новый
+            if field in {'photo', 'resume_file'} and not value:
+                continue
+            setattr(candidate, field, value)
+        candidate.consent_given = True
     candidate.submitted_at = now
     candidate.consent_at = candidate.consent_at or now
-    is_new = candidate.pk is None
     candidate.save()
-    if invite is not None:
-        invite.candidate = candidate
-        invite.used_at = invite.used_at or now
-        invite.save(update_fields=['candidate', 'used_at', 'updated_at'])
+
+    ReserveInvite.objects.filter(pk=invite.pk).update(
+        submissions=models.F('submissions') + 1, used_at=now,
+    )
     if is_new:
         log_event(candidate, EventKind.CREATED, 'Кандидат добавлен через анкету')
         log_event(
@@ -156,7 +160,7 @@ def accept_application(invite: ReserveInvite, candidate: ReserveCandidate):
     else:
         log_event(candidate, EventKind.SUBMITTED, 'Кандидат обновил свою анкету')
     # Уже проверенного человека повторная правка анкеты не отбрасывает
-    # назад по статусу — только новые и ещё не проверенные.
+    # назад по статусу — только новых и ещё не проверенных.
     if candidate.status in {CandidateStatus.NEW, CandidateStatus.REVIEW}:
         change_status(candidate, CandidateStatus.REVIEW, comment='Анкета отправлена кандидатом')
     return candidate

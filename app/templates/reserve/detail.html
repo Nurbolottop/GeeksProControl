@@ -68,12 +68,6 @@
                 <button type="submit" class="btn btn--sm">Сохранить</button>
             </form>
             <a href="{% url 'reserve:evaluate' candidate.pk %}" class="btn btn--secondary btn--sm">Оценить</a>
-            <form method="post" action="{% url 'reserve:invite' candidate.pk %}" style="margin: 0;">
-                {% csrf_token %}
-                <input type="hidden" name="ttl_days" value="7">
-                <input type="hidden" name="recipient" value="{{ candidate.full_name }}">
-                <button type="submit" class="btn btn--secondary btn--sm">Ссылка на анкету</button>
-            </form>
         </div>
     {% endif %}
 </div>

@@ -14,7 +14,6 @@ urlpatterns = [
     path('<int:pk>/edit/', views.candidate_update, name='update'),
     path('<int:pk>/evaluate/', views.candidate_evaluate, name='evaluate'),
     path('<int:pk>/status/', views.candidate_status, name='status'),
-    path('<int:pk>/invite/', views.invite_create, name='invite'),
     path('<int:pk>/recommend/', views.recommendation_create, name='recommend'),
     path(
         'recommendation/<int:pk>/status/', views.recommendation_status,

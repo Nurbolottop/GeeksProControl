@@ -28,13 +28,13 @@ APPLICATION = {
 
 
 class ReserveApplyTests(TestCase):
-    """Публичная анкета по персональной ссылке."""
+    """Публичная анкета по ссылке."""
 
     def setUp(self):
-        self.invite = services.issue_invite(recipient='Кандидат')
+        self.invite = services.issue_invite()
         self.url = self.invite.get_absolute_url()
 
-    def test_form_opens_by_personal_link(self):
+    def test_form_opens_by_link(self):
         self.assertEqual(self.client.get(self.url).status_code, 200)
 
     def test_application_without_consent_is_rejected(self):
@@ -53,21 +53,27 @@ class ReserveApplyTests(TestCase):
         self.assertIsNotNone(candidate.submitted_at)
         self.assertIsNotNone(candidate.consent_at)
 
-    def test_link_survives_the_first_submission(self):
-        """Персональная ссылка живёт до своего срока: анкету можно дополнить."""
+    def test_link_serves_many_candidates(self):
+        """Ссылка общая: каждое заполнение — отдельная карточка."""
         self.client.post(self.url, APPLICATION)
+        self.client.post(self.url, dict(
+            APPLICATION, full_name='Второй Кандидат', phone='0700999888',
+        ))
+        self.assertEqual(ReserveCandidate.objects.count(), 2)
         self.invite.refresh_from_db()
+        self.assertEqual(self.invite.submissions, 2)
         self.assertTrue(self.invite.is_active)
-        self.assertIsNotNone(self.invite.used_at)
         self.assertEqual(self.client.get(self.url).status_code, 200)
 
-    def test_second_submission_updates_the_same_card(self):
+    def test_same_phone_updates_the_same_card(self):
         self.client.post(self.url, APPLICATION)
         self.client.post(self.url, dict(APPLICATION, city='Ош'))
         self.assertEqual(ReserveCandidate.objects.count(), 1)
         candidate = ReserveCandidate.objects.get()
         self.assertEqual(candidate.city, 'Ош')
-        self.assertTrue(candidate.events.filter(title='Кандидат обновил свою анкету').exists())
+        self.assertTrue(
+            candidate.events.filter(title='Кандидат обновил свою анкету').exists(),
+        )
 
     def test_checked_candidate_is_not_thrown_back_by_an_edit(self):
         self.client.post(self.url, APPLICATION)
@@ -77,37 +83,34 @@ class ReserveApplyTests(TestCase):
         candidate.refresh_from_db()
         self.assertEqual(candidate.status, CandidateStatus.RESERVE)
 
+    def test_disabled_link_does_not_open(self):
+        self.invite.deactivate()
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.client.post(self.url, APPLICATION)
+        self.assertFalse(ReserveCandidate.objects.exists())
+
     def test_expired_link_does_not_open(self):
         ReserveInvite.objects.filter(pk=self.invite.pk).update(
             expires_at=timezone.now() - timedelta(minutes=1),
         )
         self.assertEqual(self.client.get(self.url).status_code, 404)
 
-    def test_invite_for_existing_candidate_updates_the_same_card(self):
-        candidate = ReserveCandidate.objects.create(full_name='Старое Имя')
-        invite = services.issue_invite(candidate)
-        self.client.post(invite.get_absolute_url(), APPLICATION)
-        self.assertEqual(ReserveCandidate.objects.count(), 1)
-        candidate.refresh_from_db()
-        self.assertEqual(candidate.full_name, 'Тест Кандидатов')
+    def test_links_live_independently(self):
+        second = services.issue_invite()
+        self.invite.deactivate()
+        second.refresh_from_db()
+        self.assertTrue(second.is_active)
+        self.assertEqual(self.client.get(second.get_absolute_url()).status_code, 200)
 
     def test_candidate_sees_no_internal_data(self):
-        candidate = ReserveCandidate.objects.create(
+        ReserveCandidate.objects.create(
             full_name='Оценённый', comment_pm='Внутренний комментарий',
             score_hard_skills=9, decision_comment='Секрет',
         )
-        services.recalculate_rating(candidate)
-        invite = services.issue_invite(candidate)
-        response = self.client.get(invite.get_absolute_url())
+        response = self.client.get(self.url)
         self.assertNotContains(response, 'Внутренний комментарий')
         self.assertNotContains(response, 'Секрет')
-
-    def test_new_invite_kills_the_previous_one_for_the_candidate(self):
-        candidate = ReserveCandidate.objects.create(full_name='Кандидат')
-        first = services.issue_invite(candidate)
-        services.issue_invite(candidate)
-        first.refresh_from_db()
-        self.assertFalse(first.is_active)
+        self.assertNotContains(response, 'Оценённый')
 
 
 class ReserveRatingTests(TestCase):

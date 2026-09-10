@@ -37,22 +37,22 @@
 {% if can_edit %}
     <div class="form-link {% if not open_invites %}form-link--off{% endif %}">
         <div class="form-link__body">
-            <div class="form-link__label">Персональные ссылки на анкету</div>
+            <div class="form-link__label">Ссылки на анкету</div>
             {% for invite in open_invites %}
                 <div class="form-link__row">
                     <div>
                         <a class="form-link__url" id="invite-url-{{ invite.pk }}" href="{{ invite.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ invite.get_absolute_url }}</a>
                         <div class="form-link__meta">
-                            {% if invite.candidate %}<a href="{{ invite.candidate.get_absolute_url }}">{{ invite.candidate.full_name }}</a>{% else %}{{ invite.recipient|default:'Новый кандидат' }}{% endif %}
-                            · создана {{ invite.created_at|date:'d.m.Y H:i' }}
+                            {% if invite.recipient %}{{ invite.recipient }} · {% endif %}
+                            создана {{ invite.created_at|date:'d.m.Y H:i' }}
                             · {% if invite.expires_at %}действует до {{ invite.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
-                            {% if invite.used_at %}· анкета заполнена {{ invite.used_at|date:'d.m.Y H:i' }}, можно дополнить{% endif %}
+                            · заполнений: {{ invite.submissions }}
                         </div>
                     </div>
                     <div class="form-link__actions">
                         <button type="button" class="btn btn--secondary btn--sm" data-copy="invite-url-{{ invite.pk }}">Копировать</button>
                         <form method="post" action="{% url 'reserve:invite_disable' invite.pk %}" style="margin: 0;"
-                              data-confirm="Отключить ссылку на анкету? Кандидат больше не сможет её заполнить."
+                              data-confirm="Отключить ссылку? Анкету по ней больше не заполнить."
                               data-confirm-ok="Отключить">
                             {% csrf_token %}
                             <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
@@ -60,7 +60,7 @@
                     </div>
                 </div>
             {% empty %}
-                <div class="form-link__meta">Действующих ссылок нет. Создайте ссылку кнопкой выше и отправьте кандидату — он заполнит анкету сам, доступа к платформе не получит.</div>
+                <div class="form-link__meta">Действующих ссылок нет. Создайте ссылку кнопкой выше и раздайте кандидатам — анкету заполняют сами, доступа к платформе не получают.</div>
             {% endfor %}
         </div>
     </div>
