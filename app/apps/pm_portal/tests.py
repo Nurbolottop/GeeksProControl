@@ -248,6 +248,24 @@ class PmAttendanceTests(TestCase):
             Attendance.objects.filter(meeting=meeting, intern=self.pm_intern).exists(),
         )
 
+    def test_toggle_mark_is_ajax_returns_partial_not_redirect(self):
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import MeetingKind
+
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
+        response = self.client.post(
+            reverse(
+                "pm_portal:meeting_mark_toggle",
+                args=[self.project_a.pk, meeting.pk],
+            ),
+            {"intern": self.pm_intern.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'id="mark-{self.pm_intern.pk}"')
+        self.assertContains(response, "Был")
+
     def test_score_person_creates_work_score(self):
         from apps.attendance import services as attendance_services
         from apps.attendance.models import MeetingKind, WorkScore

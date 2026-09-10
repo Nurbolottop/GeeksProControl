@@ -1,0 +1,14 @@
+<div class="member" id="mark-{{ member.intern_id }}">
+    <div class="member__avatar">{{ member.person_name|first|upper }}</div>
+    <div class="member__body">
+        <span class="member__name">{{ member.person_name }}</span>
+    </div>
+    <button type="button"
+        class="badge {% if member.mark.status == 'present' %}badge--green{% elif member.mark.status == 'late' %}badge--yellow{% elif member.mark.status == 'excused' %}badge--blue{% elif member.mark.status == 'absent' %}badge--red{% else %}badge--gray{% endif %}"
+        style="border: none; cursor: pointer;"
+        hx-post="{% url 'pm_portal:meeting_mark_toggle' project.pk meeting.pk %}"
+        hx-vals='{"intern": "{{ member.intern_id }}"}'
+        hx-target="#mark-{{ member.intern_id }}" hx-swap="outerHTML">
+        {% if member.mark %}{{ member.mark.get_status_display }}{% else %}Отметить{% endif %}
+    </button>
+</div>

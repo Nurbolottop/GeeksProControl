@@ -178,15 +178,19 @@ def meeting_score(request, pk, meeting_pk):
 
 @login_required
 def meeting_mark_toggle(request, pk, meeting_pk):
+    """AJAX: клик по бейджу переключает отметку — Был → Не был → ... → пусто."""
     project = services.pm_project_or_404(request.user, pk)
     group = _group_or_404(project)
     meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
-    if request.method == 'POST':
-        intern = get_object_or_404(
-            group.members.filter(intern__isnull=False), intern_id=request.POST.get('intern'),
-        ).intern
-        attendance_services.toggle_mark(meeting, intern, user=request.user)
-    return redirect('pm_portal:meeting_detail', pk=project.pk, meeting_pk=meeting.pk)
+    if request.method != 'POST':
+        raise Http404
+    member = get_object_or_404(
+        group.members.filter(intern__isnull=False), intern_id=request.POST.get('intern'),
+    )
+    member.mark = attendance_services.toggle_mark(meeting, member.intern, user=request.user)
+    return render(request, 'pm_portal/partials/mark_row.html', {
+        'project': project, 'meeting': meeting, 'member': member,
+    })
 
 
 @login_required

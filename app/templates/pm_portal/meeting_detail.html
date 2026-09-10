@@ -48,21 +48,7 @@
                 </div>
                 <div class="member-list">
                     {% for member in section.members %}
-                        <div class="member">
-                            <div class="member__avatar">{{ member.person_name|first|upper }}</div>
-                            <div class="member__body">
-                                <span class="member__name">{{ member.person_name }}</span>
-                            </div>
-                            <form method="post" action="{% url 'pm_portal:meeting_mark_toggle' project.pk meeting.pk %}" style="margin:0">
-                                {% csrf_token %}
-                                <input type="hidden" name="intern" value="{{ member.intern_id }}">
-                                <button type="submit"
-                                    class="badge {% if member.mark.status == 'present' %}badge--green{% elif member.mark.status == 'late' %}badge--yellow{% elif member.mark.status == 'excused' %}badge--blue{% elif member.mark.status == 'absent' %}badge--red{% else %}badge--gray{% endif %}"
-                                    style="border: none; cursor: pointer;">
-                                    {% if member.mark %}{{ member.mark.get_status_display }}{% else %}Отметить{% endif %}
-                                </button>
-                            </form>
-                        </div>
+                        {% include 'pm_portal/partials/mark_row.html' %}
                     {% endfor %}
                 </div>
             </div>
