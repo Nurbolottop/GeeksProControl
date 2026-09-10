@@ -17,7 +17,11 @@
                 <div class="member {% if member.status != 'active' %}member--left{% endif %}">
                     <div class="member__avatar">{{ member.person_name|first|upper }}</div>
                     <div class="member__body">
-                        <span class="member__name">{{ member.person_name }}</span>
+                        {% if member.intern_id and member.status == 'active' %}
+                            <a href="{% url 'pm_portal:intern_detail' project.pk member.intern_id %}" class="member__name">{{ member.person_name }}</a>
+                        {% else %}
+                            <span class="member__name">{{ member.person_name }}</span>
+                        {% endif %}
                         <div class="member__meta">
                             {{ member.intern.specialization|default:'—' }}
                             {% if member.status != 'active' %} · вышел{% endif %}

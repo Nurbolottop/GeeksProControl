@@ -347,6 +347,69 @@ class PmEvaluationTests(PmProjectOwnershipTests):
         self.assertEqual(evaluation.project, self.project_a)
 
 
+class PmInternDetailTests(PmProjectOwnershipTests):
+    """Детальная карточка стажёра — только по своей команде своего проекта."""
+
+    def test_can_view_own_team_member_detail(self):
+        member_intern = Intern.objects.create(
+            full_name="Стажёров Детализируемый", phone="0700111222",
+        )
+        TeamMember.objects.create(
+            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("pm_portal:intern_detail", args=[self.project_a.pk, member_intern.pk]),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Стажёров Детализируемый")
+        self.assertContains(response, "0700111222")
+
+    def test_cannot_view_intern_not_on_own_project(self):
+        outsider = Intern.objects.create(full_name="Не в команде")
+        response = self.client.get(
+            reverse("pm_portal:intern_detail", args=[self.project_a.pk, outsider.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_cannot_view_via_foreign_project(self):
+        """Свой стажёр, но проект в урле подделан на чужой — 404."""
+        member_intern = Intern.objects.create(full_name="Стажёров Свой")
+        TeamMember.objects.create(
+            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("pm_portal:intern_detail", args=[self.project_b.pk, member_intern.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_left_member_not_viewable(self):
+        member_intern = Intern.objects.create(full_name="Вышедший")
+        TeamMember.objects.create(
+            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        response = self.client.get(
+            reverse("pm_portal:intern_detail", args=[self.project_a.pk, member_intern.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_team_tab_links_to_detail_for_active_members(self):
+        member_intern = Intern.objects.create(full_name="Кликабельный")
+        TeamMember.objects.create(
+            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
+        )
+        self.assertContains(
+            response,
+            reverse("pm_portal:intern_detail", args=[self.project_a.pk, member_intern.pk]),
+        )
+
+
 class PmDocumentTests(PmProjectOwnershipTests):
     """Документы — загрузка и просмотр только по своему проекту."""
 

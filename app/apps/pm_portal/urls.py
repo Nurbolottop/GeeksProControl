@@ -43,6 +43,10 @@ urlpatterns = [
         name='meeting_score',
     ),
     path(
+        '<int:pk>/interns/<int:intern_pk>/', views.intern_detail,
+        name='intern_detail',
+    ),
+    path(
         '<int:pk>/interns/<int:intern_pk>/evaluate/', views.evaluation_add,
         name='evaluation_add',
     ),

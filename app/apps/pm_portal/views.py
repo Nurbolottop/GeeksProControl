@@ -325,6 +325,25 @@ def member_delete(request, pk, member_pk):
 
 
 @login_required
+def intern_detail(request, pk, intern_pk):
+    """Детальная карточка стажёра — только по своему проекту, только чтение."""
+    project = services.pm_project_or_404(request.user, pk)
+    member = get_object_or_404(
+        TeamMember.objects.select_related('intern__specialization'),
+        project=project, intern_id=intern_pk, status=TeamMember.Status.ACTIVE,
+    )
+    intern = member.intern
+    evaluations = (
+        InternEvaluation.objects.filter(project=project, intern=intern)
+        .select_related('evaluator').order_by('-created_at')
+    )
+    return render(request, 'pm_portal/intern_detail.html', {
+        'project': project, 'member': member, 'intern': intern,
+        'evaluations': evaluations, 'criteria': InternEvaluation.CRITERIA,
+    })
+
+
+@login_required
 def evaluation_add(request, pk, intern_pk):
     project = services.pm_project_or_404(request.user, pk)
     intern = get_object_or_404(

@@ -1,0 +1,56 @@
+{% extends 'pm_portal/base.html' %}
+
+{% block title %}{{ intern.full_name }} — Портал ПМ{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'pm_portal:project_detail' project.pk %}?tab=team">← Команда</a></p>
+<div class="page-head">
+    <div>
+        <h1>{{ intern.full_name }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
+            <span class="badge badge--gray">{{ member.get_role_display }}</span>
+            {% if intern.rating %}<span class="badge badge--yellow">★ {{ intern.rating }}</span>{% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'pm_portal:evaluation_add' project.pk intern.pk %}" class="btn btn--secondary">+ Оценка</a>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Карточка</h2>
+    <dl class="def-grid">
+        <div class="def"><dt>Телефон</dt><dd>{{ intern.phone|default:'—' }}</dd></div>
+        <div class="def"><dt>Email</dt><dd>{{ intern.email|default:'—' }}</dd></div>
+        <div class="def"><dt>Telegram</dt><dd>{{ intern.telegram|default:'—' }}</dd></div>
+        <div class="def"><dt>Город</dt><dd>{{ intern.city|default:'—' }}</dd></div>
+        <div class="def"><dt>Филиал</dt><dd>{{ intern.branch|default:'—' }}</dd></div>
+        <div class="def"><dt>Начало стажировки</dt><dd>{{ intern.internship_start_date|date:'d.m.Y'|default:'—' }}</dd></div>
+        <div class="def"><dt>Стажировка по счёту</dt><dd>{{ intern.internship_attempt }}-й раз</dd></div>
+    </dl>
+</div>
+
+<div class="panel">
+    <h2>Оценки ({{ evaluations|length }})</h2>
+    {% for evaluation in evaluations %}
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border);">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <strong>★ {{ evaluation.average }}</strong>
+                <span class="when" style="color:var(--text-muted); font-size:12px">
+                    {{ evaluation.created_at|date:'d.m.Y' }}{% if evaluation.evaluator %} · {{ evaluation.evaluator.display_name }}{% endif %}
+                </span>
+            </div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px">
+                Hard skills: {{ evaluation.hard_skills }} · Качество: {{ evaluation.quality }} ·
+                Скорость: {{ evaluation.speed }} · Ответственность: {{ evaluation.responsibility }} ·
+                Коммуникация: {{ evaluation.communication }} · Teamwork: {{ evaluation.teamwork }} ·
+                Самостоятельность: {{ evaluation.independence }}
+            </div>
+            {% if evaluation.comment %}<div style="margin-top:4px">{{ evaluation.comment }}</div>{% endif %}
+        </div>
+    {% empty %}
+        <div class="empty">Оценок пока нет.</div>
+    {% endfor %}
+</div>
+{% endblock %}
