@@ -132,7 +132,12 @@ def issue_invite(
 
 
 def accept_application(invite: ReserveInvite, candidate: ReserveCandidate):
-    """Кандидат отправил анкету: статус «На проверке», ссылка гасится."""
+    """Кандидат отправил анкету: карточка «На проверке».
+
+    Ссылка при этом не гаснет — она персональная и живёт до своего срока
+    (или пока её не отключат вручную), чтобы человек мог вернуться и
+    дополнить анкету. Повторная отправка обновляет ту же карточку.
+    """
     now = timezone.now()
     candidate.submitted_at = now
     candidate.consent_at = candidate.consent_at or now
@@ -140,16 +145,20 @@ def accept_application(invite: ReserveInvite, candidate: ReserveCandidate):
     candidate.save()
     if invite is not None:
         invite.candidate = candidate
-        invite.used_at = now
-        invite.is_active = False
-        invite.save(update_fields=['candidate', 'used_at', 'is_active', 'updated_at'])
+        invite.used_at = invite.used_at or now
+        invite.save(update_fields=['candidate', 'used_at', 'updated_at'])
     if is_new:
         log_event(candidate, EventKind.CREATED, 'Кандидат добавлен через анкету')
-    log_event(
-        candidate, EventKind.SUBMITTED, 'Кандидат заполнил анкету',
-        detail='Согласие на передачу данных работодателям получено',
-    )
-    change_status(candidate, CandidateStatus.REVIEW, comment='Анкета отправлена кандидатом')
+        log_event(
+            candidate, EventKind.SUBMITTED, 'Кандидат заполнил анкету',
+            detail='Согласие на передачу данных работодателям получено',
+        )
+    else:
+        log_event(candidate, EventKind.SUBMITTED, 'Кандидат обновил свою анкету')
+    # Уже проверенного человека повторная правка анкеты не отбрасывает
+    # назад по статусу — только новые и ещё не проверенные.
+    if candidate.status in {CandidateStatus.NEW, CandidateStatus.REVIEW}:
+        change_status(candidate, CandidateStatus.REVIEW, comment='Анкета отправлена кандидатом')
     return candidate
 
 

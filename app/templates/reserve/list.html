@@ -46,6 +46,7 @@
                             {% if invite.candidate %}<a href="{{ invite.candidate.get_absolute_url }}">{{ invite.candidate.full_name }}</a>{% else %}{{ invite.recipient|default:'Новый кандидат' }}{% endif %}
                             · создана {{ invite.created_at|date:'d.m.Y H:i' }}
                             · {% if invite.expires_at %}действует до {{ invite.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
+                            {% if invite.used_at %}· анкета заполнена {{ invite.used_at|date:'d.m.Y H:i' }}, можно дополнить{% endif %}
                         </div>
                     </div>
                     <div class="form-link__actions">

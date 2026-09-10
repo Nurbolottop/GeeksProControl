@@ -53,12 +53,29 @@ class ReserveApplyTests(TestCase):
         self.assertIsNotNone(candidate.submitted_at)
         self.assertIsNotNone(candidate.consent_at)
 
-    def test_link_dies_after_the_form_is_sent(self):
+    def test_link_survives_the_first_submission(self):
+        """Персональная ссылка живёт до своего срока: анкету можно дополнить."""
         self.client.post(self.url, APPLICATION)
         self.invite.refresh_from_db()
-        self.assertFalse(self.invite.is_active)
+        self.assertTrue(self.invite.is_active)
         self.assertIsNotNone(self.invite.used_at)
-        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    def test_second_submission_updates_the_same_card(self):
+        self.client.post(self.url, APPLICATION)
+        self.client.post(self.url, dict(APPLICATION, city='Ош'))
+        self.assertEqual(ReserveCandidate.objects.count(), 1)
+        candidate = ReserveCandidate.objects.get()
+        self.assertEqual(candidate.city, 'Ош')
+        self.assertTrue(candidate.events.filter(title='Кандидат обновил свою анкету').exists())
+
+    def test_checked_candidate_is_not_thrown_back_by_an_edit(self):
+        self.client.post(self.url, APPLICATION)
+        candidate = ReserveCandidate.objects.get()
+        services.change_status(candidate, CandidateStatus.RESERVE)
+        self.client.post(self.url, dict(APPLICATION, city='Ош'))
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.status, CandidateStatus.RESERVE)
 
     def test_expired_link_does_not_open(self):
         ReserveInvite.objects.filter(pk=self.invite.pk).update(
