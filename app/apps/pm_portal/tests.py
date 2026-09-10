@@ -2,7 +2,7 @@ import datetime
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from apps.accounts.models import User
 from apps.interns.models import Intern
@@ -297,54 +297,17 @@ class PmAttendanceTests(TestCase):
 
 
 class PmEvaluationTests(PmProjectOwnershipTests):
-    """Оценки — только для тех, кто в команде своего проекта."""
+    """Ручных оценок в ПМ-портале больше нет — только «Активность» с собраний."""
 
-    def test_can_evaluate_own_team_member(self):
-        from apps.interns.models import InternEvaluation
+    def test_no_evaluation_add_route_exists(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("pm_portal:evaluation_add", args=[self.project_a.pk, 1])
 
-        member_intern = Intern.objects.create(full_name="Оцениваемый")
-        TeamMember.objects.create(
-            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
-            status=TeamMember.Status.ACTIVE,
-        )
-        self.client.post(
-            reverse("pm_portal:evaluation_add", args=[self.project_a.pk, member_intern.pk]),
-            {
-                "hard_skills": 5, "quality": 5, "speed": 5, "responsibility": 5,
-                "communication": 5, "teamwork": 5, "independence": 5,
-                "comment": "Молодец",
-            },
-        )
-        evaluation = InternEvaluation.objects.get(intern=member_intern)
-        self.assertEqual(evaluation.project, self.project_a)
-        self.assertEqual(evaluation.evaluator, self.pm_user)
-
-    def test_cannot_evaluate_intern_not_on_own_project(self):
-        outsider = Intern.objects.create(full_name="Не в команде")
+    def test_evaluations_tab_removed_from_project_detail(self):
         response = self.client.get(
-            reverse("pm_portal:evaluation_add", args=[self.project_a.pk, outsider.pk]),
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]),
         )
-        self.assertEqual(response.status_code, 404)
-
-    def test_evaluation_locked_to_own_project_even_if_posted(self):
-        """Даже если подделать project в POST — сохранится свой проект."""
-        from apps.interns.models import InternEvaluation
-
-        member_intern = Intern.objects.create(full_name="Оцениваемый2")
-        TeamMember.objects.create(
-            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
-            status=TeamMember.Status.ACTIVE,
-        )
-        self.client.post(
-            reverse("pm_portal:evaluation_add", args=[self.project_a.pk, member_intern.pk]),
-            {
-                "project": self.project_b.pk,
-                "hard_skills": 3, "quality": 3, "speed": 3, "responsibility": 3,
-                "communication": 3, "teamwork": 3, "independence": 3,
-            },
-        )
-        evaluation = InternEvaluation.objects.get(intern=member_intern)
-        self.assertEqual(evaluation.project, self.project_a)
+        self.assertNotContains(response, "tab=evaluations")
 
 
 class PmInternDetailTests(PmProjectOwnershipTests):
@@ -408,6 +371,28 @@ class PmInternDetailTests(PmProjectOwnershipTests):
             response,
             reverse("pm_portal:intern_detail", args=[self.project_a.pk, member_intern.pk]),
         )
+
+    def test_shows_activity_scores_from_meetings(self):
+        from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
+        from apps.flows.models import Flow, Group
+
+        flow = Flow.objects.create(number=1, status=Flow.Status.ACTIVE)
+        group = Group.objects.create(flow=flow, number=1, project=self.project_a)
+        member_intern = Intern.objects.create(full_name="Оцениваемый Активностью")
+        TeamMember.objects.create(
+            project=self.project_a, group=group, intern=member_intern,
+            role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
+        )
+        meeting = GroupMeeting.objects.create(
+            group=group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 1),
+        )
+        WorkScore.objects.create(meeting=meeting, intern=member_intern, score=8)
+
+        response = self.client.get(
+            reverse("pm_portal:intern_detail", args=[self.project_a.pk, member_intern.pk]),
+        )
+        self.assertContains(response, "Активность: 8.0")
+        self.assertContains(response, "8/10")
 
 
 class PmDocumentTests(PmProjectOwnershipTests):
