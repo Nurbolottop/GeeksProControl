@@ -11,7 +11,7 @@
 <div class="apply-page">
     <header class="apply-hero">
         <div class="apply-hero__brand">Geeks<span>Pro</span></div>
-        <h1>Анкета в резерв кадров</h1>
+        <h1>{% if is_edit %}Ваша анкета в резерве кадров{% else %}Анкета в резерв кадров{% endif %}</h1>
         <p>
             Резерв — это база проверенных выпускников GeeksPro, которых мы рекомендуем
             компаниям-работодателям. Заполните анкету один раз: чем подробнее, тем точнее
@@ -124,7 +124,7 @@
         </section>
 
         <div class="aform__actions">
-            <button type="submit" class="btn btn--lg">Отправить анкету</button>
+            <button type="submit" class="btn btn--lg">{% if is_edit %}Сохранить изменения{% else %}Отправить анкету{% endif %}</button>
             <span>Поля со звёздочкой обязательны. После отправки анкета уходит на проверку в GeeksPro.</span>
         </div>
     </form>

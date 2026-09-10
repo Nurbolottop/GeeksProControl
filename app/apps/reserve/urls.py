@@ -14,6 +14,7 @@ urlpatterns = [
     path('<int:pk>/edit/', views.candidate_update, name='update'),
     path('<int:pk>/evaluate/', views.candidate_evaluate, name='evaluate'),
     path('<int:pk>/status/', views.candidate_status, name='status'),
+    path('<int:pk>/edit-link/', views.invite_create, name='edit_link'),
     path('<int:pk>/recommend/', views.recommendation_create, name='recommend'),
     path(
         'recommendation/<int:pk>/status/', views.recommendation_status,

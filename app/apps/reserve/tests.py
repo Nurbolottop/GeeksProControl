@@ -113,6 +113,74 @@ class ReserveApplyTests(TestCase):
         self.assertNotContains(response, 'Оценённый')
 
 
+class ReserveEditLinkTests(TestCase):
+    """Ссылка на редактирование конкретной карточки."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='head', password='pass12345', role=User.Role.HEAD,
+        )
+        self.candidate = ReserveCandidate.objects.create(
+            full_name='Асан Асанов', phone='0700111222', city='Бишкек',
+            skills='Python', status=CandidateStatus.RESERVE,
+        )
+
+    def test_form_opens_prefilled(self):
+        link = services.issue_invite(self.candidate, user=self.user)
+        response = self.client.get(link.get_absolute_url())
+        self.assertContains(response, 'Асан Асанов')
+        self.assertContains(response, '0700111222')
+
+    def test_edit_updates_the_same_card(self):
+        link = services.issue_invite(self.candidate, user=self.user)
+        self.client.post(link.get_absolute_url(), dict(
+            APPLICATION, full_name='Асан Асанов', phone='0700111222', city='Ош',
+        ))
+        self.assertEqual(ReserveCandidate.objects.count(), 1)
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.city, 'Ош')
+        self.assertEqual(self.candidate.status, CandidateStatus.RESERVE)
+
+    def test_changed_phone_does_not_split_the_card(self):
+        """По ссылке на правку карточка та же, даже если сменился телефон."""
+        link = services.issue_invite(self.candidate, user=self.user)
+        self.client.post(link.get_absolute_url(), dict(
+            APPLICATION, full_name='Асан Асанов', phone='0700555666',
+        ))
+        self.assertEqual(ReserveCandidate.objects.count(), 1)
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.phone, '0700555666')
+
+    def test_new_edit_link_kills_the_previous_one(self):
+        first = services.issue_invite(self.candidate, user=self.user)
+        services.issue_invite(self.candidate, user=self.user)
+        first.refresh_from_db()
+        self.assertFalse(first.is_active)
+        self.assertEqual(self.client.get(first.get_absolute_url()).status_code, 404)
+
+    def test_edit_link_is_created_from_the_card(self):
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse('reserve:edit_link', args=[self.candidate.pk]), {'ttl_days': '7'},
+        )
+        link = ReserveInvite.objects.get(candidate=self.candidate)
+        self.assertTrue(link.is_open)
+        self.assertTrue(
+            self.candidate.events.filter(kind='invited').exists(),
+        )
+
+    def test_edit_links_are_not_shown_among_general_links(self):
+        services.issue_invite(self.candidate, user=self.user)
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('reserve:list'))
+        self.assertEqual(response.context['open_invites'], [])
+
+    def test_disabled_edit_link_does_not_open(self):
+        link = services.issue_invite(self.candidate, user=self.user)
+        link.deactivate()
+        self.assertEqual(self.client.get(link.get_absolute_url()).status_code, 404)
+
+
 class ReserveRatingTests(TestCase):
     """Общий рейтинг считается сам по выставленным критериям."""
 

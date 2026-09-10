@@ -324,16 +324,24 @@ class ReserveCandidate(TimeStampedModel, ArchivableModel):
 
 
 class ReserveInvite(TimeStampedModel):
-    """Ссылка на анкету кандидата.
+    """Ссылка на анкету кандидата. Бывает двух видов.
 
-    Обычная ссылка на публичную форму: создали, отправили кому нужно,
-    при необходимости отключили. К конкретному человеку она не привязана
-    — по одной ссылке анкету может заполнить сколько угодно людей, и
-    каждое заполнение заводит свою карточку. Ни списка кандидатов, ни
-    внутренних оценок по ссылке не видно.
+    Общая (`candidate` пустой) — просто вход в пустую анкету: создали,
+    раздали, при необходимости отключили. Заполнить её может сколько
+    угодно людей, каждое заполнение заводит свою карточку.
+
+    На редактирование (`candidate` заполнен) — открывает анкету
+    конкретного человека уже с его данными, отправка обновляет ту же
+    карточку. Ни списка кандидатов, ни внутренних оценок по ссылке
+    по-прежнему не видно.
     """
 
     token = models.CharField('Токен', max_length=64, unique=True, default=generate_token)
+    candidate = models.ForeignKey(
+        ReserveCandidate, on_delete=models.CASCADE, related_name='edit_links',
+        verbose_name='Кандидат', null=True, blank=True,
+        help_text='Пусто — общая ссылка на анкету; иначе ссылка на правку карточки.',
+    )
     recipient = models.CharField(
         'Заметка', max_length=255, blank=True,
         help_text='Для кого создана ссылка — чтобы не путать несколько ссылок.',
@@ -354,6 +362,10 @@ class ReserveInvite(TimeStampedModel):
 
     def __str__(self) -> str:
         return f'Анкета резерва /{self.token}/'
+
+    @property
+    def is_edit_link(self) -> bool:
+        return self.candidate_id is not None
 
     def get_absolute_url(self) -> str:
         return reverse('reserve_apply', args=[self.token])

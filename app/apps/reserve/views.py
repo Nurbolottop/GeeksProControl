@@ -33,7 +33,8 @@ def candidate_list(request):
     paginator = Paginator(qs, 50)
     page = paginator.get_page(request.GET.get('page'))
     open_invites = [
-        invite for invite in ReserveInvite.objects.filter(is_active=True)[:20]
+        invite for invite in
+        ReserveInvite.objects.filter(is_active=True, candidate__isnull=True)[:20]
         if invite.is_open
     ]
     context = {
@@ -85,6 +86,11 @@ def candidate_detail(request, pk):
         ),
         'events': candidate.events.select_related('user')[:100],
         'status_form': StatusChangeForm(initial={'status': candidate.status}),
+        'edit_links': [
+            link for link in candidate.edit_links.filter(is_active=True)
+            if link.is_open
+        ],
+        'invite_form': InviteForm(),
         'rec_statuses': RecommendationStatus.choices,
         'can_edit': can_edit_reserve(request.user),
     }
@@ -164,19 +170,23 @@ def candidate_status(request, pk):
 
 
 @reserve_editor_required
-def invite_create(request):
-    """Новая ссылка на анкету — общая, не привязана к человеку."""
+def invite_create(request, pk=None):
+    """Ссылка на анкету: общая или на редактирование карточки кандидата."""
+    candidate = get_object_or_404(ReserveCandidate, pk=pk) if pk else None
     form = InviteForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         invite = services.issue_invite(
-            user=request.user, ttl_days=form.ttl(),
+            candidate, user=request.user, ttl_days=form.ttl(),
             recipient=form.cleaned_data['recipient'],
         )
+        kind = 'на редактирование анкеты' if candidate else 'на анкету'
         messages.success(
             request,
-            'Ссылка на анкету создана: '
+            f'Ссылка {kind} создана: '
             f'{request.build_absolute_uri(invite.get_absolute_url())}',
         )
+    if candidate is not None:
+        return redirect(candidate.get_absolute_url())
     return redirect('reserve:list')
 
 
@@ -186,6 +196,8 @@ def invite_disable(request, pk):
     if request.method == 'POST':
         invite.deactivate()
         messages.success(request, 'Ссылка на анкету отключена.')
+    if invite.candidate_id:
+        return redirect(invite.candidate.get_absolute_url())
     return redirect('reserve:list')
 
 
@@ -227,12 +239,16 @@ def apply_form(request, token):
     invite = ReserveInvite.objects.filter(token=token).first()
     if invite is None or not invite.is_open:
         return render(request, 'reserve/apply_expired.html', status=404)
-    form = ReserveApplyForm(request.POST or None, request.FILES or None)
+    form = ReserveApplyForm(
+        request.POST or None, request.FILES or None, instance=invite.candidate,
+    )
     if request.method == 'POST' and form.is_valid():
         services.accept_application(invite, form)
-        return render(request, 'reserve/apply_done.html')
+        return render(request, 'reserve/apply_done.html', {
+            'is_edit': invite.is_edit_link,
+        })
     return render(request, 'reserve/apply.html', {
-        'form': form, 'invite': invite,
+        'form': form, 'invite': invite, 'is_edit': invite.is_edit_link,
         'direction_groups': json.dumps(services.direction_groups_map()),
         'mark_optional': True,
     })

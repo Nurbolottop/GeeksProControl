@@ -106,44 +106,64 @@ def save_evaluation(candidate: ReserveCandidate, user=None) -> ReserveCandidate:
     return candidate
 
 
-def issue_invite(*, user=None, ttl_days: int | None = 7, recipient='') -> ReserveInvite:
+def issue_invite(
+    candidate=None, *, user=None, ttl_days: int | None = 7, recipient='',
+) -> ReserveInvite:
     """Новая ссылка на анкету.
 
-    Ссылок может быть сколько угодно и живут они независимо: каждую
-    отключают отдельно, а срок задаётся при создании.
+    Без кандидата — общая ссылка (каждое заполнение = новая карточка).
+    С кандидатом — ссылка на редактирование его анкеты; прежние ссылки
+    на правку этой же карточки гасим, чтобы старая не гуляла по чатам.
     """
-    return ReserveInvite.objects.create(
-        recipient=recipient,
+    if candidate is not None:
+        ReserveInvite.objects.filter(
+            candidate=candidate, is_active=True,
+        ).update(is_active=False)
+    invite = ReserveInvite.objects.create(
+        candidate=candidate,
+        recipient=recipient or (candidate.full_name if candidate else ''),
         created_by=user if user and user.is_authenticated else None,
         expires_at=timezone.now() + timedelta(days=ttl_days) if ttl_days else None,
     )
+    if candidate is not None:
+        log_event(
+            candidate, EventKind.INVITED, 'Создана ссылка на редактирование анкеты',
+            detail=invite.get_absolute_url(), user=user,
+        )
+    return invite
 
 
 def accept_application(invite: ReserveInvite, form) -> ReserveCandidate:
-    """Кандидат отправил анкету по ссылке.
+    """Анкета отправлена по ссылке.
 
-    Каждое заполнение — отдельный человек и отдельная карточка. Дубли
-    ловим по телефону: если человек с таким номером уже есть, обновляем
-    его карточку, а не заводим вторую.
+    По ссылке на редактирование обновляется та самая карточка. По общей
+    ссылке каждое заполнение — отдельный человек; дубли ловим по
+    телефону: если такой номер уже есть, обновляем его карточку.
     """
     from apps.reserve.forms import PUBLIC_FIELDS
 
     now = timezone.now()
     data = form.cleaned_data
     phone = (data.get('phone') or '').strip()
-    candidate = ReserveCandidate.objects.filter(phone=phone).first() if phone else None
-    is_new = candidate is None
 
-    if is_new:
+    if invite.is_edit_link:
         candidate = form.save(commit=False)
+        is_new = False
     else:
-        for field in PUBLIC_FIELDS:
-            value = data.get(field)
-            # файлы затираем только если человек прислал новый
-            if field in {'photo', 'resume_file'} and not value:
-                continue
-            setattr(candidate, field, value)
-        candidate.consent_given = True
+        candidate = (
+            ReserveCandidate.objects.filter(phone=phone).first() if phone else None
+        )
+        is_new = candidate is None
+        if is_new:
+            candidate = form.save(commit=False)
+        else:
+            for field in PUBLIC_FIELDS:
+                value = data.get(field)
+                # файлы затираем только если человек прислал новый
+                if field in {'photo', 'resume_file'} and not value:
+                    continue
+                setattr(candidate, field, value)
+            candidate.consent_given = True
     candidate.submitted_at = now
     candidate.consent_at = candidate.consent_at or now
     candidate.save()
