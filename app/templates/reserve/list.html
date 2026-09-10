@@ -20,50 +20,48 @@
                 </select>
                 <button type="submit" class="btn btn--secondary">Взять в резерв</button>
             </form>
+            <form method="post" action="{% url 'reserve:invite_create' %}" style="margin: 0; display: flex; gap: 8px;">
+                {% csrf_token %}
+                <select name="ttl_days" class="form-link__ttl" title="Срок действия ссылки">
+                    {% for value, label in invite_form.fields.ttl_days.choices %}
+                        <option value="{{ value }}" {% if value == '7' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn--secondary">Новая ссылка на анкету</button>
+            </form>
             <a href="{% url 'reserve:create' %}" class="btn">+ Новый кандидат</a>
         </div>
     {% endif %}
 </div>
 
 {% if can_edit %}
-    <div class="form-link">
+    <div class="form-link {% if not open_invites %}form-link--off{% endif %}">
         <div class="form-link__body">
-            <div class="form-link__label">Персональная ссылка на анкету</div>
-            {% if open_invites %}
-                <div class="form-link__meta">Действующие приглашения — кандидат заполняет свою часть сам:</div>
-                <table class="data data--tight" style="margin-top: 6px;">
-                    {% for invite in open_invites %}
-                        <tr>
-                            <td style="width: 40%;">
-                                <a class="form-link__url" href="{{ invite.get_absolute_url }}" target="_blank" rel="noopener" id="invite-url-{{ invite.pk }}">{{ request.scheme }}://{{ request.get_host }}{{ invite.get_absolute_url }}</a>
-                            </td>
-                            <td>{% if invite.candidate %}<a href="{{ invite.candidate.get_absolute_url }}">{{ invite.candidate.full_name }}</a>{% else %}{{ invite.recipient|default:'Новый кандидат' }}{% endif %}</td>
-                            <td class="sub">{% if invite.expires_at %}до {{ invite.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}</td>
-                            <td style="text-align: right; white-space: nowrap;">
-                                <button type="button" class="btn btn--secondary btn--sm" data-copy="invite-url-{{ invite.pk }}">Копировать</button>
-                                <form method="post" action="{% url 'reserve:invite_disable' invite.pk %}" style="display: inline; margin: 0;"
-                                      data-confirm="Отключить ссылку на анкету?" data-confirm-ok="Отключить">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </table>
-            {% else %}
-                <div class="form-link__meta">Действующих приглашений нет. Создайте ссылку и отправьте её кандидату — он заполнит анкету сам, к платформе доступа не получит.</div>
-            {% endif %}
+            <div class="form-link__label">Персональные ссылки на анкету</div>
+            {% for invite in open_invites %}
+                <div class="form-link__row">
+                    <div>
+                        <a class="form-link__url" id="invite-url-{{ invite.pk }}" href="{{ invite.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ invite.get_absolute_url }}</a>
+                        <div class="form-link__meta">
+                            {% if invite.candidate %}<a href="{{ invite.candidate.get_absolute_url }}">{{ invite.candidate.full_name }}</a>{% else %}{{ invite.recipient|default:'Новый кандидат' }}{% endif %}
+                            · создана {{ invite.created_at|date:'d.m.Y H:i' }}
+                            · {% if invite.expires_at %}действует до {{ invite.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
+                        </div>
+                    </div>
+                    <div class="form-link__actions">
+                        <button type="button" class="btn btn--secondary btn--sm" data-copy="invite-url-{{ invite.pk }}">Копировать</button>
+                        <form method="post" action="{% url 'reserve:invite_disable' invite.pk %}" style="margin: 0;"
+                              data-confirm="Отключить ссылку на анкету? Кандидат больше не сможет её заполнить."
+                              data-confirm-ok="Отключить">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
+                        </form>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="form-link__meta">Действующих ссылок нет. Создайте ссылку кнопкой выше и отправьте кандидату — он заполнит анкету сам, доступа к платформе не получит.</div>
+            {% endfor %}
         </div>
-        <form method="post" action="{% url 'reserve:invite_create' %}" class="form-link__actions" style="align-items: flex-end;">
-            {% csrf_token %}
-            <input type="text" name="recipient" placeholder="Кому (ФИО/контакт)" class="form-link__ttl" style="width: 190px;">
-            <select name="ttl_days" class="form-link__ttl" title="Срок действия">
-                {% for value, label in invite_form.fields.ttl_days.choices %}
-                    <option value="{{ value }}" {% if value == '7' %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn btn--secondary btn--sm">Создать ссылку</button>
-        </form>
     </div>
 {% endif %}
 

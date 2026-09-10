@@ -4,27 +4,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Анкета кандидата — GeeksPro</title>
+    <title>Анкета в резерв кадров — GeeksPro</title>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
-<body>
+<body class="apply-body">
 <div class="apply-page">
-    <div class="apply-card">
-        <h1>Geeks<span style="background: linear-gradient(120deg,#5b6cf9,#8b7cf9); -webkit-background-clip: text; background-clip: text; color: transparent;">Pro</span></h1>
-        <p class="sub">Анкета для резерва кадров. Заполните её — мы рекомендуем проверенных выпускников компаниям-работодателям.</p>
-        {% if form.non_field_errors %}
-            <div class="message message--error">{{ form.non_field_errors }}</div>
+    <header class="apply-hero">
+        <div class="apply-hero__brand">Geeks<span>Pro</span></div>
+        <h1>Анкета в резерв кадров</h1>
+        <p>
+            Резерв — это база проверенных выпускников GeeksPro, которых мы рекомендуем
+            компаниям-работодателям. Заполните анкету один раз: чем подробнее, тем точнее
+            мы подберём вам вакансию.
+        </p>
+        {% if invite.recipient %}<div class="apply-hero__to">Анкета для: <strong>{{ invite.recipient }}</strong></div>{% endif %}
+    </header>
+
+    <form method="post" enctype="multipart/form-data" class="aform" novalidate>
+        {% csrf_token %}
+        {% if form.errors %}
+            <div class="apply-alert">
+                Проверьте выделенные поля — анкета не отправлена.
+                {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
         {% endif %}
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            <div class="form-grid">
-                {% include 'partials/form_fields.html' %}
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">1</span>
+                <div>
+                    <h2>Личные данные</h2>
+                    <p>Как с вами связаться и как вас представить работодателю.</p>
+                </div>
             </div>
-            <div class="form-actions">
-                <button type="submit" class="btn">Отправить анкету</button>
+            <div class="agrid">
+                {% include 'reserve/partials/field.html' with field=form.full_name %}
+                {% include 'reserve/partials/field.html' with field=form.phone %}
+                {% include 'reserve/partials/field.html' with field=form.email %}
+                {% include 'reserve/partials/field.html' with field=form.telegram %}
+                {% include 'reserve/partials/field.html' with field=form.city %}
+                {% include 'reserve/partials/field.html' with field=form.birth_date %}
+                {% include 'reserve/partials/field.html' with field=form.photo wide=1 %}
             </div>
-        </form>
-    </div>
+        </section>
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">2</span>
+                <div>
+                    <h2>Профессиональные данные</h2>
+                    <p>Направление, уровень, технологии и опыт.</p>
+                </div>
+            </div>
+            <div class="agrid">
+                {% include 'reserve/partials/field.html' with field=form.specialization %}
+                {% include 'reserve/partials/field.html' with field=form.direction_other %}
+                {% include 'reserve/partials/field.html' with field=form.desired_position %}
+                {% include 'reserve/partials/field.html' with field=form.expected_level %}
+                {% include 'reserve/partials/field.html' with field=form.skills wide=1 %}
+                {% include 'reserve/partials/field.html' with field=form.work_experience wide=1 %}
+                {% include 'reserve/partials/field.html' with field=form.internship_experience wide=1 %}
+                {% include 'reserve/partials/field.html' with field=form.education wide=1 %}
+                {% include 'reserve/partials/field.html' with field=form.courses wide=1 %}
+                {% include 'reserve/partials/field.html' with field=form.english_level %}
+                {% include 'reserve/partials/field.html' with field=form.other_languages %}
+                {% include 'reserve/partials/field.html' with field=form.about wide=1 %}
+            </div>
+        </section>
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">3</span>
+                <div>
+                    <h2>Ссылки и документы</h2>
+                    <p>Всё, что показывает вашу работу. Заполняйте то, что есть.</p>
+                </div>
+            </div>
+            <div class="agrid">
+                {% include 'reserve/partials/field.html' with field=form.resume_file %}
+                {% include 'reserve/partials/field.html' with field=form.resume_url %}
+                {% include 'reserve/partials/field.html' with field=form.github_url %}
+                {% include 'reserve/partials/field.html' with field=form.linkedin_url %}
+                {% include 'reserve/partials/field.html' with field=form.portfolio_url %}
+                {% include 'reserve/partials/field.html' with field=form.behance_url %}
+                {% include 'reserve/partials/field.html' with field=form.website_url %}
+                {% include 'reserve/partials/field.html' with field=form.project_links wide=1 %}
+            </div>
+        </section>
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">4</span>
+                <div>
+                    <h2>Поиск работы</h2>
+                    <p>Что вам подходит — по этим полям мы фильтруем кандидатов под вакансии.</p>
+                </div>
+            </div>
+            <div class="agrid">
+                {% include 'reserve/partials/field.html' with field=form.work_format %}
+                {% include 'reserve/partials/field.html' with field=form.employment_type %}
+                {% include 'reserve/partials/field.html' with field=form.available_from %}
+                {% include 'reserve/partials/field.html' with field=form.desired_salary %}
+                {% include 'reserve/partials/field.html' with field=form.target_positions wide=1 %}
+            </div>
+            <div class="achecks">
+                {% include 'reserve/partials/check.html' with field=form.is_looking_for_job %}
+                {% include 'reserve/partials/check.html' with field=form.ready_for_internship %}
+                {% include 'reserve/partials/check.html' with field=form.ready_to_relocate %}
+            </div>
+        </section>
+
+        <section class="acard acard--consent">
+            {% include 'reserve/partials/check.html' with field=form.consent_given %}
+        </section>
+
+        <div class="aform__actions">
+            <button type="submit" class="btn btn--lg">Отправить анкету</button>
+            <span>Поля со звёздочкой обязательны. После отправки анкета уходит на проверку в GeeksPro.</span>
+        </div>
+    </form>
 </div>
 </body>
 </html>

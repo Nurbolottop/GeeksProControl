@@ -1,0 +1,9 @@
+{# Одно поле анкеты: подпись, контрол, подсказка, ошибка #}
+<div class="afield {% if wide %}afield--wide{% endif %}">
+    <label for="{{ field.id_for_label }}">
+        {{ field.label }}{% if field.field.required %} <span class="afield__req">*</span>{% endif %}
+    </label>
+    {{ field }}
+    {% if field.help_text %}<div class="afield__hint">{{ field.help_text }}</div>{% endif %}
+    {% if field.errors %}<div class="afield__error">{{ field.errors.0 }}</div>{% endif %}
+</div>
