@@ -220,3 +220,32 @@ def candidate_from_intern(intern, user=None) -> ReserveCandidate:
         study_end=intern.education_end_date,
     )
     return create_candidate(candidate, user)
+
+
+# Группы направлений — по ним анкета решает, какие ссылки показывать
+# (GitHub разработчику, Behance дизайнеру) и какие примеры навыков давать.
+DIRECTION_KEYWORDS = [
+    ('design', ('ux', 'ui', 'дизайн', 'design', 'graphic')),
+    ('qa', ('qa', 'test', 'тест')),
+    ('pm', ('pm', 'project', 'менедж', 'product')),
+    ('dev', ('backend', 'frontend', 'mobile', 'devops', 'разраб', 'ios', 'android')),
+]
+
+
+def direction_group(name: str) -> str:
+    """К какой группе относится направление: dev / design / qa / pm / other."""
+    lowered = (name or '').lower()
+    for group, keywords in DIRECTION_KEYWORDS:
+        if any(keyword in lowered for keyword in keywords):
+            return group
+    return 'other'
+
+
+def direction_groups_map() -> dict:
+    """id направления → группа, для показа нужных вопросов в анкете."""
+    from apps.training.models import Specialization
+
+    return {
+        str(spec.pk): direction_group(spec.name)
+        for spec in Specialization.objects.all()
+    }

@@ -53,7 +53,7 @@
         {% include 'reserve/partials/question.html' with field=form.direction_other %}
         {% include 'reserve/partials/question.html' with field=form.desired_position %}
         {% include 'reserve/partials/question.html' with field=form.expected_level %}
-        {% include 'reserve/partials/question.html' with field=form.skills %}
+        {% include 'reserve/partials/question.html' with field=form.skills note='Через запятую' %}
         {% include 'reserve/partials/question.html' with field=form.work_experience %}
         {% include 'reserve/partials/question.html' with field=form.internship_experience %}
         {% include 'reserve/partials/question.html' with field=form.education %}
@@ -69,12 +69,16 @@
         </div>
         {% include 'reserve/partials/question.html' with field=form.resume_file %}
         {% include 'reserve/partials/question.html' with field=form.resume_url %}
-        {% include 'reserve/partials/question.html' with field=form.github_url %}
-        {% include 'reserve/partials/question.html' with field=form.linkedin_url %}
-        {% include 'reserve/partials/question.html' with field=form.portfolio_url %}
-        {% include 'reserve/partials/question.html' with field=form.behance_url %}
-        {% include 'reserve/partials/question.html' with field=form.website_url %}
+        {% include 'reserve/partials/question.html' with field=form.github_url dirs='dev qa' note='Для разработчиков и QA' %}
+        {% include 'reserve/partials/question.html' with field=form.behance_url dirs='design' note='Для дизайнеров' %}
+        {% include 'reserve/partials/question.html' with field=form.portfolio_url dirs='design pm other' note='Для дизайнеров, PM и остальных направлений' %}
         {% include 'reserve/partials/question.html' with field=form.project_links %}
+        {% include 'reserve/partials/question.html' with field=form.linkedin_url %}
+        {% include 'reserve/partials/question.html' with field=form.website_url %}
+        <div class="gform__toggle">
+            <button type="button" class="btn btn--secondary btn--sm" data-show-all>Показать все ссылки</button>
+            <span>Часть вопросов скрыта: они не для вашего направления.</span>
+        </div>
 
         <div class="gcard gcard--section">
             <div class="gsection__num">Раздел 4 из 4</div>
@@ -108,5 +112,51 @@
         Не вводите пароли. Данные из анкеты передаются работодателям только с вашего согласия.
     </p>
 </div>
+
+<script>
+    (function () {
+        var GROUPS = {{ direction_groups|safe }};
+        var EXAMPLES = {
+            dev: 'Например: Python, Django, PostgreSQL, Docker, React',
+            design: 'Например: Figma, Photoshop, прототипирование, UX-исследования',
+            qa: 'Например: Postman, Selenium, TestRail, SQL',
+            pm: 'Например: Jira, Notion, Agile, работа с заказчиком',
+            other: 'Через запятую'
+        };
+        var showAll = false;
+        var cards = document.querySelectorAll('[data-dirs]');
+        var toggle = document.querySelector('[data-show-all]');
+        var toggleBox = document.querySelector('.gform__toggle');
+        var skillsNote = document.querySelector('#id_skills')
+            .closest('.gcard').querySelector('.gq__note');
+
+        function currentGroup() {
+            var checked = document.querySelector('input[name=specialization]:checked');
+            if (!checked || !checked.value) return null;
+            return GROUPS[checked.value] || 'other';
+        }
+
+        function refresh() {
+            var group = currentGroup();
+            var hidden = 0;
+            cards.forEach(function (card) {
+                var suits = !group || card.dataset.dirs.split(' ').indexOf(group) !== -1;
+                var show = suits || showAll;
+                card.classList.toggle('is-hidden', !show);
+                card.classList.toggle('gcard--foreign', show && !suits);
+                if (!suits) hidden += 1;
+            });
+            toggleBox.hidden = hidden === 0;
+            toggle.textContent = showAll ? 'Скрыть лишние ссылки' : 'Показать все ссылки';
+            if (skillsNote) skillsNote.textContent = EXAMPLES[group || 'other'];
+        }
+
+        document.querySelectorAll('input[name=specialization]').forEach(function (radio) {
+            radio.addEventListener('change', function () { refresh(); });
+        });
+        toggle.addEventListener('click', function () { showAll = !showAll; refresh(); });
+        refresh();
+    })();
+</script>
 </body>
 </html>

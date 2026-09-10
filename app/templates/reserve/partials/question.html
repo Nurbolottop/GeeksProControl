@@ -1,8 +1,12 @@
-{# Один вопрос анкеты — отдельная карточка, как в гугл-формах #}
-<div class="gcard gcard--q {% if field.errors %}is-error{% endif %}">
+{# Один вопрос анкеты — отдельная карточка, как в гугл-формах.
+   dirs — для каких направлений вопрос важен (dev/design/qa/pm),
+   note — пояснение, кому этот вопрос адресован. #}
+<div class="gcard gcard--q {% if field.errors %}is-error{% endif %}"
+     {% if dirs %}data-dirs="{{ dirs }}"{% endif %}>
     <label class="gq__title" for="{{ field.id_for_label }}">
-        {{ field.label }}{% if field.field.required %}<span class="gq__req">*</span>{% endif %}
+        {{ field.label }}{% if field.field.required %}<span class="gq__req">*</span>{% else %}<span class="gq__opt">необязательно</span>{% endif %}
     </label>
+    {% if note %}<div class="gq__note">{{ note }}</div>{% endif %}
     {% if field.help_text %}<div class="gq__hint">{{ field.help_text }}</div>{% endif %}
     <div class="gq__control">{{ field }}</div>
     {% if field.errors %}<div class="gq__error">{{ field.errors.0 }}</div>{% endif %}

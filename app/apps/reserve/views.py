@@ -5,6 +5,8 @@
 анкета доступна только по токену приглашения и не даёт кандидату
 ничего, кроме собственной формы.
 """
+import json
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -241,4 +243,5 @@ def apply_form(request, token):
         return render(request, 'reserve/apply_done.html')
     return render(request, 'reserve/apply.html', {
         'form': form, 'invite': invite,
+        'direction_groups': json.dumps(services.direction_groups_map()),
     })
