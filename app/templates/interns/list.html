@@ -80,26 +80,17 @@
     </div>
 {% endif %}
 
+<div class="tabs">
+    <a href="?{{ base_qs }}" class="{% if not params.specialization %}is-active{% endif %}">Все</a>
+    {% for spec in specializations %}
+        <a href="?{{ base_qs }}{% if base_qs %}&{% endif %}specialization={{ spec.pk }}"
+           class="{% if params.specialization == spec.pk|stringformat:'s' %}is-active{% endif %}">{{ spec.name }}</a>
+    {% endfor %}
+</div>
+
 <form method="get" class="filters">
+    <input type="hidden" name="specialization" value="{{ params.specialization|default:'' }}">
     <input type="text" name="q" placeholder="Поиск: ФИО, телефон, email, telegram" value="{{ params.q|default:'' }}">
-    <select name="specialization">
-        <option value="">Направление: все</option>
-        {% for spec in specializations %}
-            <option value="{{ spec.pk }}" {% if params.specialization == spec.pk|stringformat:'s' %}selected{% endif %}>{{ spec.name }}</option>
-        {% endfor %}
-    </select>
-    <select name="status">
-        <option value="">Статус: все</option>
-        {% for value, label in statuses %}
-            <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-    </select>
-    <select name="group">
-        <option value="">Группа: все</option>
-        {% for group in groups %}
-            <option value="{{ group.pk }}" {% if params.group == group.pk|stringformat:'s' %}selected{% endif %}>{{ group }}</option>
-        {% endfor %}
-    </select>
     <select name="availability">
         <option value="">Занятость: все</option>
         <option value="free" {% if params.availability == 'free' %}selected{% endif %}>Свободен</option>

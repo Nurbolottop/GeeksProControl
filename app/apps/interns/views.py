@@ -17,7 +17,7 @@ from apps.interns.models import (
 )
 from apps.teams.forms import ROLE_BY_SPECIALIZATION, InternProjectAddForm
 from apps.teams.models import TeamMember, TeamRole
-from apps.training.models import Specialization, TrainingGroup
+from apps.training.models import Specialization
 
 
 def lead_ids() -> set:
@@ -65,10 +65,6 @@ def intern_list(request):
         )
     if params.get('specialization'):
         qs = qs.filter(specialization_id=params['specialization'])
-    if params.get('status'):
-        qs = qs.filter(status=params['status'])
-    if params.get('group'):
-        qs = qs.filter(training_group_id=params['group'])
     if params.get('city'):
         qs = qs.filter(city=params['city'])
     busy_ids = set(
@@ -87,13 +83,15 @@ def intern_list(request):
         intern.is_busy = intern.pk in busy_ids
     _attach_current_projects(page.object_list)
     from apps.resources.services import interns_summary
+    base_params = params.copy()
+    base_params.pop('specialization', None)
+    base_params.pop('page', None)
     context = {
         'page': page,
         'params': params,
+        'base_qs': base_params.urlencode(),
         'balance': interns_summary(),
         'specializations': Specialization.objects.all(),
-        'groups': TrainingGroup.objects.select_related('specialization'),
-        'statuses': InternStatus.choices,
         'cities': Intern.objects.active().exclude(city='')
                   .values_list('city', flat=True).distinct().order_by('city'),
         'profile_link': services.active_profile_form_link(),
