@@ -1,6 +1,8 @@
-{# Одно поле анкеты: подпись, контрол, подсказка, ошибка.
-   dirs — для каких направлений поле уместно (dev/design/qa/pm/other),
-   note — кому оно адресовано. #}
+{% comment %}
+Одно поле анкеты: подпись, контрол, подсказка, ошибка.
+dirs — для каких направлений поле уместно (dev/design/qa/pm/other),
+note — кому оно адресовано.
+{% endcomment %}
 <div class="afield {% if wide %}afield--wide{% endif %}"
      {% if dirs %}data-dirs="{{ dirs }}"{% endif %}>
     <label for="{{ field.id_for_label }}">
