@@ -23,49 +23,78 @@
         min-height: 62vh;
         overflow: hidden;
     }
+    .deck__progress {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: var(--border);
+        z-index: 2;
+    }
+    .deck__progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #5b6cf9, #8b7cf9);
+        transition: width .25s ease;
+    }
     .slide {
         min-height: 62vh;
-        padding: 48px 56px;
         display: flex;
         flex-direction: column;
-        justify-content: center;
+    }
+    .slide__band {
+        padding: 40px 56px 28px;
+        background: linear-gradient(120deg, var(--band-a, #5b6cf9), var(--band-b, #8b7cf9));
+        color: #fff;
+    }
+    .slide__badge {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.22);
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 800; font-size: 15px;
+        margin-bottom: 14px;
     }
     .slide__eyebrow {
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 700;
         letter-spacing: .08em;
         text-transform: uppercase;
-        color: var(--primary);
+        color: rgba(255,255,255,.85);
         margin-bottom: 10px;
     }
-    .slide__title { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
-    .slide__sub { color: var(--text-muted); font-size: 15px; }
-    .slide--cover { align-items: center; text-align: center; }
-    .slide--cover .slide__title {
-        font-size: 46px;
-        background: linear-gradient(120deg, #5b6cf9, #8b7cf9);
-        -webkit-background-clip: text; background-clip: text; color: transparent;
+    .slide__title { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0; color: #fff; }
+    .slide__sub { color: rgba(255,255,255,.85); font-size: 14.5px; margin-top: 6px; }
+    .slide__body { padding: 8px 56px 36px; flex: 1; }
+    .slide--cover, .slide--closing {
+        align-items: center; text-align: center; justify-content: center;
+        padding: 56px;
+        background: linear-gradient(135deg, #4a5af0, #8b7cf9 60%, #b98ff5);
+        color: #fff;
     }
-    .slide--closing { align-items: center; text-align: center; }
-    .slide__rows { margin-top: 8px; }
+    .slide--cover .slide__title, .slide--closing .slide__title { font-size: 44px; color: #fff; }
+    .slide--cover .slide__eyebrow, .slide--closing .slide__eyebrow { color: rgba(255,255,255,.75); }
+    .slide--cover .present-dot--before, .slide--closing .present-dot--before { background: rgba(255,255,255,.6); }
+    .slide--cover .present-dot--after, .slide--closing .present-dot--after { background: #fff; }
+    .slide__rows { margin-top: 4px; }
     .slide-row {
         display: flex;
         align-items: baseline;
         justify-content: space-between;
         gap: 16px;
-        padding: 16px 0;
+        padding: 18px 0;
         border-bottom: 1px solid var(--border);
     }
     .slide-row:last-child { border-bottom: none; }
-    .slide-row__label { font-size: 17px; color: var(--text); }
+    .slide-row__label { font-size: 16.5px; color: var(--text); }
     .slide-row__values { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
-    .slide-row__before { color: var(--text-muted); font-size: 18px; font-variant-numeric: tabular-nums; }
-    .slide-row__arrow { color: var(--border-strong); font-size: 18px; }
-    .slide-row__after { font-weight: 800; font-size: 26px; color: var(--primary); font-variant-numeric: tabular-nums; }
+    .slide-row__before { color: var(--text-muted); font-size: 17px; font-variant-numeric: tabular-nums; }
+    .slide-row__arrow { color: var(--border-strong); font-size: 17px; }
+    .slide-row__after { font-weight: 800; font-size: 25px; color: var(--primary); font-variant-numeric: tabular-nums; }
     .slide-row__delta {
-        font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
-        background: #eef0f6; color: var(--text-muted);
+        font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+        background: #eef0f6; color: var(--text-muted); border: 1px solid var(--border);
     }
+    .slide-row__delta--up { background: #e7f8ee; color: #1f9d55; border-color: #cdeedb; }
+    .slide-row__delta--down { background: #fdecec; color: #d64545; border-color: #f6d4d4; }
     .deck__nav {
         display: flex;
         align-items: center;
@@ -80,13 +109,15 @@
         background: var(--border-strong); cursor: pointer;
     }
     .deck__dot.is-active { background: var(--primary); width: 20px; border-radius: 5px; }
-    .deck:fullscreen { background: var(--bg, #f4f5fa); padding: 40px; display: flex; flex-direction: column; justify-content: center; }
+    .deck:fullscreen { background: #eef0f6; padding: 40px; display: flex; flex-direction: column; justify-content: center; }
     .deck:fullscreen .deck__stage { min-height: 0; flex: 1; display: flex; }
-    .deck:fullscreen .slide { flex: 1; min-height: 0; padding: 64px 96px; }
+    .deck:fullscreen .slide { flex: 1; min-height: 0; }
+    .deck:fullscreen .slide__body { display: flex; flex-direction: column; justify-content: center; }
     .deck:fullscreen .deck__bar { display: none; }
     @media print {
         .sidebar, .deck__bar, .deck__nav { display: none !important; }
         .deck__stage { border: none; box-shadow: none; min-height: 0; }
+        .deck__progress { display: none !important; }
         .slide { display: flex !important; min-height: 92vh; page-break-after: always; }
         .slide:last-child { page-break-after: auto; }
     }
@@ -112,8 +143,12 @@
     </div>
 
     <div class="deck__stage">
+        <div class="deck__progress"><div class="deck__progress-bar" :style="'width:' + ((i + 1) / n * 100) + '%'"></div></div>
         {% for slide in slides %}
+            {% cycle '#5b6cf9' '#3fb87f' '#e8935f' '#4aa8d8' '#c165c9' '#d9a441' '#3f9d9d' as band_a silent %}
+            {% cycle '#8b7cf9' '#6fd6a4' '#f2b98a' '#7fc6ea' '#e59be8' '#f0c76e' '#6fc6c6' as band_b silent %}
             <div class="slide {% if slide.kind == 'cover' %}slide--cover{% elif slide.kind == 'closing' %}slide--closing{% endif %}"
+                 style="--band-a: {{ band_a }}; --band-b: {{ band_b }};"
                  x-show="i === {{ forloop.counter0 }}" x-cloak>
                 {% if slide.kind == 'cover' %}
                     <div class="slide__eyebrow">GeeksPro Control</div>
@@ -127,22 +162,26 @@
                     <h2 class="slide__title">Спасибо!</h2>
                     <div class="slide__sub">Полная версия отчёта — во вкладке «Отчёты» → «Недельный»</div>
                 {% else %}
-                    <div class="slide__eyebrow">{{ forloop.counter0 }} / {{ slides|length|add:'-2' }}</div>
-                    <h2 class="slide__title">{{ slide.title }}</h2>
-                    <div class="slide__rows">
-                        {% for row in slide.rows %}
-                            <div class="slide-row">
-                                <div class="slide-row__label">{{ row.label }}</div>
-                                <div class="slide-row__values">
-                                    <span class="slide-row__before">{% if row.before is not None %}{{ row.before }}{{ row.suffix }}{% else %}—{% endif %}</span>
-                                    <span class="slide-row__arrow">→</span>
-                                    <span class="slide-row__after">{% if row.after is not None %}{{ row.after }}{{ row.suffix }}{% else %}—{% endif %}</span>
-                                    {% if row.delta is not None %}
-                                        <span class="slide-row__delta">{% if row.delta > 0 %}+{{ row.delta }}{% else %}{{ row.delta }}{% endif %}{{ row.suffix }}</span>
-                                    {% endif %}
+                    <div class="slide__band">
+                        <div class="slide__badge">{{ forloop.counter0 }}</div>
+                        <h2 class="slide__title">{{ slide.title }}</h2>
+                    </div>
+                    <div class="slide__body">
+                        <div class="slide__rows">
+                            {% for row in slide.rows %}
+                                <div class="slide-row">
+                                    <div class="slide-row__label">{{ row.label }}</div>
+                                    <div class="slide-row__values">
+                                        <span class="slide-row__before">{% if row.before is not None %}{{ row.before }}{{ row.suffix }}{% else %}—{% endif %}</span>
+                                        <span class="slide-row__arrow">→</span>
+                                        <span class="slide-row__after">{% if row.after is not None %}{{ row.after }}{{ row.suffix }}{% else %}—{% endif %}</span>
+                                        {% if row.delta %}
+                                            <span class="slide-row__delta {% if row.delta > 0 %}slide-row__delta--up{% else %}slide-row__delta--down{% endif %}">{% if row.delta > 0 %}+{{ row.delta }}{% else %}{{ row.delta }}{% endif %}{{ row.suffix }}</span>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                            </div>
-                        {% endfor %}
+                            {% endfor %}
+                        </div>
                     </div>
                 {% endif %}
             </div>
