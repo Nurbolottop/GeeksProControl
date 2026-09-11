@@ -65,21 +65,6 @@
     {% endif %}
 </div>
 
-{% if balance %}
-    <div class="spec-grid">
-        {% for row in balance %}
-            <a href="?specialization={{ row.specialization.pk }}" class="spec-card">
-                <div class="spec-card__name">{{ row.specialization }}</div>
-                <div class="spec-card__row">
-                    <div><strong>{{ row.total }}</strong><span>всего</span></div>
-                    <div><strong>{{ row.busy }}</strong><span>занято</span></div>
-                    <div><strong style="color: var(--green)">{{ row.free }}</strong><span>свободно</span></div>
-                </div>
-            </a>
-        {% endfor %}
-    </div>
-{% endif %}
-
 <div class="tabs">
     <a href="?{{ base_qs }}" class="{% if not params.specialization %}is-active{% endif %}">Все</a>
     {% for spec in specializations %}

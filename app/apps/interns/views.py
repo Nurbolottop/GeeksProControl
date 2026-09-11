@@ -82,7 +82,6 @@ def intern_list(request):
     for intern in page.object_list:
         intern.is_busy = intern.pk in busy_ids
     _attach_current_projects(page.object_list)
-    from apps.resources.services import interns_summary
     base_params = params.copy()
     base_params.pop('specialization', None)
     base_params.pop('page', None)
@@ -90,7 +89,6 @@ def intern_list(request):
         'page': page,
         'params': params,
         'base_qs': base_params.urlencode(),
-        'balance': interns_summary(),
         'specializations': Specialization.objects.all(),
         'cities': Intern.objects.active().exclude(city='')
                   .values_list('city', flat=True).distinct().order_by('city'),
@@ -156,6 +154,84 @@ def profile_link_disable(request):
             link.deactivate()
             messages.success(request, 'Ссылка на анкету отключена.')
     return redirect('interns:list')
+
+
+@login_required
+def by_project(request):
+    """Стажёры по проектам: где сколько людей и кого не хватает.
+
+    Считаем действующие членства: один человек может быть сразу на двух
+    проектах, поэтому сумма по проектам больше, чем людей на проектах.
+    Тимлиды — сотрудники на зарплате, в счёт стажёров не идут, но
+    показываем их отдельной строкой, чтобы было видно, кто ведёт команду.
+    """
+    from apps.projects.models import Project, ProjectStatus
+    from apps.teams.models import TeamRole
+
+    leads = lead_ids()
+    memberships = (
+        TeamMember.objects
+        .filter(status=TeamMember.Status.ACTIVE, project__isnull=False)
+        .select_related('intern__specialization', 'project', 'user')
+    )
+    rows = {}
+    for member in memberships:
+        row = rows.setdefault(member.project_id, {
+            'project': member.project, 'interns': [], 'specs': {},
+            'pms': [], 'leads': [],
+        })
+        if member.role == TeamRole.PROJECT_MANAGER:
+            row['pms'].append(member.intern or member.user)
+        if member.intern_id is None:
+            continue
+        if member.intern_id in leads or member.role == TeamRole.TEAM_LEAD:
+            row['leads'].append(member.intern)
+            continue
+        row['interns'].append(member.intern)
+        spec = member.intern.specialization
+        name = spec.name if spec else 'Без направления'
+        row['specs'][name] = row['specs'].get(name, 0) + 1
+
+    projects = (
+        Project.objects.active()
+        .exclude(status__in=[
+            ProjectStatus.COMPLETED, ProjectStatus.CANCELLED, ProjectStatus.REFUSED,
+        ])
+        .select_related('client')
+    )
+    table = []
+    for project in projects:
+        row = rows.pop(project.pk, None) or {
+            'project': project, 'interns': [], 'specs': {}, 'pms': [], 'leads': [],
+        }
+        row['specs'] = sorted(row['specs'].items(), key=lambda item: (-item[1], item[0]))
+        table.append(row)
+    # Команды на уже закрытых проектах, если кого-то забыли снять
+    for row in rows.values():
+        row['specs'] = sorted(row['specs'].items(), key=lambda item: (-item[1], item[0]))
+        row['is_closed'] = True
+        table.append(row)
+    table.sort(key=lambda row: (-len(row['interns']), row['project'].name))
+
+    busy_ids = set(
+        TeamMember.objects.filter(
+            status=TeamMember.Status.ACTIVE, intern__isnull=False,
+            project__isnull=False,
+        ).values_list('intern_id', flat=True),
+    )
+    free = (
+        Intern.objects.active()
+        .exclude(pk__in=leads)
+        .exclude(pk__in=busy_ids)
+        .select_related('specialization')
+        .order_by('full_name')
+    )
+    return render(request, 'interns/by_project.html', {
+        'rows': table,
+        'projects_count': sum(1 for row in table if row['interns']),
+        'on_projects': len(busy_ids - leads),
+        'free': free,
+    })
 
 
 @login_required

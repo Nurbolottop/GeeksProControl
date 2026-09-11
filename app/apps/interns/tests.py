@@ -818,3 +818,108 @@ class ProfileFormLinkTests(TestCase):
         )
         response = self.client.get(reverse("interns:profile_link_answers"))
         self.assertContains(response, "Кто-то")
+
+
+class InternsByProjectTests(TestCase):
+    """Страница «Стажёры по проектам»: где сколько людей."""
+
+    def setUp(self):
+        from apps.projects.models import Project, ProjectStatus
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.url = reverse("interns:by_project")
+        self.backend = Specialization.objects.create(name="Backend")
+        self.design = Specialization.objects.create(name="UX/UI")
+        self.alpha = Project.objects.create(name="Альфа")
+        self.beta = Project.objects.create(name="Бета")
+        self.done = Project.objects.create(
+            name="Закрытый", status=ProjectStatus.COMPLETED,
+        )
+        self.dev = Intern.objects.create(
+            full_name="Разработчик Один", specialization=self.backend,
+        )
+        self.designer = Intern.objects.create(
+            full_name="Дизайнер Два", specialization=self.design,
+        )
+        self.lead = Intern.objects.create(full_name="Тимлид Три")
+        self.free_person = Intern.objects.create(full_name="Свободный Четыре")
+        TeamMember.objects.create(
+            project=self.alpha, intern=self.dev, role=TeamRole.BACKEND,
+        )
+        TeamMember.objects.create(
+            project=self.alpha, intern=self.designer, role=TeamRole.UXUI,
+        )
+        TeamMember.objects.create(
+            project=self.alpha, intern=self.lead, role=TeamRole.TEAM_LEAD,
+        )
+
+    def _row(self, response, project):
+        return next(
+            row for row in response.context["rows"]
+            if row["project"].pk == project.pk
+        )
+
+    def test_counts_interns_per_project(self):
+        response = self.client.get(self.url)
+        row = self._row(response, self.alpha)
+        self.assertEqual(len(row["interns"]), 2)
+        self.assertEqual(dict(row["specs"]), {"Backend": 1, "UX/UI": 1})
+
+    def test_team_lead_counted_separately_not_as_intern(self):
+        response = self.client.get(self.url)
+        row = self._row(response, self.alpha)
+        self.assertNotIn(self.lead, row["interns"])
+        self.assertIn(self.lead, row["leads"])
+
+    def test_project_without_team_is_shown_empty(self):
+        response = self.client.get(self.url)
+        row = self._row(response, self.beta)
+        self.assertEqual(row["interns"], [])
+        self.assertContains(response, "Бета")
+
+    def test_person_on_two_projects_counted_in_both(self):
+        from apps.teams.models import TeamMember, TeamRole
+
+        TeamMember.objects.create(
+            project=self.beta, intern=self.dev, role=TeamRole.BACKEND,
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(len(self._row(response, self.alpha)["interns"]), 2)
+        self.assertEqual(len(self._row(response, self.beta)["interns"]), 1)
+        # человек один, поэтому «на проектах» его считаем один раз
+        self.assertEqual(response.context["on_projects"], 2)
+
+    def test_free_interns_are_those_without_a_project(self):
+        response = self.client.get(self.url)
+        free = [intern.full_name for intern in response.context["free"]]
+        self.assertIn("Свободный Четыре", free)
+        self.assertNotIn("Разработчик Один", free)
+        self.assertNotIn("Тимлид Три", free)
+
+    def test_completed_project_shows_up_only_with_live_team(self):
+        from apps.teams.models import TeamMember, TeamRole
+
+        response = self.client.get(self.url)
+        self.assertNotIn(
+            self.done.pk, [row["project"].pk for row in response.context["rows"]],
+        )
+        TeamMember.objects.create(
+            project=self.done, intern=self.free_person, role=TeamRole.BACKEND,
+        )
+        response = self.client.get(self.url)
+        row = self._row(response, self.done)
+        self.assertTrue(row["is_closed"])
+        self.assertContains(response, "проект закрыт, команда не снята")
+
+    def test_left_members_are_not_counted(self):
+        from apps.teams.models import TeamMember, TeamRole
+
+        TeamMember.objects.create(
+            project=self.beta, intern=self.free_person, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(self._row(response, self.beta)["interns"], [])

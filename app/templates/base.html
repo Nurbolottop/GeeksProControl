@@ -84,6 +84,8 @@
                 <div class="nav-sub" x-show="open" x-cloak>
                     <a href="{% url 'resources:forecast' %}"
                        class="{% if request.resolver_match.url_name == 'forecast' %}is-active{% endif %}">По направлениям</a>
+                    <a href="{% url 'interns:by_project' %}"
+                       class="{% if request.resolver_match.url_name == 'by_project' %}is-active{% endif %}">По проектам</a>
                     <a href="{% url 'interns:list' %}"
                        class="{% if request.resolver_match.url_name == 'list' %}is-active{% endif %}">Все стажёры</a>
                     <a href="{% url 'teams:pm_list' %}"

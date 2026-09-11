@@ -7,6 +7,7 @@ app_name = 'interns'
 urlpatterns = [
     path('', views.intern_list, name='list'),
     path('create/', views.intern_create, name='create'),
+    path('by-project/', views.by_project, name='by_project'),
     path(
         'profile-link/new/', views.profile_link_create,
         name='profile_link_create',
