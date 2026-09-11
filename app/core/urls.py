@@ -35,7 +35,6 @@ urlpatterns = [
     path('interns/', include('apps.interns.urls')),
     path('reserve/', include('apps.reserve.urls')),
     path('documents/', include('apps.documents.urls')),
-    path('meetings/', include('apps.meetings.urls')),
     path('notifications/', include('apps.notifications.urls')),
     path('risks/', include('apps.risks.urls')),
     path('resources/', include('apps.resources.urls')),

@@ -13,5 +13,4 @@ urlpatterns = [
     path('written/<int:pk>/edit/', views.written_update, name='written_update'),
     path('written/<int:pk>/delete/', views.written_delete, name='written_delete'),
     path('kpi/', views.kpi_view, name='kpi'),
-    path('presentation/', views.presentation, name='presentation'),
 ]
