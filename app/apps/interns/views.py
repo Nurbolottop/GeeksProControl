@@ -67,6 +67,8 @@ def intern_list(request):
         qs = qs.filter(specialization_id=params['specialization'])
     if params.get('city'):
         qs = qs.filter(city=params['city'])
+    if params.get('branch') in services.BRANCHES:
+        qs = qs.filter(services.branch_filter(params['branch']))
     busy_ids = set(
         TeamMember.objects.filter(
             status=TeamMember.Status.ACTIVE, intern__isnull=False,
@@ -232,6 +234,22 @@ def by_project(request):
         'on_projects': len(busy_ids - leads),
         'free': free,
     })
+
+
+@login_required
+def by_branch(request):
+    """Стажёры по филиалам: сколько человек в Бишкеке и в Оше.
+
+    Считаем ровно тех же людей, что видно в списке стажёров, чтобы
+    цифра совпадала с числом строк при переходе по ней.
+    """
+    interns = list(
+        Intern.objects.active()
+        .exclude(pk__in=lead_ids())
+        .select_related('specialization'),
+    )
+    summary = services.branch_summary(interns)
+    return render(request, 'interns/by_branch.html', summary)
 
 
 @login_required

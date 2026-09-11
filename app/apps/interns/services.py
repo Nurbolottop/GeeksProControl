@@ -90,3 +90,90 @@ def active_profile_form_link() -> ProfileFormLink | None:
         link.save(update_fields=['is_active', 'deactivated_at', 'updated_at'])
         return None
     return link
+
+
+# --- Филиалы -------------------------------------------------------------
+# В базе филиал писался импортом как есть («Ошский филиал», «Внешние
+# стажёры(Биш)», у части людей пусто), поэтому значение нормализуем:
+# сначала смотрим филиал, если он пустой или непонятный — город.
+
+BRANCH_BISHKEK = 'Бишкек'
+BRANCH_OSH = 'Ош'
+BRANCH_UNKNOWN = 'Без филиала'
+BRANCHES = (BRANCH_BISHKEK, BRANCH_OSH, BRANCH_UNKNOWN)
+
+
+def branch_of(intern: Intern) -> str:
+    """Филиал стажёра одним из трёх значений BRANCHES."""
+    for value in (intern.branch, intern.city):
+        if not value:
+            continue
+        if 'Ош' in value:
+            return BRANCH_OSH
+        if 'Биш' in value:
+            return BRANCH_BISHKEK
+    return BRANCH_UNKNOWN
+
+
+def branch_filter(branch: str):
+    """Q-фильтр по филиалу — та же логика, что и в branch_of."""
+    from django.db.models import Q
+
+    osh = Q(branch__icontains='Ош') | (Q(branch='') & Q(city__icontains='Ош'))
+    bishkek = ~osh & (
+        Q(branch__icontains='Биш') | (Q(branch='') & Q(city__icontains='Биш'))
+    )
+    if branch == BRANCH_OSH:
+        return osh
+    if branch == BRANCH_BISHKEK:
+        return bishkek
+    return ~osh & ~bishkek
+
+
+def branch_summary(interns) -> dict:
+    """Сколько стажёров в каждом филиале: всего, занято, свободно,
+    и разбивка по направлениям."""
+    from apps.teams.models import TeamMember
+
+    busy_ids = set(
+        TeamMember.objects.filter(
+            status=TeamMember.Status.ACTIVE, intern__isnull=False,
+        ).values_list('intern_id', flat=True),
+    )
+    cards = {
+        name: {'branch': name, 'total': 0, 'busy': 0, 'free': 0}
+        for name in BRANCHES
+    }
+    by_spec: dict[str, dict] = {}
+    for intern in interns:
+        branch = branch_of(intern)
+        card = cards[branch]
+        card['total'] += 1
+        if intern.pk in busy_ids:
+            card['busy'] += 1
+        else:
+            card['free'] += 1
+        spec = str(intern.specialization) if intern.specialization else 'Без направления'
+        row = by_spec.setdefault(
+            spec, {'name': spec, 'counts': dict.fromkeys(BRANCHES, 0), 'total': 0},
+        )
+        row['counts'][branch] += 1
+        row['total'] += 1
+
+    # филиал, в котором никого нет, не показываем ни карточкой, ни колонкой
+    visible = [name for name in BRANCHES if cards[name]['total']]
+    rows = sorted(by_spec.values(), key=lambda row: -row['total'])
+    for row in rows:
+        row['cells'] = [row['counts'][name] for name in visible]
+    totals = {
+        'total': sum(card['total'] for card in cards.values()),
+        'busy': sum(card['busy'] for card in cards.values()),
+        'free': sum(card['free'] for card in cards.values()),
+        'cells': [cards[name]['total'] for name in visible],
+    }
+    return {
+        'branches': visible,
+        'cards': [cards[name] for name in visible],
+        'rows': rows,
+        'totals': totals,
+    }
