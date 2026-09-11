@@ -448,6 +448,17 @@ class PresentationViewTests(TestCase):
         self.assertIn("Проекты в разработке", titles)
         self.assertIn("Внутренние собрания за неделю", titles)
 
+    def test_slides_wrap_sections_with_cover_and_closing(self):
+        response = self.client.get(reverse("reports:presentation"))
+        slides = response.context["slides"]
+        sections = response.context["sections"]
+        self.assertEqual(slides[0]["kind"], "cover")
+        self.assertEqual(slides[-1]["kind"], "closing")
+        middle = slides[1:-1]
+        self.assertEqual(len(middle), len(sections))
+        self.assertTrue(all(slide["kind"] == "section" for slide in middle))
+        self.assertEqual(middle[0]["title"], sections[0]["title"])
+
     def test_before_and_after_values_differ_by_date(self):
         monday = datetime.date(2026, 8, 17)
         Project.objects.create(name="Старый", contract_date=monday)

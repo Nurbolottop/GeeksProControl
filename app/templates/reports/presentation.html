@@ -4,108 +4,160 @@
 
 {% block content %}
 <style>
-    .present-hero {
-        background: linear-gradient(120deg, #5b6cf9, #8b7cf9);
-        border-radius: var(--radius);
-        padding: 28px 30px;
-        color: #fff;
-        margin-bottom: 20px;
-        box-shadow: var(--shadow-lift);
-    }
-    .present-hero h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
-    .present-hero .sub { color: rgba(255,255,255,.85); margin-top: 6px; font-size: 13.5px; }
-    .present-section {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow-sm);
-        padding: 18px 20px;
-        margin-bottom: 16px;
-        break-inside: avoid;
-    }
-    .present-section h2 {
-        margin: 0 0 12px;
-        font-size: 15px;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        letter-spacing: .04em;
-    }
-    .present-row {
+    .deck { max-width: 980px; margin: 0 auto; }
+    .deck__bar {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        padding: 10px 0;
-        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+        margin-bottom: 14px;
     }
-    .present-row:last-child { border-bottom: none; }
-    .present-row__label { font-size: 13.5px; color: var(--text); flex: 1; }
-    .present-row__values {
+    .deck__bar .filters { margin: 0; }
+    .deck__stage {
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lift);
+        min-height: 62vh;
+        overflow: hidden;
+    }
+    .slide {
+        min-height: 62vh;
+        padding: 48px 56px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .slide__eyebrow {
+        font-size: 12.5px;
+        font-weight: 700;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--primary);
+        margin-bottom: 10px;
+    }
+    .slide__title { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+    .slide__sub { color: var(--text-muted); font-size: 15px; }
+    .slide--cover { align-items: center; text-align: center; }
+    .slide--cover .slide__title {
+        font-size: 46px;
+        background: linear-gradient(120deg, #5b6cf9, #8b7cf9);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .slide--closing { align-items: center; text-align: center; }
+    .slide__rows { margin-top: 8px; }
+    .slide-row {
         display: flex;
         align-items: baseline;
-        gap: 10px;
-        white-space: nowrap;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--border);
     }
-    .present-row__before { color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
-    .present-row__arrow { color: var(--border-strong); }
-    .present-row__after {
-        font-weight: 750;
-        font-size: 19px;
-        color: var(--primary);
-        font-variant-numeric: tabular-nums;
+    .slide-row:last-child { border-bottom: none; }
+    .slide-row__label { font-size: 17px; color: var(--text); }
+    .slide-row__values { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
+    .slide-row__before { color: var(--text-muted); font-size: 18px; font-variant-numeric: tabular-nums; }
+    .slide-row__arrow { color: var(--border-strong); font-size: 18px; }
+    .slide-row__after { font-weight: 800; font-size: 26px; color: var(--primary); font-variant-numeric: tabular-nums; }
+    .slide-row__delta {
+        font-size: 12.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+        background: #eef0f6; color: var(--text-muted);
     }
-    .present-row__delta {
-        font-size: 11.5px;
-        font-weight: 700;
-        padding: 2px 8px;
-        border-radius: 999px;
-        background: var(--gray-bg, #eef0f6);
-        color: var(--text-muted);
+    .deck__nav {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        margin-top: 16px;
     }
+    .deck__count { font-size: 13px; color: var(--text-muted); min-width: 52px; text-align: center; }
+    .deck__dots { display: flex; gap: 6px; align-items: center; }
+    .deck__dot {
+        width: 8px; height: 8px; border-radius: 50%; border: none; padding: 0;
+        background: var(--border-strong); cursor: pointer;
+    }
+    .deck__dot.is-active { background: var(--primary); width: 20px; border-radius: 5px; }
+    .deck:fullscreen { background: var(--bg, #f4f5fa); padding: 40px; display: flex; flex-direction: column; justify-content: center; }
+    .deck:fullscreen .deck__stage { min-height: 0; flex: 1; display: flex; }
+    .deck:fullscreen .slide { flex: 1; min-height: 0; padding: 64px 96px; }
+    .deck:fullscreen .deck__bar { display: none; }
     @media print {
-        .sidebar, .page-actions, .filters, .layout > .sidebar { display: none !important; }
-        .present-hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { background: #fff; }
+        .sidebar, .deck__bar, .deck__nav { display: none !important; }
+        .deck__stage { border: none; box-shadow: none; min-height: 0; }
+        .slide { display: flex !important; min-height: 92vh; page-break-after: always; }
+        .slide:last-child { page-break-after: auto; }
     }
 </style>
 
-<div class="present-hero">
-    <h1>Показатели: до и после</h1>
-    <div class="sub">Те же вопросы, что и в недельном отчёте — значения на две даты рядом</div>
-</div>
+<div class="deck" x-data="{ i: 0, n: {{ slides|length }} }"
+     @keydown.window="if ($event.key === 'ArrowRight') i = Math.min(n - 1, i + 1); if ($event.key === 'ArrowLeft') i = Math.max(0, i - 1)">
+    <div class="deck__bar">
+        <div>
+            <h1 style="margin:0">Показатели: до и после</h1>
+            <div class="sub">Те же вопросы, что и в недельном отчёте — теперь как слайды</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <form method="get" class="filters">
+                <label for="before-date" style="align-self:center; font-size:13px; color:var(--text-muted)">До:</label>
+                <input type="date" id="before-date" name="before" value="{{ before|date:'Y-m-d' }}">
+                <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+            </form>
+            <button type="button" class="btn btn--secondary btn--sm"
+                    onclick="this.closest('.deck').requestFullscreen()">Во весь экран</button>
+            <button type="button" class="btn btn--secondary btn--sm" onclick="window.print()">Печать / PDF</button>
+        </div>
+    </div>
 
-<div class="page-actions" style="margin-bottom: 14px;">
-    <form method="get" class="filters" style="margin:0">
-        <label for="before-date" style="align-self:center; font-size:13px; color:var(--text-muted)">До:</label>
-        <input type="date" id="before-date" name="before" value="{{ before|date:'Y-m-d' }}">
-        <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
-    </form>
-    <button type="button" class="btn btn--secondary btn--sm" onclick="window.print()">Печать / PDF</button>
-</div>
-
-<div class="present-legend">
-    <span><span class="present-dot present-dot--before"></span> До — {{ before|date:'d.m.Y' }}</span>
-    <span><span class="present-dot present-dot--after"></span> После — {{ today|date:'d.m.Y' }}</span>
-</div>
-
-<div class="kpi-grid" style="grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); align-items: start;">
-    {% for section in sections %}
-        <div class="present-section">
-            <h2>{{ section.title }}</h2>
-            {% for row in section.rows %}
-                <div class="present-row">
-                    <div class="present-row__label">{{ row.label }}</div>
-                    <div class="present-row__values">
-                        <span class="present-row__before">{% if row.before is not None %}{{ row.before }}{{ row.suffix }}{% else %}—{% endif %}</span>
-                        <span class="present-row__arrow">→</span>
-                        <span class="present-row__after">{% if row.after is not None %}{{ row.after }}{{ row.suffix }}{% else %}—{% endif %}</span>
-                        {% if row.delta is not None %}
-                            <span class="present-row__delta">{% if row.delta > 0 %}+{{ row.delta }}{% else %}{{ row.delta }}{% endif %}{{ row.suffix }}</span>
-                        {% endif %}
+    <div class="deck__stage">
+        {% for slide in slides %}
+            <div class="slide {% if slide.kind == 'cover' %}slide--cover{% elif slide.kind == 'closing' %}slide--closing{% endif %}"
+                 x-show="i === {{ forloop.counter0 }}" x-cloak>
+                {% if slide.kind == 'cover' %}
+                    <div class="slide__eyebrow">GeeksPro Control</div>
+                    <h2 class="slide__title">Показатели: до и после</h2>
+                    <div class="slide__sub">
+                        <span class="present-dot present-dot--before"></span> {{ before|date:'d.m.Y' }}
+                        &nbsp;→&nbsp;
+                        <span class="present-dot present-dot--after"></span> {{ today|date:'d.m.Y' }}
                     </div>
-                </div>
+                {% elif slide.kind == 'closing' %}
+                    <h2 class="slide__title">Спасибо!</h2>
+                    <div class="slide__sub">Полная версия отчёта — во вкладке «Отчёты» → «Недельный»</div>
+                {% else %}
+                    <div class="slide__eyebrow">{{ forloop.counter0 }} / {{ slides|length|add:'-2' }}</div>
+                    <h2 class="slide__title">{{ slide.title }}</h2>
+                    <div class="slide__rows">
+                        {% for row in slide.rows %}
+                            <div class="slide-row">
+                                <div class="slide-row__label">{{ row.label }}</div>
+                                <div class="slide-row__values">
+                                    <span class="slide-row__before">{% if row.before is not None %}{{ row.before }}{{ row.suffix }}{% else %}—{% endif %}</span>
+                                    <span class="slide-row__arrow">→</span>
+                                    <span class="slide-row__after">{% if row.after is not None %}{{ row.after }}{{ row.suffix }}{% else %}—{% endif %}</span>
+                                    {% if row.delta is not None %}
+                                        <span class="slide-row__delta">{% if row.delta > 0 %}+{{ row.delta }}{% else %}{{ row.delta }}{% endif %}{{ row.suffix }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="deck__nav">
+        <button type="button" class="btn btn--secondary btn--sm" @click="i = Math.max(0, i - 1)" :disabled="i === 0">← Назад</button>
+        <div class="deck__dots">
+            {% for slide in slides %}
+                <button type="button" class="deck__dot" @click="i = {{ forloop.counter0 }}" :class="i === {{ forloop.counter0 }} && 'is-active'"></button>
             {% endfor %}
         </div>
-    {% endfor %}
+        <span class="deck__count" x-text="(i + 1) + ' / ' + n"></span>
+        <button type="button" class="btn btn--secondary btn--sm" @click="i = Math.min(n - 1, i + 1)" :disabled="i === n - 1">Дальше →</button>
+    </div>
 </div>
 {% endblock %}

@@ -123,8 +123,14 @@ def presentation(request):
             })
         sections.append({'title': before_section['title'], 'rows': rows})
 
+    slides = (
+        [{'kind': 'cover'}]
+        + [{'kind': 'section', **section} for section in sections]
+        + [{'kind': 'closing'}]
+    )
+
     return render(request, 'reports/presentation.html', {
-        'sections': sections, 'before': before, 'today': today,
+        'sections': sections, 'slides': slides, 'before': before, 'today': today,
     })
 
 
