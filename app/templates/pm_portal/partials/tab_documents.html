@@ -11,23 +11,28 @@
                 <th>Номер</th>
                 <th>Дата</th>
                 <th>Статус</th>
+                <th>Подписан</th>
                 <th>Файл</th>
             </tr>
             </thead>
             <tbody>
             {% for document in documents %}
                 <tr>
-                    <td>{{ document.doc_type }}</td>
+                    <td><strong>{{ document.doc_type }}</strong></td>
                     <td>{{ document.number|default:'—' }}</td>
                     <td>{{ document.document_date|date:'d.m.Y'|default:'—' }}</td>
                     <td>
-                        {% if document.is_signed %}<span class="badge badge--green">Подписан</span>
-                        {% else %}<span class="badge badge--gray">{{ document.get_status_display }}</span>{% endif %}
+                        {% if document.status == 'signed' %}<span class="badge badge--green">Подписан</span>
+                        {% elif document.status == 'awaiting' %}<span class="badge badge--yellow">Ожидает подписи</span>
+                        {% elif document.status == 'expired' %}<span class="badge badge--red">Истёк</span>
+                        {% elif document.status == 'cancelled' %}<span class="badge badge--gray">Отменён</span>
+                        {% else %}<span class="badge badge--gray">Черновик</span>{% endif %}
                     </td>
-                    <td>{% if document.file %}<a href="{{ document.file.url }}" target="_blank">Скачать</a>{% else %}—{% endif %}</td>
+                    <td>{% if document.is_signed %}✓{% else %}—{% endif %}</td>
+                    <td>{% if document.file %}<a href="{{ document.file.url }}" target="_blank" rel="noopener">Открыть</a>{% else %}—{% endif %}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Документов пока нет.</td></tr>
+                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Документов пока нет.</td></tr>
             {% endfor %}
             </tbody>
         </table>
