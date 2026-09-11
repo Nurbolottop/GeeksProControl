@@ -429,3 +429,75 @@ class BackwardWeekTests(TestCase):
             response.context["last_week"], this_week - datetime.timedelta(days=7),
         )
         self.assertContains(response, "за прошедшую неделю")
+
+
+class PresentationViewTests(TestCase):
+    """Страница «Презентация» — те же вопросы недельного отчёта, значения
+    на две даты рядом (что было / что стало)."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head3", password="x")
+        self.client.force_login(self.user)
+
+    def test_page_uses_same_sections_as_weekly_report(self):
+        response = self.client.get(reverse("reports:presentation"))
+        self.assertEqual(response.status_code, 200)
+        titles = [section["title"] for section in response.context["sections"]]
+        self.assertIn("Проекты в разработке", titles)
+        self.assertIn("Внутренние собрания за неделю", titles)
+
+    def test_before_and_after_values_differ_by_date(self):
+        monday = datetime.date(2026, 8, 17)
+        Project.objects.create(name="Старый", contract_date=monday)
+
+        response = self.client.get(
+            reverse("reports:presentation"), {"before": monday.isoformat()},
+        )
+        sections = {s["title"]: s for s in response.context["sections"]}
+        rows = {
+            row["label"]: row
+            for row in sections["Проекты в разработке"]["rows"]
+        }
+        self.assertEqual(rows["Подписано договоров за неделю"]["before"], 1)
+        # к сегодняшней неделе этот договор уже не «за неделю» — 0, не 1
+        self.assertEqual(rows["Подписано договоров за неделю"]["after"], 0)
+        self.assertEqual(rows["Подписано договоров за неделю"]["delta"], -1)
+
+    def test_before_date_from_query_param(self):
+        response = self.client.get(
+            reverse("reports:presentation"), {"before": "2026-01-01"},
+        )
+        self.assertEqual(response.context["before"], datetime.date(2026, 1, 1))
+
+    def test_invalid_before_falls_back_to_earliest_project(self):
+        response = self.client.get(
+            reverse("reports:presentation"), {"before": "not-a-date"},
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_no_data_hint_shown_as_dash_not_zero(self):
+        response = self.client.get(reverse("reports:presentation"))
+        sections = {s["title"]: s for s in response.context["sections"]}
+        graduates_row = {
+            row["label"]: row
+            for row in sections["Выпускники — на конец недели"]["rows"]
+        }["Успешно завершившие стажировку"]
+        self.assertIsNone(graduates_row["before"])
+        self.assertIsNone(graduates_row["after"])
+        self.assertIsNone(graduates_row["delta"])
+
+    def test_weekly_detail_links_to_presentation_with_this_weeks_date(self):
+        from apps.reports.models import WeeklyReport
+
+        report = WeeklyReport.objects.create(
+            week_start=datetime.date(2026, 8, 17), data={},
+        )
+        response = self.client.get(
+            reverse("reports:weekly_detail", args=[report.pk]),
+        )
+        self.assertContains(
+            response,
+            f"{reverse('reports:presentation')}?before=2026-08-17",
+        )

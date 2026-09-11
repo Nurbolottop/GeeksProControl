@@ -84,6 +84,51 @@ def kpi_view(request):
 
 
 @login_required
+def presentation(request):
+    """«До / после»: те же вопросы недельного отчёта, только значения на
+    две даты рядом — что было и что стало."""
+    today = timezone.localdate()
+    try:
+        before = datetime.date.fromisoformat(request.GET.get('before', ''))
+    except ValueError:
+        before = services.earliest_project_date()
+
+    before_week, _ = weekly_form.week_bounds(before)
+    after_week, _ = weekly_form.week_bounds(today)
+    before_sections = weekly_form.as_sections(weekly_form.build(before_week))
+    after_sections = weekly_form.as_sections(weekly_form.build(after_week))
+
+    sections = []
+    for before_section, after_section in zip(before_sections, after_sections):
+        rows = []
+        for before_row, after_row in zip(
+            before_section['rows'], after_section['rows'],
+        ):
+            before_value = before_row['value'] if not before_row['no_data'] else None
+            after_value = after_row['value'] if not after_row['no_data'] else None
+            delta = None
+            if (
+                isinstance(before_value, (int, float))
+                and isinstance(after_value, (int, float))
+            ):
+                delta = round(after_value - before_value, 2)
+                if delta == int(delta):
+                    delta = int(delta)
+            rows.append({
+                'label': before_row['label'],
+                'suffix': before_row['suffix'],
+                'before': before_value,
+                'after': after_value,
+                'delta': delta,
+            })
+        sections.append({'title': before_section['title'], 'rows': rows})
+
+    return render(request, 'reports/presentation.html', {
+        'sections': sections, 'before': before, 'today': today,
+    })
+
+
+@login_required
 def weekly_delete(request, pk):
     """Удаление недельного отчёта вместе с написанным текстом."""
     report = get_object_or_404(WeeklyReport, pk=pk)

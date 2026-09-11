@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block title %}Презентация — GeeksPro Control{% endblock %}
+
+{% block content %}
+<style>
+    .present-hero {
+        background: linear-gradient(120deg, #5b6cf9, #8b7cf9);
+        border-radius: var(--radius);
+        padding: 28px 30px;
+        color: #fff;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-lift);
+    }
+    .present-hero h1 { margin: 0; font-size: 26px; letter-spacing: -0.02em; }
+    .present-hero .sub { color: rgba(255,255,255,.85); margin-top: 6px; font-size: 13.5px; }
+    .present-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        padding: 18px 20px;
+        margin-bottom: 16px;
+        break-inside: avoid;
+    }
+    .present-section h2 {
+        margin: 0 0 12px;
+        font-size: 15px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+    .present-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .present-row:last-child { border-bottom: none; }
+    .present-row__label { font-size: 13.5px; color: var(--text); flex: 1; }
+    .present-row__values {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        white-space: nowrap;
+    }
+    .present-row__before { color: var(--text-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .present-row__arrow { color: var(--border-strong); }
+    .present-row__after {
+        font-weight: 750;
+        font-size: 19px;
+        color: var(--primary);
+        font-variant-numeric: tabular-nums;
+    }
+    .present-row__delta {
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--gray-bg, #eef0f6);
+        color: var(--text-muted);
+    }
+    @media print {
+        .sidebar, .page-actions, .filters, .layout > .sidebar { display: none !important; }
+        .present-hero { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { background: #fff; }
+    }
+</style>
+
+<div class="present-hero">
+    <h1>Показатели: до и после</h1>
+    <div class="sub">Те же вопросы, что и в недельном отчёте — значения на две даты рядом</div>
+</div>
+
+<div class="page-actions" style="margin-bottom: 14px;">
+    <form method="get" class="filters" style="margin:0">
+        <label for="before-date" style="align-self:center; font-size:13px; color:var(--text-muted)">До:</label>
+        <input type="date" id="before-date" name="before" value="{{ before|date:'Y-m-d' }}">
+        <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
+    </form>
+    <button type="button" class="btn btn--secondary btn--sm" onclick="window.print()">Печать / PDF</button>
+</div>
+
+<div class="present-legend">
+    <span><span class="present-dot present-dot--before"></span> До — {{ before|date:'d.m.Y' }}</span>
+    <span><span class="present-dot present-dot--after"></span> После — {{ today|date:'d.m.Y' }}</span>
+</div>
+
+<div class="kpi-grid" style="grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); align-items: start;">
+    {% for section in sections %}
+        <div class="present-section">
+            <h2>{{ section.title }}</h2>
+            {% for row in section.rows %}
+                <div class="present-row">
+                    <div class="present-row__label">{{ row.label }}</div>
+                    <div class="present-row__values">
+                        <span class="present-row__before">{% if row.before is not None %}{{ row.before }}{{ row.suffix }}{% else %}—{% endif %}</span>
+                        <span class="present-row__arrow">→</span>
+                        <span class="present-row__after">{% if row.after is not None %}{{ row.after }}{{ row.suffix }}{% else %}—{% endif %}</span>
+                        {% if row.delta is not None %}
+                            <span class="present-row__delta">{% if row.delta > 0 %}+{{ row.delta }}{% else %}{{ row.delta }}{% endif %}{{ row.suffix }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

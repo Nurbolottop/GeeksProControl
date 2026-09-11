@@ -20,6 +20,7 @@
             <input type="hidden" name="week" value="{{ report.week_start|date:'Y-m-d' }}">
             <button type="submit" class="btn btn--secondary">Пересчитать</button>
         </form>
+        <a href="{% url 'reports:presentation' %}?before={{ report.week_start|date:'Y-m-d' }}" class="btn btn--secondary">Презентацию</a>
         <form method="post" action="{% url 'reports:weekly_delete' report.pk %}" style="margin:0"
               data-confirm="Удалить отчёт за эту неделю?">
             {% csrf_token %}
