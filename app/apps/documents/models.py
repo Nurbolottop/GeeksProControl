@@ -30,21 +30,14 @@ class DocumentType(models.Model):
 BRIEF = 'brief'
 CONTRACT = 'contract'
 REQUIREMENTS = 'requirements'
-FINAL_ACT = 'final_act'
+ACCEPTANCE_ACT = 'acceptance_act'
 
 DEFAULT_TYPES = [
     # (code, name, required_for_delivery)
     (BRIEF, 'Бриф заказчика', True),
     (CONTRACT, 'Договор', True),
     (REQUIREMENTS, 'ТЗ', True),
-    ('annex', 'Приложение', False),
-    ('extra_agreement', 'Дополнительное соглашение', False),
-    ('acceptance_act', 'Акт приёма-передачи', False),
-    ('work_act', 'Акт выполненных работ', False),
-    (FINAL_ACT, 'Финальный акт', True),
-    ('access_transfer', 'Передача доступов', False),
-    ('requisites', 'Реквизиты', False),
-    ('other', 'Другое', False),
+    (ACCEPTANCE_ACT, 'Акт приёма-передачи', True),
 ]
 
 

@@ -47,5 +47,13 @@ urlpatterns = [
         name='intern_detail',
     ),
     path('<int:pk>/documents/upload/', views.document_upload, name='document_upload'),
+    path(
+        '<int:pk>/documents/<int:document_pk>/edit/', views.document_update,
+        name='document_update',
+    ),
+    path(
+        '<int:pk>/documents/<int:document_pk>/approve/', views.document_approve,
+        name='document_approve',
+    ),
     path('<int:pk>/client/', views.client_edit, name='client_edit'),
 ]

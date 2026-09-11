@@ -468,6 +468,77 @@ class PmDocumentTests(PmProjectOwnershipTests):
         self.assertContains(response, "OWN-1")
         self.assertNotContains(response, "FOREIGN-1")
 
+    def test_documents_tab_shows_checklist_format(self):
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=documents",
+        )
+        self.assertContains(response, "Обязательных загружено")
+        self.assertContains(response, "Бриф заказчика")
+
+    def test_can_approve_own_document(self):
+        from apps.documents.models import Document
+
+        document = Document.objects.create(
+            project=self.project_a, doc_type=self.doc_type, number="3",
+        )
+        self.client.post(
+            reverse("pm_portal:document_approve", args=[self.project_a.pk, document.pk]),
+        )
+        document.refresh_from_db()
+        self.assertTrue(document.is_signed)
+        self.assertEqual(document.status, "signed")
+
+    def test_cannot_approve_document_of_foreign_project(self):
+        from apps.documents.models import Document
+
+        document = Document.objects.create(
+            project=self.project_b, doc_type=self.doc_type, number="4",
+        )
+        response = self.client.post(
+            reverse("pm_portal:document_approve", args=[self.project_a.pk, document.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+        document.refresh_from_db()
+        self.assertFalse(document.is_signed)
+
+    def test_can_edit_own_document(self):
+        from apps.documents.models import Document
+
+        document = Document.objects.create(
+            project=self.project_a, doc_type=self.doc_type, number="5",
+        )
+        self.client.post(
+            reverse("pm_portal:document_update", args=[self.project_a.pk, document.pk]),
+            {"doc_type": self.doc_type.pk, "number": "5-updated", "status": "draft"},
+        )
+        document.refresh_from_db()
+        self.assertEqual(document.number, "5-updated")
+
+    def test_cannot_edit_document_of_foreign_project(self):
+        from apps.documents.models import Document
+
+        document = Document.objects.create(
+            project=self.project_b, doc_type=self.doc_type, number="6",
+        )
+        response = self.client.get(
+            reverse("pm_portal:document_update", args=[self.project_a.pk, document.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_upload_link_prefills_type_from_checklist(self):
+        from apps.documents import services as document_services
+        from apps.documents.models import DocumentType
+
+        document_services.ensure_default_types()
+        brief = DocumentType.objects.get(code="brief")
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=documents",
+        )
+        self.assertContains(
+            response,
+            f"{reverse('pm_portal:document_upload', args=[self.project_a.pk])}?type={brief.pk}",
+        )
+
 
 class PmClientTests(PmProjectOwnershipTests):
     """Данные клиента заполняет ПМ по своему проекту."""

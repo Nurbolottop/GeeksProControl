@@ -6,7 +6,7 @@ from apps.documents import services as doc_services
 from apps.documents.models import (
     BRIEF,
     CONTRACT,
-    FINAL_ACT,
+    ACCEPTANCE_ACT,
     Document,
     DocumentType,
     REQUIREMENTS,
@@ -40,7 +40,7 @@ class DeliveryTests(TestCase):
 
     def _add_signed_docs(self):
         today = timezone.localdate()
-        for code in (BRIEF, CONTRACT, REQUIREMENTS, FINAL_ACT):
+        for code in (BRIEF, CONTRACT, REQUIREMENTS, ACCEPTANCE_ACT):
             Document.objects.create(
                 project=self.project,
                 doc_type=DocumentType.objects.get(code=code),

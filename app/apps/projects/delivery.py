@@ -20,7 +20,7 @@ from apps.projects.models import (
 def delivery_checks(project: Project) -> list[dict]:
     """Список проверок готовности к сдаче: [{label, ok, hint}]."""
     from apps.documents import services as doc_services
-    from apps.documents.models import BRIEF, CONTRACT, FINAL_ACT, REQUIREMENTS
+    from apps.documents.models import ACCEPTANCE_ACT, BRIEF, CONTRACT, REQUIREMENTS
     from apps.tasks.models import TaskPriority, TaskStatus
 
     open_statuses = (TaskStatus.NEW, TaskStatus.IN_PROGRESS, TaskStatus.REVIEW)
@@ -86,14 +86,14 @@ def delivery_checks(project: Project) -> list[dict]:
         },
         {
             'group': 'Документы',
-            'label': 'Акт подготовлен',
-            'ok': doc_services.has_document(project, FINAL_ACT),
-            'hint': 'Загрузите финальный акт во вкладке «Документы»',
+            'label': 'Акт приёма-передачи подготовлен',
+            'ok': doc_services.has_document(project, ACCEPTANCE_ACT),
+            'hint': 'Загрузите акт приёма-передачи во вкладке «Документы»',
         },
         {
             'group': 'Документы',
             'label': 'Акт подписан',
-            'ok': doc_services.has_signed_document(project, FINAL_ACT),
+            'ok': doc_services.has_signed_document(project, ACCEPTANCE_ACT),
             'hint': 'Отметьте акт подписанным с датой подписания',
         },
         {

@@ -5,10 +5,12 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.attendance import services as attendance_services
 from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
 from apps.documents import services as document_services
+from apps.documents.models import Document, DocumentStatus
 from apps.pm_portal import services
 from apps.pm_portal.forms import PMClientForm, PMDocumentForm
 from apps.projects.models import ProjectReport
@@ -47,8 +49,21 @@ def project_detail(request, pk):
         if group:
             context['meetings'] = group.meetings.select_related('host').order_by('-date')
     elif tab == 'documents':
+        from apps.documents.models import DocumentType
+
         document_services.ensure_default_types()
-        context['documents'] = project.documents.active().select_related('doc_type')
+        documents = list(project.documents.active().select_related('doc_type'))
+        by_type = {}
+        for document in documents:
+            by_type.setdefault(document.doc_type_id, document)
+        context['checklist'] = [
+            {'type': doc_type, 'document': by_type.get(doc_type.pk)}
+            for doc_type in DocumentType.objects.order_by(
+                '-required_for_delivery', 'name',
+            )
+        ]
+        context['documents'] = documents
+        context['doc_progress'] = document_services.document_progress(project)
     elif tab == 'client':
         context['client'] = project.client
     return render(request, 'pm_portal/project_detail.html', context)
@@ -347,8 +362,11 @@ def intern_detail(request, pk, intern_pk):
 def document_upload(request, pk):
     project = services.pm_project_or_404(request.user, pk)
     document_services.ensure_default_types()
+    initial = {}
+    if request.GET.get('type'):
+        initial['doc_type'] = request.GET['type']
     form = PMDocumentForm(
-        request.POST or None, request.FILES or None, project=project,
+        request.POST or None, request.FILES or None, project=project, initial=initial,
     )
     if request.method == 'POST' and form.is_valid():
         document = form.save()
@@ -357,6 +375,39 @@ def document_upload(request, pk):
     return render(request, 'pm_portal/document_form.html', {
         'form': form, 'project': project,
     })
+
+
+@login_required
+def document_update(request, pk, document_pk):
+    project = services.pm_project_or_404(request.user, pk)
+    document = get_object_or_404(Document, pk=document_pk, project=project)
+    form = PMDocumentForm(
+        request.POST or None, request.FILES or None, project=project, instance=document,
+    )
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Документ обновлён.')
+        return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=documents")
+    return render(request, 'pm_portal/document_form.html', {
+        'form': form, 'project': project,
+    })
+
+
+@login_required
+def document_approve(request, pk, document_pk):
+    """Утвердить документ: бриф принят, ТЗ/акт согласован с заказчиком."""
+    project = services.pm_project_or_404(request.user, pk)
+    document = get_object_or_404(Document, pk=document_pk, project=project)
+    if request.method == 'POST':
+        document.status = DocumentStatus.SIGNED
+        document.is_signed = True
+        if not document.signed_date:
+            document.signed_date = timezone.localdate()
+        document.save(update_fields=[
+            'status', 'is_signed', 'signed_date', 'updated_at',
+        ])
+        messages.success(request, f'«{document.doc_type}» утверждён.')
+    return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=documents")
 
 
 @login_required

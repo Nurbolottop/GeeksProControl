@@ -1,40 +1,62 @@
-<div class="panel">
-    <div class="panel-head">
-        <h2>Документы ({{ documents|length }})</h2>
-        <a href="{% url 'pm_portal:document_upload' project.pk %}" class="btn btn--sm">+ Загрузить</a>
+<div class="page-head" style="margin-bottom: 16px">
+    <div>
+        <h2 style="margin:0">Документы проекта</h2>
+        <div class="sub">
+            Обязательных загружено: <strong>{{ doc_progress.done }}/{{ doc_progress.total }}</strong>
+        </div>
     </div>
-    <div class="table-wrap">
-        <table class="data">
-            <thead>
-            <tr>
-                <th>Тип</th>
-                <th>Номер</th>
-                <th>Дата</th>
-                <th>Статус</th>
-                <th>Подписан</th>
-                <th>Файл</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for document in documents %}
-                <tr>
-                    <td><strong>{{ document.doc_type }}</strong></td>
-                    <td>{{ document.number|default:'—' }}</td>
-                    <td>{{ document.document_date|date:'d.m.Y'|default:'—' }}</td>
-                    <td>
-                        {% if document.status == 'signed' %}<span class="badge badge--green">Подписан</span>
-                        {% elif document.status == 'awaiting' %}<span class="badge badge--yellow">Ожидает подписи</span>
-                        {% elif document.status == 'expired' %}<span class="badge badge--red">Истёк</span>
-                        {% elif document.status == 'cancelled' %}<span class="badge badge--gray">Отменён</span>
-                        {% else %}<span class="badge badge--gray">Черновик</span>{% endif %}
-                    </td>
-                    <td>{% if document.is_signed %}✓{% else %}—{% endif %}</td>
-                    <td>{% if document.file %}<a href="{{ document.file.url }}" target="_blank" rel="noopener">Открыть</a>{% else %}—{% endif %}</td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Документов пока нет.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
+</div>
+
+<div class="doc-list">
+    {% for item in checklist %}
+        <div class="doc-row {% if item.document %}doc-row--done{% endif %}">
+            <div class="doc-row__icon">
+                {% if item.document %}✓{% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                {% endif %}
+            </div>
+            <div class="doc-row__name">
+                {{ item.type.name }}
+                {% if item.type.required_for_delivery %}
+                    <span class="doc-row__req">обязательный</span>
+                {% endif %}
+                {% if item.document.number %}
+                    <div class="doc-row__meta">№ {{ item.document.number }}{% if item.document.document_date %} от {{ item.document.document_date|date:'d.m.Y' }}{% endif %}</div>
+                {% endif %}
+            </div>
+            <div class="doc-row__status">
+                {% if item.document %}
+                    {% if item.document.is_signed %}
+                        <span class="badge badge--green">✓ Подписан</span>
+                    {% elif item.document.status == 'awaiting' %}
+                        <span class="badge badge--yellow">Ожидает подписи</span>
+                    {% elif item.document.status == 'expired' %}
+                        <span class="badge badge--red">Истёк</span>
+                    {% elif item.document.status == 'cancelled' %}
+                        <span class="badge badge--gray">Отменён</span>
+                    {% else %}
+                        <span class="badge badge--blue">Загружен</span>
+                    {% endif %}
+                {% else %}
+                    <span class="badge badge--gray">Не загружен</span>
+                {% endif %}
+            </div>
+            <div class="doc-row__actions">
+                {% if item.document %}
+                    {% if item.document.file %}
+                        <a href="{{ item.document.file.url }}" target="_blank" rel="noopener" class="btn btn--secondary btn--sm">Открыть</a>
+                    {% endif %}
+                    {% if not item.document.is_signed %}
+                        <form method="post" action="{% url 'pm_portal:document_approve' project.pk item.document.pk %}" style="display:inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--sm">Утвердить</button>
+                        </form>
+                    {% endif %}
+                    <a href="{% url 'pm_portal:document_update' project.pk item.document.pk %}" class="btn btn--secondary btn--sm">Изменить</a>
+                {% else %}
+                    <a href="{% url 'pm_portal:document_upload' project.pk %}?type={{ item.type.pk }}" class="btn btn--sm">Загрузить</a>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
 </div>
