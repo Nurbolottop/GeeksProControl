@@ -177,13 +177,21 @@ def meeting_mark_all(request, pk):
 
 @login_required
 def dashboard(request):
-    """Табель: собрания сегодня и посещаемость по всем группам."""
-    year, month = _period(request)
-    current = datetime.date(year, month, 1)
-    prev_month = (current - datetime.timedelta(days=1)).replace(day=1)
-    next_month = (current + datetime.timedelta(days=32)).replace(day=1)
+    """Табель: собрания сегодня и посещаемость за неделю."""
+    today = timezone.localdate()
+    raw_week = request.GET.get('week')
+    if raw_week:
+        try:
+            day = datetime.date.fromisoformat(raw_week)
+        except ValueError:
+            raise Http404('Некорректная неделя')
+    else:
+        day = today
+    week_start, week_end = overview.week_bounds(day)
+    prev_week = week_start - datetime.timedelta(days=7)
+    next_week = week_start + datetime.timedelta(days=7)
 
-    rows = overview.groups_summary(year, month)
+    rows = overview.groups_summary(week_start, week_end)
     total_meetings = sum(row['meetings'] for row in rows)
     total_held = sum(row['held'] for row in rows)
     rates = [row['rate'] for row in rows if row['rate'] is not None]
@@ -192,19 +200,19 @@ def dashboard(request):
     return render(request, 'attendance/dashboard.html', {
         'rows': rows,
         'today_meetings': overview.today_meetings(),
-        'week_meetings': overview.week_meetings(),
+        'week_meetings': overview.period_meetings(week_start, week_end),
         'total_meetings': total_meetings,
         'total_held': total_held,
         'average_rate': round(sum(rates) / len(rates)) if rates else None,
         'average_activity': (
             round(sum(activities) / len(activities), 1) if activities else None
         ),
-        'year': year,
-        'month': month,
-        'current': current,
-        'prev_month': prev_month,
-        'next_month': next_month,
-        'today': timezone.localdate(),
+        'week_start': week_start,
+        'week_end': week_end,
+        'prev_week': prev_week,
+        'next_week': next_week,
+        'is_current_week': week_start == overview.week_bounds(today)[0],
+        'today': today,
     })
 
 

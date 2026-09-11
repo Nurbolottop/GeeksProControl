@@ -4,13 +4,17 @@ import datetime
 from django.utils import timezone
 
 from apps.attendance.models import Attendance, GroupMeeting, WorkScore
-from apps.attendance.services import month_bounds
 from apps.flows.models import Group
 
 
-def groups_summary(year: int, month: int) -> list[dict]:
-    """По каждой группе: собрания месяца, проведено, посещаемость."""
-    first, last = month_bounds(year, month)
+def week_bounds(day: datetime.date) -> tuple[datetime.date, datetime.date]:
+    """Понедельник — воскресенье недели, в которую попадает дата."""
+    start = day - datetime.timedelta(days=day.weekday())
+    return start, start + datetime.timedelta(days=6)
+
+
+def groups_summary(first: datetime.date, last: datetime.date) -> list[dict]:
+    """По каждой группе: собрания периода, проведено, посещаемость."""
     groups = (
         Group.objects.select_related('flow', 'project')
         .prefetch_related('members')
@@ -65,13 +69,12 @@ def today_meetings() -> list[GroupMeeting]:
     )
 
 
-def week_meetings() -> list[GroupMeeting]:
-    """Ближайшие собрания на неделю вперёд."""
-    today = timezone.localdate()
+def period_meetings(
+    first: datetime.date, last: datetime.date,
+) -> list[GroupMeeting]:
+    """Все собрания выбранной недели — по дням."""
     return list(
-        GroupMeeting.objects.filter(
-            date__gt=today, date__lte=today + datetime.timedelta(days=7),
-        )
-        .select_related('group', 'group__project', 'host')
-        .order_by('date'),
+        GroupMeeting.objects.filter(date__gte=first, date__lte=last)
+        .select_related('group', 'group__project', 'group__flow', 'host')
+        .order_by('date', 'group__flow__number', 'group__number'),
     )

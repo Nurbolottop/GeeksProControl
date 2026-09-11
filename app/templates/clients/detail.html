@@ -10,6 +10,12 @@
     </div>
     <div class="page-actions">
         <a href="{% url 'clients:update' client.pk %}" class="btn btn--secondary">Редактировать</a>
+        <form method="post" action="{% url 'clients:delete' client.pk %}" style="margin:0"
+              data-confirm="Удалить заказчика «{{ client.organization|escapejs }}»?{% if projects %} У него проектов: {{ projects|length }} — удаление будет отклонено.{% endif %}"
+              data-confirm-ok="Удалить">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--secondary">Удалить</button>
+        </form>
         <a href="{% url 'projects:create' %}" class="btn">+ Проект</a>
     </div>
 </div>

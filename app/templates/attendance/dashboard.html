@@ -17,11 +17,11 @@
     </div>
     <div class="kpi-card kpi-card--green">
         <div class="kpi-card__value">{{ total_held }}</div>
-        <div class="kpi-card__label">Проведено за месяц</div>
+        <div class="kpi-card__label">Проведено за неделю</div>
     </div>
     <div class="kpi-card kpi-card--yellow">
         <div class="kpi-card__value">{{ total_meetings }}</div>
-        <div class="kpi-card__label">Всего назначено</div>
+        <div class="kpi-card__label">Назначено за неделю</div>
     </div>
     <div class="kpi-card kpi-card--green">
         <div class="kpi-card__value">{% if average_rate is not None %}{{ average_rate }}%{% else %}—{% endif %}</div>
@@ -63,9 +63,12 @@
 </div>
 
 <div class="month-nav">
-    <a href="?year={{ prev_month.year }}&month={{ prev_month.month }}" class="btn btn--secondary btn--sm">‹ {{ prev_month|date:'F' }}</a>
-    <strong>{{ current|date:'F Y' }}</strong>
-    <a href="?year={{ next_month.year }}&month={{ next_month.month }}" class="btn btn--secondary btn--sm">{{ next_month|date:'F' }} ›</a>
+    <a href="?week={{ prev_week|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">‹ Прошлая неделя</a>
+    <strong style="min-width: 200px;">{{ week_start|date:'d.m' }} — {{ week_end|date:'d.m.Y' }}</strong>
+    <a href="?week={{ next_week|date:'Y-m-d' }}" class="btn btn--secondary btn--sm">Следующая неделя ›</a>
+    {% if not is_current_week %}
+        <a href="?" class="btn btn--secondary btn--sm">Текущая неделя</a>
+    {% endif %}
 </div>
 
 <div class="panel" style="padding: 0;">
@@ -124,22 +127,30 @@
     </div>
 </div>
 
-{% if week_meetings %}
-    <div class="panel">
-        <h2>Ближайшая неделя</h2>
-        {% for meeting in week_meetings %}
-            <div class="today-meeting">
-                <div class="today-meeting__info">
-                    <strong>{{ meeting.date|date:'d.m, D' }}</strong>
-                    <span>
-                        Группа {{ meeting.group.code }} · {{ meeting.get_kind_display }}
-                        {% if meeting.group.project %} · {{ meeting.group.project.name }}{% endif %}
-                    </span>
-                </div>
+<div class="panel">
+    <h2>Собрания недели {{ week_start|date:'d.m' }} — {{ week_end|date:'d.m.Y' }}</h2>
+    {% for meeting in week_meetings %}
+        <div class="today-meeting">
+            <div class="today-meeting__info">
+                <strong>{{ meeting.date|date:'d.m, D' }}</strong>
+                <span>
+                    Группа {{ meeting.group.code }} · {{ meeting.get_kind_display }}
+                    {% if meeting.group.project %} · {{ meeting.group.project.name }}{% endif %}
+                    {% if meeting.host %} · ведёт {{ meeting.host.full_name }}{% endif %}
+                </span>
+            </div>
+            <div class="today-meeting__actions">
+                {% if meeting.status == 'held' %}
+                    <span class="badge badge--green">✓ Проведено{% if meeting.attendance_rate is not None %} · {{ meeting.attendance_rate }}%{% endif %}</span>
+                {% else %}
+                    <span class="badge badge--yellow">Не отмечено</span>
+                {% endif %}
                 <a href="{% url 'attendance:meeting_detail' meeting.pk %}"
                    class="btn btn--secondary btn--sm">Открыть</a>
             </div>
-        {% endfor %}
-    </div>
-{% endif %}
+        </div>
+    {% empty %}
+        <div class="empty">На эту неделю собраний не назначено.</div>
+    {% endfor %}
+</div>
 {% endblock %}

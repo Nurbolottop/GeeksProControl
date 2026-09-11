@@ -36,6 +36,7 @@
                 <th>Email</th>
                 <th>Город</th>
                 <th>Проектов</th>
+                <th></th>
             </tr>
             </thead>
             <tbody>
@@ -47,9 +48,21 @@
                     <td>{{ client.email|default:'—' }}</td>
                     <td>{{ client.city|default:'—' }}</td>
                     <td>{{ client.project_count }}</td>
+                    <td style="text-align: right;">
+                        {% if client.project_count %}
+                            <span class="badge badge--gray" title="Сначала перенесите или удалите проекты">нельзя удалить</span>
+                        {% else %}
+                            <form method="post" action="{% url 'clients:delete' client.pk %}" style="margin:0; display:inline;"
+                                  data-confirm="Удалить заказчика «{{ client.organization|escapejs }}»?"
+                                  data-confirm-ok="Удалить">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn--secondary btn--sm">Удалить</button>
+                            </form>
+                        {% endif %}
+                    </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Заказчиков не найдено.</td></tr>
+                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Заказчиков не найдено.</td></tr>
             {% endfor %}
             </tbody>
         </table>

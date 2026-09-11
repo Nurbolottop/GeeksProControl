@@ -61,6 +61,28 @@ def client_create(request):
 
 
 @login_required
+def client_delete(request, pk):
+    """Удаление заказчика. Клиента с проектами удалить нельзя."""
+    client = get_object_or_404(Client, pk=pk)
+    if request.method != 'POST':
+        return redirect('clients:detail', pk=client.pk)
+
+    projects = client.projects.count()
+    if projects:
+        messages.error(
+            request,
+            f'Заказчик «{client.organization}» не удалён: у него проектов — '
+            f'{projects}. Сначала перенесите или удалите их.',
+        )
+        return redirect('clients:detail', pk=client.pk)
+
+    name = client.organization
+    client.delete()
+    messages.success(request, f'Заказчик «{name}» удалён.')
+    return redirect('clients:list')
+
+
+@login_required
 def client_update(request, pk):
     client = get_object_or_404(Client, pk=pk)
     form = ClientForm(request.POST or None, instance=client)
