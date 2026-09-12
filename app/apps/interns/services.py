@@ -103,9 +103,9 @@ BRANCH_UNKNOWN = 'Без филиала'
 BRANCHES = (BRANCH_BISHKEK, BRANCH_OSH, BRANCH_UNKNOWN)
 
 
-def branch_of(intern: Intern) -> str:
-    """Филиал стажёра одним из трёх значений BRANCHES."""
-    for value in (intern.branch, intern.city):
+def branch_from_text(*values) -> str:
+    """Филиал по первому осмысленному значению: «Ошский филиал» → Ош и т.д."""
+    for value in values:
         if not value:
             continue
         if 'Ош' in value:
@@ -113,6 +113,11 @@ def branch_of(intern: Intern) -> str:
         if 'Биш' in value:
             return BRANCH_BISHKEK
     return BRANCH_UNKNOWN
+
+
+def branch_of(intern: Intern) -> str:
+    """Филиал стажёра одним из трёх значений BRANCHES."""
+    return branch_from_text(intern.branch, intern.city)
 
 
 def branch_filter(branch: str):
