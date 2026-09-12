@@ -114,6 +114,17 @@ class Command(BaseCommand):
             for label, qs in moves.items():
                 field = 'host' if label.startswith('собрания') else 'intern'
                 qs.update(**{field: keep})
+            # обе карточки могли числиться на одном проекте — оставляем одну запись
+            seen = set()
+            for member in TeamMember.objects.filter(intern=keep).order_by('pk'):
+                key = (member.project_id, member.role, member.status)
+                if key in seen:
+                    self.stdout.write(
+                        f'  убираем задвоенное участие в проекте: {member.project}',
+                    )
+                    member.delete()
+                    continue
+                seen.add(key)
             for field, value in changes.items():
                 setattr(keep, field, value)
             keep.save()
