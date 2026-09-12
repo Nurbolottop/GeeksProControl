@@ -6,7 +6,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.interns import services
 from apps.interns.models import (
-    Intern, InternEvaluation, InternStatus, ProfileFormLink,
+    GraduateStatus, Intern, InternEvaluation, InternStatus, ProfileFormLink,
     ProfileFormSubmission, TalentReserveCandidate,
 )
 from apps.interns.services import add_evaluation
@@ -605,7 +605,13 @@ class ReserveResumeBankToggleTests(TestCase):
 
 
 class GraduatesListTests(TestCase):
-    """«Выпускники»: стажёры, вышедшие из команды завершённого проекта."""
+    """«Выпускники»: стажёры завершённого проекта, ждущие проверки ПМ.
+
+    Источник истины — ``Intern.graduate_status``, его выставляет
+    :func:`apps.projects.services.release_team` при завершении проекта
+    (см. `GraduateWorkflowTests` ниже) — здесь он проставляется вручную,
+    чтобы проверить именно отображение списка.
+    """
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -625,7 +631,9 @@ class GraduatesListTests(TestCase):
         )
         active = Project.objects.create(name="Активный", status=ProjectStatus.ACTIVE)
 
-        graduate = Intern.objects.create(full_name="Выпускник Один")
+        graduate = Intern.objects.create(
+            full_name="Выпускник Один", graduate_status=GraduateStatus.PENDING,
+        )
         TeamMember.objects.create(
             project=finished, intern=graduate, role=TeamRole.BACKEND,
             status=TeamMember.Status.LEFT, left_at=datetime.date(2026, 1, 15),
@@ -651,7 +659,10 @@ class GraduatesListTests(TestCase):
             name="Завершённый", status=ProjectStatus.COMPLETED,
             actual_end_date=datetime.date(2026, 1, 15),
         )
-        graduate = Intern.objects.create(full_name="Выпускник Два", in_resume_bank=True)
+        graduate = Intern.objects.create(
+            full_name="Выпускник Два", in_resume_bank=True,
+            graduate_status=GraduateStatus.DECLINED,
+        )
         TeamMember.objects.create(
             project=finished, intern=graduate, role=TeamRole.BACKEND,
             status=TeamMember.Status.LEFT, left_at=datetime.date(2026, 1, 15),
@@ -660,6 +671,94 @@ class GraduatesListTests(TestCase):
         response = self.client.get(reverse("interns:graduates"))
         self.assertContains(response, "В банке резюме")
         self.assertNotContains(response, reverse("interns:reserve_create"))
+
+
+class GraduateWorkflowTests(TestCase):
+    """Полный цикл «выпускника»: завершение проекта → проверка ПМ (ТЗ,
+    сформулировано пользователем: «если проект закончился автоматически
+    переходит в выпускники ... если не хочет — в банк резюме»)."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head5", password="x")
+        self.client.force_login(self.user)
+
+    def test_completing_project_marks_interns_pending(self):
+        from apps.projects.models import Project, ProjectStatus
+        from apps.projects.services import release_team
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Проект", status=ProjectStatus.COMPLETED)
+        intern = Intern.objects.create(full_name="Стажёр")
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        release_team(project)
+
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, GraduateStatus.PENDING)
+
+    def test_cancelling_project_does_not_mark_interns_pending(self):
+        """Проект отменён/отказ клиента — это не «успешный выпуск»."""
+        from apps.projects.models import Project, ProjectStatus
+        from apps.projects.services import release_team
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Проект", status=ProjectStatus.CANCELLED)
+        intern = Intern.objects.create(full_name="Стажёр")
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        release_team(project)
+
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, "")
+
+    def test_assigning_new_project_clears_graduate_status(self):
+        from apps.projects.models import Project
+
+        graduate = Intern.objects.create(
+            full_name="Продолжает", graduate_status=GraduateStatus.PENDING,
+            status=InternStatus.ACTIVE,
+        )
+        new_project = Project.objects.create(name="Новый проект")
+
+        response = self.client.post(
+            reverse("interns:project_add", args=[graduate.pk]),
+            {"project": new_project.pk},
+        )
+        self.assertRedirects(response, graduate.get_absolute_url())
+
+        graduate.refresh_from_db()
+        self.assertEqual(graduate.graduate_status, "")
+        self.assertNotIn(graduate, services.graduated_interns())
+
+    def test_decline_sets_status_without_touching_resume_bank(self):
+        graduate = Intern.objects.create(
+            full_name="Не продолжает", graduate_status=GraduateStatus.PENDING,
+        )
+
+        response = self.client.post(
+            reverse("interns:graduate_decline", args=[graduate.pk]),
+        )
+        self.assertRedirects(response, reverse("interns:graduates"))
+
+        graduate.refresh_from_db()
+        self.assertEqual(graduate.graduate_status, GraduateStatus.DECLINED)
+        self.assertFalse(graduate.in_resume_bank)
+
+    def test_decline_view_shows_copyable_instructions(self):
+        graduate = Intern.objects.create(
+            full_name="Копия Инструкции", graduate_status=GraduateStatus.DECLINED,
+        )
+
+        response = self.client.get(reverse("interns:graduates"))
+        self.assertContains(response, reverse("resume_bank_apply"))
 
 
 class TalentReserveStaffTests(TestCase):

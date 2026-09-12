@@ -31,6 +31,10 @@ urlpatterns = [
     ),
     path('resume-bank/', views.resume_bank_list, name='resume_bank'),
     path('graduates/', views.graduates_list, name='graduates'),
+    path(
+        'graduates/<int:pk>/decline/', views.graduate_decline,
+        name='graduate_decline',
+    ),
     path('<int:pk>/', views.intern_detail, name='detail'),
     path('<int:pk>/edit/', views.intern_update, name='update'),
     path('<int:pk>/evaluate/', views.evaluation_add, name='evaluate'),

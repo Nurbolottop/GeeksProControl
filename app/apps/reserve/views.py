@@ -10,6 +10,7 @@ import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -71,6 +72,10 @@ def candidate_list(request):
         'open_invites': open_invites,
         'invite_form': InviteForm(),
         'can_edit': can_edit_reserve(request.user),
+        # перетаскивать строки есть смысл только в режиме «Свой порядок»
+        'can_drag': (
+            sort == selectors.DRAGGABLE_SORT and can_edit_reserve(request.user)
+        ),
         'free_interns': (
             Intern.objects.active().filter(reserve_card__isnull=True)
             .order_by('full_name')
@@ -172,6 +177,27 @@ def candidate_evaluate(request, pk):
         'form': form, 'candidate': candidate,
         'criteria': ReserveCandidate.EVALUATION_CRITERIA,
     })
+
+
+@reserve_editor_required
+def candidates_reorder(request):
+    """Новый порядок кандидатов после перетаскивания строки.
+
+    Приходит список id в том порядке, в каком они теперь видны на
+    странице; приоритет раздаём сверху вниз. Порядок задаётся тем, что
+    сотрудник видит на экране, поэтому перетаскивание доступно только
+    в режиме «Свой порядок».
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False}, status=405)
+    try:
+        order = [int(pk) for pk in request.POST.getlist('order')]
+    except (TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Некорректный порядок'}, status=400)
+    if not order:
+        return JsonResponse({'ok': False, 'error': 'Пустой порядок'}, status=400)
+    services.reorder_candidates(order, request.user)
+    return JsonResponse({'ok': True})
 
 
 @reserve_editor_required

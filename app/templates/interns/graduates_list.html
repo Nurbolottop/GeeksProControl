@@ -6,7 +6,7 @@
 <div class="page-head">
     <div>
         <h1>{{ title }}</h1>
-        <div class="sub">Стажёры и тимлиды с завершённых проектов. Всего: {{ people|length }}</div>
+        <div class="sub">Стажёры с завершённых проектов. Всего: {{ people|length }}</div>
     </div>
 </div>
 
@@ -19,10 +19,12 @@
                 <th>Направление</th>
                 <th>Проект</th>
                 <th>Дата выпуска</th>
+                <th>Статус</th>
                 <th>Банк резюме</th>
+                <th>Действия</th>
             </tr>
             </thead>
-            <tbody>
+            <tbody x-data="{ open: {} }">
             {% for person in people %}
                 <tr>
                     <td><a href="{{ person.get_absolute_url }}"><strong>{{ person.full_name }}</strong></a></td>
@@ -30,18 +32,68 @@
                     <td>{{ person.graduated_project|default:'—' }}</td>
                     <td>{{ person.graduated_at|date:'d.m.Y'|default:'—' }}</td>
                     <td>
+                        {% if person.graduate_status == GraduateStatus.PENDING %}
+                            <span class="badge badge--yellow">На проверке</span>
+                        {% else %}
+                            <span class="badge badge--gray">Не хочет продолжать</span>
+                        {% endif %}
+                    </td>
+                    <td>
                         {% if person.in_resume_bank %}
                             <span class="badge badge--blue">✓ В банке резюме</span>
                         {% else %}
                             <span class="badge badge--gray">Не заполнял анкету</span>
                         {% endif %}
                     </td>
+                    <td>
+                        {% if person.graduate_status == GraduateStatus.PENDING %}
+                            <button type="button" class="btn btn--secondary btn--sm" @click="open[{{ person.pk }}] = !open[{{ person.pk }}]">Проверить</button>
+                        {% else %}
+                            <button type="button" class="btn btn--secondary btn--sm" @click="open[{{ person.pk }}] = !open[{{ person.pk }}]">Инструкция</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr x-show="open[{{ person.pk }}]" x-cloak style="display:none;">
+                    <td colspan="7" style="background: var(--bg-muted, #f7f7f8);">
+                        {% if person.graduate_status == GraduateStatus.PENDING %}
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding: 8px 0;">
+                                <span>{{ person.full_name }} продолжает стажировку?</span>
+                                <a href="{% url 'interns:project_add' person.pk %}" class="btn btn--sm">Продолжит — назначить проект</a>
+                                <form method="post" action="{% url 'interns:graduate_decline' person.pk %}"
+                                      data-confirm="Отметить, что {{ person.full_name }} не хочет продолжать стажировку?"
+                                      data-confirm-ok="Не хочет продолжать" style="margin: 0;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn--secondary btn--sm">Не хочет — в банк резюме</button>
+                                </form>
+                            </div>
+                        {% else %}
+                            <div style="padding: 12px 0;">
+                                <div class="form-link__meta" style="margin-bottom: 6px;">
+                                    Отправьте это сообщение {{ person.full_name }} — заполнив анкету по ссылке, он(а) сам(а) попадёт в банк резюме:
+                                </div>
+                                <textarea readonly rows="4" style="width:100%; resize:vertical;" id="decline-text-{{ person.pk }}">Привет, {{ person.full_name }}! Твоя стажировка в GeeksPro завершена. Если сейчас не готов(а) продолжать — можно попасть в наш банк резюме, чтобы менеджеры находили тебя под новые проекты. Заполни, пожалуйста, короткую анкету: {{ request.scheme }}://{{ request.get_host }}{% url 'resume_bank_apply' %}
+Это займёт пару минут, спасибо!</textarea>
+                                <button type="button" class="btn btn--secondary btn--sm" style="margin-top:6px;" data-copy-text="decline-text-{{ person.pk }}">Копировать</button>
+                            </div>
+                        {% endif %}
+                    </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="5" class="empty" style="text-align:center; padding: 24px;">Пока никого нет.</td></tr>
+                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Пока никого нет.</td></tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+<script>
+    document.querySelectorAll('[data-copy-text]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var textarea = document.getElementById(button.dataset.copyText);
+            navigator.clipboard.writeText(textarea.value).then(function () {
+                button.textContent = 'Скопировано';
+                setTimeout(function () { button.textContent = 'Копировать'; }, 1500);
+            });
+        });
+    });
+</script>
 {% endblock %}

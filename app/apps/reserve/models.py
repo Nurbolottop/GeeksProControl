@@ -270,10 +270,16 @@ class ReserveCandidate(TimeStampedModel, ArchivableModel):
         verbose_name='Последнее изменение', null=True, blank=True,
     )
 
+    # Ручной порядок в списке: кого перетащили выше, тот приоритетнее.
+    # Больше значение — выше в списке; 0 у всех, пока порядок не задавали.
+    priority = models.PositiveIntegerField(
+        'Приоритет в списке', default=0, db_index=True,
+    )
+
     class Meta:
         verbose_name = 'Кандидат резерва'
         verbose_name_plural = 'Резерв кадров'
-        ordering = ['-rating', 'full_name']
+        ordering = ['-priority', '-rating', 'full_name']
 
     def __str__(self) -> str:
         return self.full_name

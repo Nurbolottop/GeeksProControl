@@ -12,7 +12,7 @@ from apps.interns.forms import (
     ResumeBankApplyForm, TalentReserveApplyForm, TalentReserveForm,
 )
 from apps.interns.models import (
-    Intern, InternEvaluation, InternStatus, ProfileFormLink,
+    GraduateStatus, Intern, InternEvaluation, InternStatus, ProfileFormLink,
     ProfileFormSubmission, TalentReserveCandidate,
 )
 from apps.teams.forms import ROLE_BY_SPECIALIZATION, InternProjectAddForm
@@ -528,7 +528,28 @@ def graduates_list(request):
     people = services.graduated_interns()
     return render(request, 'interns/graduates_list.html', {
         'people': people, 'title': 'Выпускники',
+        'GraduateStatus': GraduateStatus,
     })
+
+
+@login_required
+def graduate_decline(request, pk):
+    """ПМ отметил, что выпускник не хочет продолжать стажировку.
+
+    В банк резюме это НЕ добавляет — только меняет статус выпускника.
+    Дальше на странице «Выпускники» появляется готовый текст-инструкция
+    для самого стажёра: попасть в банк резюме можно только его же руками,
+    через публичную анкету.
+    """
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        services.decline_graduate(intern)
+        messages.success(
+            request,
+            f'{intern.full_name}: отмечен(а) как не продолжающий(ая) '
+            'стажировку. Ниже — текст для отправки, чтобы попасть в банк резюме.',
+        )
+    return redirect('interns:graduates')
 
 
 def resume_bank_apply(request):

@@ -5,17 +5,24 @@ from apps.reserve.models import CandidateStatus, ReserveCandidate
 
 # Подпись → выражение сортировки для ORM
 SORT_OPTIONS = [
+    ('priority', 'Свой порядок'),
     ('rating', 'По рейтингу'),
     ('created', 'По дате добавления'),
     ('updated', 'По дате обновления'),
     ('name', 'По ФИО'),
 ]
 SORT_EXPRESSIONS = {
+    # пока порядок не задавали, приоритет у всех нулевой и список
+    # выглядит как раньше — по рейтингу
+    'priority': ('-priority', '-rating', 'full_name'),
     'rating': ('-rating', 'full_name'),
     'created': ('-created_at',),
     'updated': ('-updated_at',),
     'name': ('full_name',),
 }
+# Перетаскивать строки можно только в этом режиме — в остальных
+# порядок задаёт сортировка, и ручная перестановка ничего не значит
+DRAGGABLE_SORT = 'priority'
 
 RATING_OPTIONS = [('9', 'от 9'), ('8', 'от 8'), ('7', 'от 7'), ('6', 'от 6')]
 
@@ -71,9 +78,9 @@ def candidates(params) -> tuple:
     if rating.isdigit():
         qs = qs.filter(rating__gte=int(rating))
 
-    sort = params.get('sort', 'rating')
+    sort = params.get('sort', DRAGGABLE_SORT)
     if sort not in SORT_EXPRESSIONS:
-        sort = 'rating'
+        sort = DRAGGABLE_SORT
     return qs.order_by(*SORT_EXPRESSIONS[sort]), sort
 
 

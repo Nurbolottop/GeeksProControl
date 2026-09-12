@@ -282,3 +282,22 @@ def direction_groups_map() -> dict:
         str(spec.pk): direction_group(spec.name)
         for spec in Specialization.objects.all()
     }
+
+
+def reorder_candidates(order: list[int], user=None) -> int:
+    """Расставить кандидатов в заданном порядке: первый в списке — самый
+    приоритетный. Тем, кого в списке нет, приоритеты не трогаем."""
+    candidates = ReserveCandidate.objects.in_bulk(order)
+    top = len(order)
+    changed = []
+    for index, pk in enumerate(order):
+        candidate = candidates.get(pk)
+        if candidate is None:
+            continue
+        value = top - index
+        if candidate.priority != value:
+            candidate.priority = value
+            changed.append(candidate)
+    if changed:
+        ReserveCandidate.objects.bulk_update(changed, ['priority'])
+    return len(changed)

@@ -153,6 +153,7 @@
         <table class="data">
             <thead>
                 <tr>
+                    {% if can_drag %}<th style="width: 28px;"></th>{% endif %}
                     <th>Кандидат</th>
                     <th>Направление</th>
                     <th>Уровень</th>
@@ -163,9 +164,12 @@
                     <th>Статус</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody{% if can_drag %} id="reserve-rows"{% endif %}>
                 {% for candidate in page.object_list %}
-                    <tr>
+                    <tr{% if can_drag %} draggable="true" data-id="{{ candidate.pk }}"{% endif %}>
+                        {% if can_drag %}
+                            <td class="drag-handle" title="Перетащите, чтобы поднять выше">⠿</td>
+                        {% endif %}
                         <td>
                             <div class="person">
                                 {% if candidate.photo %}
@@ -196,7 +200,7 @@
                         <td><span class="badge badge--{{ candidate.status_tone }}">{{ candidate.get_status_display }}</span></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="8" class="empty" style="text-align:center; padding: 24px;">Кандидатов не найдено.</td></tr>
+                    <tr><td colspan="{% if can_drag %}9{% else %}8{% endif %}" class="empty" style="text-align:center; padding: 24px;">Кандидатов не найдено.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -209,6 +213,56 @@
         <span class="current">{{ page.number }} / {{ page.paginator.num_pages }}</span>
         {% if page.has_next %}<a href="?page={{ page.next_page_number }}">›</a>{% endif %}
     </div>
+{% endif %}
+
+{% if can_drag %}
+<div class="sub" style="margin-top: 10px;">
+    Порядок задаёте вы: перетащите строку мышкой за «⠿» — кто выше, тот приоритетнее.
+</div>
+<script>
+(function () {
+    var tbody = document.getElementById('reserve-rows');
+    if (!tbody) return;
+    var dragged = null;
+
+    tbody.querySelectorAll('tr[draggable]').forEach(function (row) {
+        row.addEventListener('dragstart', function () {
+            dragged = row;
+            row.classList.add('is-dragging');
+        });
+        row.addEventListener('dragend', function () {
+            row.classList.remove('is-dragging');
+        });
+        row.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            if (!dragged || dragged === row) return;
+            var box = row.getBoundingClientRect();
+            var below = (e.clientY - box.top) > box.height / 2;
+            tbody.insertBefore(dragged, below ? row.nextSibling : row);
+        });
+    });
+
+    tbody.addEventListener('drop', function (e) {
+        e.preventDefault();
+        if (!dragged) return;
+        dragged = null;
+        var body = new URLSearchParams();
+        tbody.querySelectorAll('tr[data-id]').forEach(function (row) {
+            body.append('order', row.dataset.id);
+        });
+        fetch('{% url "reserve:reorder" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body,
+        }).then(function (resp) {
+            if (!resp.ok) { window.location.reload(); }
+        });
+    });
+})();
+</script>
 {% endif %}
 
 <script>
