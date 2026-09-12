@@ -186,6 +186,52 @@ class InternListProjectColumnTests(TestCase):
         self.assertLess(with_more_interns, baseline + 10)
 
 
+class InternWaitingFilterTests(TestCase):
+    """Быстрый способ найти новеньких, ждущих распределения на проект."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+
+    def test_badge_shows_waiting_count(self):
+        Intern.objects.create(full_name="Новенький", status=InternStatus.WAITING)
+        Intern.objects.create(full_name="Активный", status=InternStatus.ACTIVE)
+        response = self.client.get(reverse("interns:list"))
+        self.assertEqual(response.context["waiting_count"], 1)
+        self.assertContains(response, "ожидает распределения")
+
+    def test_no_badge_when_nobody_waiting(self):
+        Intern.objects.create(full_name="Активный", status=InternStatus.ACTIVE)
+        response = self.client.get(reverse("interns:list"))
+        self.assertNotContains(response, "распределения")
+
+    def test_status_filter_shows_only_waiting(self):
+        Intern.objects.create(full_name="Новенький", status=InternStatus.WAITING)
+        Intern.objects.create(full_name="Активный", status=InternStatus.ACTIVE)
+        response = self.client.get(reverse("interns:list"), {"status": "waiting"})
+        names = [i.full_name for i in response.context["page"].object_list]
+        self.assertEqual(names, ["Новенький"])
+        self.assertContains(response, "сбросить")
+
+    def test_waiting_count_excludes_leads(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Балажан")
+        lead = Intern.objects.create(
+            full_name="Тимлид Новенький", status=InternStatus.WAITING,
+        )
+        TeamMember.objects.create(
+            project=project, intern=lead, role=TeamRole.TEAM_LEAD,
+        )
+        response = self.client.get(reverse("interns:list"))
+        self.assertEqual(response.context["waiting_count"], 0)
+
+
 class InternProjectAddRemoveTests(TestCase):
     """С карточки стажёра можно назначить/снять проект напрямую."""
 

@@ -54,7 +54,10 @@ def intern_list(request):
         .exclude(pk__in=lead_ids())
         .select_related('specialization', 'training_group', 'team_lead')
     )
+    waiting_count = qs.filter(status=InternStatus.WAITING).count()
     params = request.GET
+    if params.get('status') == 'waiting':
+        qs = qs.filter(status=InternStatus.WAITING)
     search = params.get('q', '').strip()
     if search:
         qs = qs.filter(
@@ -91,6 +94,7 @@ def intern_list(request):
         'page': page,
         'params': params,
         'base_qs': base_params.urlencode(),
+        'waiting_count': waiting_count,
         'specializations': Specialization.objects.all(),
         'cities': Intern.objects.active().exclude(city='')
                   .values_list('city', flat=True).distinct().order_by('city'),

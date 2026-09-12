@@ -6,7 +6,18 @@
 <div class="page-head">
     <div>
         <h1>Стажёры</h1>
-        <div class="sub">Всего: {{ page.paginator.count }}</div>
+        <div class="sub" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <span>Всего: {{ page.paginator.count }}</span>
+            {% if params.status == 'waiting' %}
+                <a href="{% url 'interns:list' %}" class="badge badge--yellow" style="text-decoration:none;">
+                    ✓ Ожидают распределения — сбросить
+                </a>
+            {% elif waiting_count %}
+                <a href="?status=waiting" class="badge badge--yellow" style="text-decoration:none;">
+                    {{ waiting_count }} ожида{{ waiting_count|pluralize:"ет,ют" }} распределения
+                </a>
+            {% endif %}
+        </div>
     </div>
     <div class="page-actions">
         <form method="post" id="profile-link-form" action="{% url 'interns:profile_link_create' %}"
