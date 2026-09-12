@@ -1,7 +1,7 @@
 """Бизнес-логика стажёров: пересчёт рейтинга (ТЗ §12.1)."""
 from decimal import Decimal
 
-from apps.interns.models import Intern, InternEvaluation, ProfileFormLink
+from apps.interns.models import GraduateStatus, Intern, InternEvaluation, ProfileFormLink
 
 
 def add_evaluation(evaluation: InternEvaluation) -> InternEvaluation:
@@ -22,35 +22,57 @@ def recalculate_rating(intern: Intern) -> None:
 
 
 def graduated_interns() -> list[Intern]:
-    """Стажёры, вышедшие из команды завершённого проекта («Выпускники»).
+    """Стажёры со статусом выпускника («Выпускники»): на проверке или отказались.
 
-    По каждому стажёру берём самое позднее такое членство — человек
-    мог выпуститься не с одного проекта.
+    Источник истины — ``Intern.graduate_status``, а не сам факт наличия
+    завершённого проекта в истории: как только ПМ назначает стажёра на
+    новый проект (:func:`apps.interns.views.intern_project_add`), статус
+    сбрасывается и человек пропадает из этого списка — даже если у него
+    остаётся членство в завершённом проекте в прошлом.
     """
     from apps.projects.models import ProjectStatus
     from apps.teams.models import TeamMember
 
+    interns = list(
+        Intern.objects.filter(graduate_status__in=GraduateStatus.values)
+        .select_related('specialization'),
+    )
+    if not interns:
+        return interns
+
     memberships = (
         TeamMember.objects.filter(
-            intern__isnull=False,
+            intern_id__in=[i.pk for i in interns],
             status=TeamMember.Status.LEFT,
             project__status=ProjectStatus.COMPLETED,
         )
-        .select_related('project', 'intern__specialization')
+        .select_related('project')
         .order_by('intern_id', '-project__actual_end_date', '-left_at')
     )
     latest_by_intern = {}
     for member in memberships:
         latest_by_intern.setdefault(member.intern_id, member)
 
-    interns = []
-    for member in latest_by_intern.values():
-        intern = member.intern
-        intern.graduated_project = member.project
-        intern.graduated_at = member.project.actual_end_date or member.left_at
-        interns.append(intern)
+    for intern in interns:
+        member = latest_by_intern.get(intern.pk)
+        intern.graduated_project = member.project if member else None
+        intern.graduated_at = (
+            (member.project.actual_end_date or member.left_at) if member else None
+        )
     interns.sort(key=lambda i: i.graduated_at or i.created_at.date(), reverse=True)
     return interns
+
+
+def decline_graduate(intern: Intern) -> None:
+    """Стажёр не хочет продолжать стажировку — остаётся выпускником.
+
+    Именно здесь ``in_resume_bank`` НЕ трогаем: попасть в банк резюме
+    можно только самостоятельно, через публичную форму (ТЗ — банк резюме
+    заполняется человеком сам, а не ставится ПМ галочкой). ПМ лишь
+    получает готовый текст-инструкцию, которую отправляет стажёру.
+    """
+    intern.graduate_status = GraduateStatus.DECLINED
+    intern.save(update_fields=['graduate_status', 'updated_at'])
 
 
 def issue_profile_form_link(user=None, ttl_days: int | None = None) -> ProfileFormLink:

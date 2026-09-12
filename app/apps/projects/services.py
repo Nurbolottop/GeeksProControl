@@ -43,12 +43,26 @@ TERMINAL_STATUSES = {
 
 
 def release_team(project: Project, when: datetime.date | None = None) -> None:
-    """Освобождает активных участников команды (ТЗ §42.3)."""
+    """Освобождает активных участников команды (ТЗ §42.3).
+
+    Если проект завершён успешно (не отменён и не отказ клиента),
+    освобождённые стажёры попадают в «Выпускники» на проверку — надо
+    решить, продолжают ли они стажировку дальше.
+    """
+    from apps.interns.models import GraduateStatus, Intern
     from apps.teams.models import TeamMember
 
-    project.team_members.filter(status=TeamMember.Status.ACTIVE).update(
+    members = project.team_members.filter(status=TeamMember.Status.ACTIVE)
+    intern_ids = list(
+        members.filter(intern__isnull=False).values_list('intern_id', flat=True),
+    )
+    members.update(
         status=TeamMember.Status.LEFT, left_at=when or timezone.localdate(),
     )
+    if project.status == ProjectStatus.COMPLETED and intern_ids:
+        Intern.objects.filter(pk__in=intern_ids).update(
+            graduate_status=GraduateStatus.PENDING,
+        )
 
 
 def calculate_deadline_status(

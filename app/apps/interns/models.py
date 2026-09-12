@@ -32,6 +32,17 @@ class Branch(models.TextChoices):
     OSH = 'Ош', 'Ош'
 
 
+class GraduateStatus(models.TextChoices):
+    """Куда делся стажёр после завершения проекта (ТЗ: разбор «Выпускников»).
+
+    Пусто — не выпускник прямо сейчас (либо ещё не выпускался, либо уже
+    назначен на новый проект — тогда из «Выпускников» пропадает совсем).
+    """
+
+    PENDING = 'pending', 'На проверке'
+    DECLINED = 'declined', 'Не хочет продолжать'
+
+
 class Intern(TimeStampedModel, ArchivableModel):
     """Карточка стажёра (ТЗ §12)."""
 
@@ -80,6 +91,10 @@ class Intern(TimeStampedModel, ArchivableModel):
         null=True, blank=True,
     )
     in_resume_bank = models.BooleanField('В банке резюме', default=False)
+    graduate_status = models.CharField(
+        'Статус выпускника', max_length=10,
+        choices=GraduateStatus.choices, blank=True,
+    )
     rating = models.DecimalField(
         'Рейтинг', max_digits=3, decimal_places=2, null=True, blank=True,
     )

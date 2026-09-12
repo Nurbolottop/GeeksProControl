@@ -2,7 +2,7 @@ from django import forms
 
 from apps.clients.models import Client
 from apps.reserve.models import (
-    CandidateStatus, ReserveCandidate, ReserveRecommendation,
+    MANUAL_STATUSES, CandidateStatus, ReserveCandidate, ReserveRecommendation,
 )
 
 DATE = forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d')
@@ -19,6 +19,8 @@ PUBLIC_FIELDS = [
     'is_looking_for_job', 'work_format', 'employment_type',
     'ready_for_internship', 'ready_to_relocate', 'available_from',
     'desired_salary', 'target_positions',
+    'training_group', 'study_specialization', 'teacher', 'curator',
+    'study_start', 'study_end',
 ]
 
 TEXT_WIDGETS = {
@@ -32,6 +34,8 @@ TEXT_WIDGETS = {
     'target_positions': forms.Textarea(attrs={'rows': 2}),
     'birth_date': DATE,
     'available_from': DATE,
+    'study_start': DATE,
+    'study_end': DATE,
 }
 
 
@@ -60,6 +64,8 @@ class ReserveApplyForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['phone'].required = True
         self.fields['specialization'].empty_label = 'Другое / не из списка'
+        self.fields['training_group'].empty_label = 'Не помню / не из GeeksPro'
+        self.fields['study_specialization'].empty_label = 'Не выбрано'
 
 
 class ReserveCandidateForm(forms.ModelForm):
@@ -67,14 +73,8 @@ class ReserveCandidateForm(forms.ModelForm):
 
     class Meta:
         model = ReserveCandidate
-        fields = PUBLIC_FIELDS + [
-            'intern', 'training_group', 'study_specialization', 'teacher',
-            'curator', 'study_start', 'study_end', 'status',
-        ]
-        widgets = dict(TEXT_WIDGETS, **{
-            'study_start': DATE,
-            'study_end': DATE,
-        })
+        fields = PUBLIC_FIELDS + ['intern', 'status']
+        widgets = TEXT_WIDGETS
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -151,6 +151,19 @@ class StatusChangeForm(forms.Form):
         label='Комментарий', required=False,
         widget=forms.Textarea(attrs={'rows': 2}),
     )
+
+    def __init__(self, *args, current=None, **kwargs):
+        """В списке — только те статусы, что ставят руками.
+
+        Статусы воронки приходят сами из рекомендаций компаниям; текущий
+        статус показываем всегда, иначе его случайно собьют выбором.
+        """
+        super().__init__(*args, **kwargs)
+        labels = dict(CandidateStatus.choices)
+        values = list(MANUAL_STATUSES)
+        if current and current not in values:
+            values.insert(0, current)
+        self.fields['status'].choices = [(value, labels[value]) for value in values]
 
 
 class InviteForm(forms.Form):

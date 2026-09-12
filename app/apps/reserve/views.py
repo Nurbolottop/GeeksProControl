@@ -101,7 +101,9 @@ def candidate_detail(request, pk):
             'company', 'created_by',
         ),
         'events': candidate.events.select_related('user')[:100],
-        'status_form': StatusChangeForm(initial={'status': candidate.status}),
+        'status_form': StatusChangeForm(
+            initial={'status': candidate.status}, current=candidate.status,
+        ),
         'edit_links': [
             link for link in candidate.edit_links.filter(is_active=True)
             if link.is_open
@@ -175,13 +177,17 @@ def candidate_evaluate(request, pk):
 @reserve_editor_required
 def candidate_status(request, pk):
     candidate = get_object_or_404(ReserveCandidate, pk=pk)
-    form = StatusChangeForm(request.POST or None)
-    if request.method == 'POST' and form.is_valid():
-        services.change_status(
-            candidate, form.cleaned_data['status'],
-            comment=form.cleaned_data['comment'], user=request.user,
-        )
-        messages.success(request, f'Статус: {candidate.get_status_display()}.')
+    # current — чтобы отправка текущего статуса воронки не считалась ошибкой
+    form = StatusChangeForm(request.POST or None, current=candidate.status)
+    if request.method == 'POST':
+        if form.is_valid():
+            services.change_status(
+                candidate, form.cleaned_data['status'],
+                comment=form.cleaned_data['comment'], user=request.user,
+            )
+            messages.success(request, f'Статус: {candidate.get_status_display()}.')
+        else:
+            messages.error(request, 'Статус не изменён: выберите его из списка.')
     return redirect(candidate.get_absolute_url())
 
 

@@ -324,9 +324,15 @@ def intern_project_add(request, pk):
         )
         member.joined_at = timezone.localdate()
         member.save()
+        update_fields = []
         if intern.status in (InternStatus.WAITING, InternStatus.READY):
             intern.status = InternStatus.ACTIVE
-            intern.save(update_fields=['status', 'updated_at'])
+            update_fields.append('status')
+        if intern.graduate_status:
+            intern.graduate_status = ''
+            update_fields.append('graduate_status')
+        if update_fields:
+            intern.save(update_fields=[*update_fields, 'updated_at'])
         messages.success(
             request, f'{intern.full_name} добавлен(а) в «{member.project.name}».',
         )

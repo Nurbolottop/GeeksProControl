@@ -34,6 +34,18 @@ class CandidateStatus(models.TextChoices):
     NOT_READY = 'not_ready', 'Пока не готов к работе'
 
 
+# Статусы воронки (предложен → собеседование → оффер → трудоустроен)
+# выставляются сами по ходу работы с рекомендациями компаниям, поэтому
+# руками их не ставят — в выпадающем списке остаются только эти.
+MANUAL_STATUSES = (
+    CandidateStatus.REVIEW,
+    CandidateStatus.RESERVE,
+    CandidateStatus.NOT_READY,
+    CandidateStatus.INACTIVE,
+    CandidateStatus.DECLINED,
+)
+
+
 # Как красить статус в списке и в карточке
 STATUS_TONE = {
     CandidateStatus.NEW: 'gray',

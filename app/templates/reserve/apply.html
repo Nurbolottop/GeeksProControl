@@ -54,7 +54,7 @@
                 <span class="acard__num">2</span>
                 <div>
                     <h2>Профессиональные данные</h2>
-                    <p>Направление, уровень, технологии и опыт.</p>
+                    <p>Направление, уровень, технологии, опыт и учёба.</p>
                 </div>
             </div>
             <div class="agrid">
@@ -70,6 +70,14 @@
                 {% include 'partials/apply_field.html' with field=form.english_level %}
                 {% include 'partials/apply_field.html' with field=form.other_languages %}
                 {% include 'partials/apply_field.html' with field=form.about wide=1 %}
+            </div>
+            <div class="agrid" style="margin-top: 14px;">
+                {% include 'partials/apply_field.html' with field=form.training_group note='Учебная группа в GeeksPro, если вы у нас учились' %}
+                {% include 'partials/apply_field.html' with field=form.study_specialization %}
+                {% include 'partials/apply_field.html' with field=form.teacher %}
+                {% include 'partials/apply_field.html' with field=form.curator %}
+                {% include 'partials/apply_field.html' with field=form.study_start %}
+                {% include 'partials/apply_field.html' with field=form.study_end %}
             </div>
         </section>
 
