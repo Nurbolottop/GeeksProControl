@@ -197,17 +197,18 @@ class InternWaitingFilterTests(TestCase):
         )
         self.client.force_login(self.user)
 
-    def test_badge_shows_waiting_count(self):
+    def test_section_shows_waiting_count(self):
         Intern.objects.create(full_name="Новенький", status=InternStatus.WAITING)
         Intern.objects.create(full_name="Активный", status=InternStatus.ACTIVE)
         response = self.client.get(reverse("interns:list"))
         self.assertEqual(response.context["waiting_count"], 1)
-        self.assertContains(response, "ожидает распределения")
+        self.assertContains(response, "Новенькие")
+        self.assertContains(response, "ждут, когда их добавят на проект")
 
-    def test_no_badge_when_nobody_waiting(self):
+    def test_no_section_when_nobody_waiting(self):
         Intern.objects.create(full_name="Активный", status=InternStatus.ACTIVE)
         response = self.client.get(reverse("interns:list"))
-        self.assertNotContains(response, "распределения")
+        self.assertNotContains(response, "Новенькие")
 
     def test_status_filter_shows_only_waiting(self):
         Intern.objects.create(full_name="Новенький", status=InternStatus.WAITING)
@@ -215,7 +216,26 @@ class InternWaitingFilterTests(TestCase):
         response = self.client.get(reverse("interns:list"), {"status": "waiting"})
         names = [i.full_name for i in response.context["page"].object_list]
         self.assertEqual(names, ["Новенький"])
-        self.assertContains(response, "сбросить")
+        self.assertContains(response, "Показать всех")
+
+    def test_waiting_but_already_on_project_is_excluded(self):
+        """Если статус почему-то не успел обновиться (или его сбросили
+        вручную), но проект уже есть — это не «новенький», не в счёт."""
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Балажан")
+        intern = Intern.objects.create(
+            full_name="Уже на проекте", status=InternStatus.WAITING,
+        )
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(reverse("interns:list"))
+        self.assertEqual(response.context["waiting_count"], 0)
+        response = self.client.get(reverse("interns:list"), {"status": "waiting"})
+        self.assertNotContains(response, "Уже на проекте")
 
     def test_waiting_count_excludes_leads(self):
         from apps.projects.models import Project

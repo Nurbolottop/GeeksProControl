@@ -6,18 +6,7 @@
 <div class="page-head">
     <div>
         <h1>Стажёры</h1>
-        <div class="sub" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <span>Всего: {{ page.paginator.count }}</span>
-            {% if params.status == 'waiting' %}
-                <a href="{% url 'interns:list' %}" class="badge badge--yellow" style="text-decoration:none;">
-                    ✓ Ожидают распределения — сбросить
-                </a>
-            {% elif waiting_count %}
-                <a href="?status=waiting" class="badge badge--yellow" style="text-decoration:none;">
-                    {{ waiting_count }} ожида{{ waiting_count|pluralize:"ет,ют" }} распределения
-                </a>
-            {% endif %}
-        </div>
+        <div class="sub">Всего: {{ page.paginator.count }}</div>
     </div>
     <div class="page-actions">
         <form method="post" id="profile-link-form" action="{% url 'interns:profile_link_create' %}"
@@ -75,6 +64,26 @@
         </script>
     {% endif %}
 </div>
+
+{% if waiting_count or params.status == 'waiting' %}
+    <div class="form-link" style="border-left-color: var(--yellow, #ddb434);">
+        <div class="form-link__body">
+            <div class="form-link__label">Новенькие</div>
+            {% if params.status == 'waiting' %}
+                <div>Показаны стажёры, которые сами заполнили анкету и ждут распределения на проект.</div>
+            {% else %}
+                <div>{{ waiting_count }} стажёр{{ waiting_count|pluralize:",ов" }} заполнил{{ waiting_count|pluralize:",и" }} анкету и ждут, когда их добавят на проект.</div>
+            {% endif %}
+        </div>
+        <div class="form-link__actions">
+            {% if params.status == 'waiting' %}
+                <a href="{% url 'interns:list' %}" class="btn btn--secondary btn--sm">Показать всех</a>
+            {% else %}
+                <a href="?status=waiting" class="btn btn--sm">Показать</a>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
 
 <div class="tabs">
     <a href="?{{ base_qs }}" class="{% if not params.specialization %}is-active{% endif %}">Все</a>
