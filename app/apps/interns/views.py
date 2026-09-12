@@ -54,10 +54,19 @@ def intern_list(request):
         .exclude(pk__in=lead_ids())
         .select_related('specialization', 'training_group', 'team_lead')
     )
-    waiting_count = qs.filter(status=InternStatus.WAITING).count()
+    unassigned_ids = set(
+        Intern.objects.filter(status=InternStatus.WAITING)
+        .exclude(
+            pk__in=TeamMember.objects.filter(
+                status=TeamMember.Status.ACTIVE, intern__isnull=False,
+            ).values_list('intern_id', flat=True),
+        )
+        .values_list('pk', flat=True),
+    )
+    waiting_count = qs.filter(pk__in=unassigned_ids).count()
     params = request.GET
     if params.get('status') == 'waiting':
-        qs = qs.filter(status=InternStatus.WAITING)
+        qs = qs.filter(pk__in=unassigned_ids)
     search = params.get('q', '').strip()
     if search:
         qs = qs.filter(
@@ -591,7 +600,9 @@ def profile_apply(request, token):
         )
         request.session[session_key] = True
         return render(request, 'interns/profile_apply_done.html')
-    return render(request, 'interns/profile_apply.html', {'form': form})
+    return render(request, 'interns/profile_apply.html', {
+        'form': form, 'mark_optional': True,
+    })
 
 
 def talent_reserve_apply(request):

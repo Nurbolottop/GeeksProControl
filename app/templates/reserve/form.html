@@ -25,61 +25,61 @@
     <div class="panel">
         <h2>Личные данные</h2>
         <div class="agrid" style="margin-top: 14px;">
-            {% include 'reserve/partials/field.html' with field=form.full_name %}
-            {% include 'reserve/partials/field.html' with field=form.phone %}
-            {% include 'reserve/partials/field.html' with field=form.email %}
-            {% include 'reserve/partials/field.html' with field=form.telegram %}
-            {% include 'reserve/partials/field.html' with field=form.city %}
-            {% include 'reserve/partials/field.html' with field=form.birth_date %}
-            {% include 'reserve/partials/field.html' with field=form.photo wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.full_name %}
+            {% include 'partials/apply_field.html' with field=form.phone %}
+            {% include 'partials/apply_field.html' with field=form.email %}
+            {% include 'partials/apply_field.html' with field=form.telegram %}
+            {% include 'partials/apply_field.html' with field=form.city %}
+            {% include 'partials/apply_field.html' with field=form.birth_date %}
+            {% include 'partials/apply_field.html' with field=form.photo wide=1 %}
         </div>
     </div>
 
     <div class="panel">
         <h2>Профессиональные данные</h2>
         <div class="agrid" style="margin-top: 14px;">
-            {% include 'reserve/partials/field.html' with field=form.specialization %}
-            {% include 'reserve/partials/field.html' with field=form.direction_other %}
-            {% include 'reserve/partials/field.html' with field=form.desired_position %}
-            {% include 'reserve/partials/field.html' with field=form.expected_level %}
-            {% include 'reserve/partials/field.html' with field=form.skills wide=1 %}
-            {% include 'reserve/partials/field.html' with field=form.work_experience wide=1 %}
-            {% include 'reserve/partials/field.html' with field=form.internship_experience wide=1 %}
-            {% include 'reserve/partials/field.html' with field=form.education wide=1 %}
-            {% include 'reserve/partials/field.html' with field=form.courses wide=1 %}
-            {% include 'reserve/partials/field.html' with field=form.english_level %}
-            {% include 'reserve/partials/field.html' with field=form.other_languages %}
-            {% include 'reserve/partials/field.html' with field=form.about wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.specialization %}
+            {% include 'partials/apply_field.html' with field=form.direction_other %}
+            {% include 'partials/apply_field.html' with field=form.desired_position %}
+            {% include 'partials/apply_field.html' with field=form.expected_level %}
+            {% include 'partials/apply_field.html' with field=form.skills wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.work_experience wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.internship_experience wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.education wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.courses wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.english_level %}
+            {% include 'partials/apply_field.html' with field=form.other_languages %}
+            {% include 'partials/apply_field.html' with field=form.about wide=1 %}
         </div>
     </div>
 
     <div class="panel">
         <h2>Ссылки и документы</h2>
         <div class="agrid" style="margin-top: 14px;">
-            {% include 'reserve/partials/field.html' with field=form.resume_file %}
-            {% include 'reserve/partials/field.html' with field=form.resume_url %}
-            {% include 'reserve/partials/field.html' with field=form.github_url %}
-            {% include 'reserve/partials/field.html' with field=form.linkedin_url %}
-            {% include 'reserve/partials/field.html' with field=form.portfolio_url %}
-            {% include 'reserve/partials/field.html' with field=form.behance_url %}
-            {% include 'reserve/partials/field.html' with field=form.website_url %}
-            {% include 'reserve/partials/field.html' with field=form.project_links wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.resume_file %}
+            {% include 'partials/apply_field.html' with field=form.resume_url %}
+            {% include 'partials/apply_field.html' with field=form.github_url %}
+            {% include 'partials/apply_field.html' with field=form.linkedin_url %}
+            {% include 'partials/apply_field.html' with field=form.portfolio_url %}
+            {% include 'partials/apply_field.html' with field=form.behance_url %}
+            {% include 'partials/apply_field.html' with field=form.website_url %}
+            {% include 'partials/apply_field.html' with field=form.project_links wide=1 %}
         </div>
     </div>
 
     <div class="panel">
         <h2>Поиск работы</h2>
         <div class="agrid" style="margin-top: 14px;">
-            {% include 'reserve/partials/field.html' with field=form.work_format %}
-            {% include 'reserve/partials/field.html' with field=form.employment_type %}
-            {% include 'reserve/partials/field.html' with field=form.available_from %}
-            {% include 'reserve/partials/field.html' with field=form.desired_salary %}
-            {% include 'reserve/partials/field.html' with field=form.target_positions wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.work_format %}
+            {% include 'partials/apply_field.html' with field=form.employment_type %}
+            {% include 'partials/apply_field.html' with field=form.available_from %}
+            {% include 'partials/apply_field.html' with field=form.desired_salary %}
+            {% include 'partials/apply_field.html' with field=form.target_positions wide=1 %}
         </div>
         <div class="achecks">
-            {% include 'reserve/partials/check.html' with field=form.is_looking_for_job %}
-            {% include 'reserve/partials/check.html' with field=form.ready_for_internship %}
-            {% include 'reserve/partials/check.html' with field=form.ready_to_relocate %}
+            {% include 'partials/apply_check.html' with field=form.is_looking_for_job %}
+            {% include 'partials/apply_check.html' with field=form.ready_for_internship %}
+            {% include 'partials/apply_check.html' with field=form.ready_to_relocate %}
         </div>
     </div>
 
@@ -87,14 +87,14 @@
         <h2>Внутреннее: обучение и статус</h2>
         <div class="sub" style="margin-top: 4px;">Кандидат этих полей не видит и не заполняет.</div>
         <div class="agrid" style="margin-top: 14px;">
-            {% include 'reserve/partials/field.html' with field=form.intern wide=1 %}
-            {% include 'reserve/partials/field.html' with field=form.training_group %}
-            {% include 'reserve/partials/field.html' with field=form.study_specialization %}
-            {% include 'reserve/partials/field.html' with field=form.teacher %}
-            {% include 'reserve/partials/field.html' with field=form.curator %}
-            {% include 'reserve/partials/field.html' with field=form.study_start %}
-            {% include 'reserve/partials/field.html' with field=form.study_end %}
-            {% include 'reserve/partials/field.html' with field=form.status %}
+            {% include 'partials/apply_field.html' with field=form.intern wide=1 %}
+            {% include 'partials/apply_field.html' with field=form.training_group %}
+            {% include 'partials/apply_field.html' with field=form.study_specialization %}
+            {% include 'partials/apply_field.html' with field=form.teacher %}
+            {% include 'partials/apply_field.html' with field=form.curator %}
+            {% include 'partials/apply_field.html' with field=form.study_start %}
+            {% include 'partials/apply_field.html' with field=form.study_end %}
+            {% include 'partials/apply_field.html' with field=form.status %}
         </div>
     </div>
 

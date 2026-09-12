@@ -7,61 +7,67 @@
     <title>Анкета стажёра — GeeksPro</title>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
-<body>
-<div class="login-page">
-    <div class="login-card">
-        <h1>Geeks<span style="background: linear-gradient(120deg,#5b6cf9,#8b7cf9); -webkit-background-clip: text; background-clip: text; color: transparent;">Pro</span></h1>
-        <p class="sub">Заполните свой профиль стажёра — если вы уже есть в базе по этому телефону, данные обновятся</p>
-        {% if form.non_field_errors %}
-            <div class="message message--error">{{ form.non_field_errors }}</div>
+<body class="apply-body">
+<div class="apply-page">
+    <header class="apply-hero">
+        <div class="apply-hero__brand">Geeks<span>Pro</span></div>
+        <h1>Анкета стажёра</h1>
+        <p>
+            Заполните свой профиль — по нему вас распределяют на проекты.
+            Если вы уже есть в базе по этому телефону, данные обновятся,
+            новая запись не появится.
+        </p>
+        <div class="apply-hero__legend"><span class="afield__req">*</span> — обязательные поля, остальные можно пропустить</div>
+    </header>
+
+    <form method="post" class="aform" novalidate>
+        {% csrf_token %}
+        {% if form.errors %}
+            <div class="apply-alert">
+                Проверьте выделенные поля — анкета не отправлена.
+                {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
         {% endif %}
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-field">
-                <label for="{{ form.full_name.id_for_label }}">ФИО</label>
-                {{ form.full_name }}
-                {% if form.full_name.errors %}<div class="form-errors">{{ form.full_name.errors.0 }}</div>{% endif %}
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">1</span>
+                <div>
+                    <h2>Личные данные</h2>
+                    <p>Как с вами связаться и в каком вы филиале.</p>
+                </div>
             </div>
-            <div class="form-field">
-                <label for="{{ form.phone.id_for_label }}">Телефон</label>
-                {{ form.phone }}
-                {% if form.phone.errors %}<div class="form-errors">{{ form.phone.errors.0 }}</div>{% endif %}
+            <div class="agrid">
+                {% include 'partials/apply_field.html' with field=form.full_name %}
+                {% include 'partials/apply_field.html' with field=form.phone %}
+                {% include 'partials/apply_field.html' with field=form.email %}
+                {% include 'partials/apply_field.html' with field=form.telegram %}
+                {% include 'partials/apply_field.html' with field=form.city %}
+                {% include 'partials/apply_field.html' with field=form.branch %}
             </div>
-            <div class="form-field">
-                <label for="{{ form.email.id_for_label }}">Email</label>
-                {{ form.email }}
+        </section>
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">2</span>
+                <div>
+                    <h2>Обучение и стажировка</h2>
+                    <p>Направление и сроки — по ним вас подбирают в команды проектов.</p>
+                </div>
             </div>
-            <div class="form-field">
-                <label for="{{ form.telegram.id_for_label }}">Telegram</label>
-                {{ form.telegram }}
+            <div class="agrid">
+                {% include 'partials/apply_field.html' with field=form.specialization %}
+                {% include 'partials/apply_field.html' with field=form.internship_attempt %}
+                {% include 'partials/apply_field.html' with field=form.education_end_date %}
+                {% include 'partials/apply_field.html' with field=form.internship_start_date %}
             </div>
-            <div class="form-field">
-                <label for="{{ form.city.id_for_label }}">Город</label>
-                {{ form.city }}
-            </div>
-            <div class="form-field">
-                <label for="{{ form.branch.id_for_label }}">Филиал</label>
-                {{ form.branch }}
-            </div>
-            <div class="form-field">
-                <label for="{{ form.specialization.id_for_label }}">Направление</label>
-                {{ form.specialization }}
-            </div>
-            <div class="form-field">
-                <label for="{{ form.education_end_date.id_for_label }}">Дата окончания обучения</label>
-                {{ form.education_end_date }}
-            </div>
-            <div class="form-field">
-                <label for="{{ form.internship_start_date.id_for_label }}">Дата начала стажировки</label>
-                {{ form.internship_start_date }}
-            </div>
-            <div class="form-field">
-                <label for="{{ form.internship_attempt.id_for_label }}">Какая по счёту стажировка (1 — первая, 2 — вторая…)</label>
-                {{ form.internship_attempt }}
-            </div>
-            <button type="submit" class="btn">Отправить</button>
-        </form>
-    </div>
+        </section>
+
+        <div class="aform__actions">
+            <button type="submit" class="btn btn--lg">Отправить анкету</button>
+            <span>Поля со звёздочкой обязательны.</span>
+        </div>
+    </form>
 </div>
 </body>
 </html>
