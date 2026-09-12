@@ -28,6 +28,22 @@ from apps.training.models import Specialization
 
 
 @login_required
+def overview(request):
+    """Главная резерва: сводка по направлениям, дальше — в список."""
+    rows = selectors.summary_by_specialization()
+    return render(request, 'reserve/overview.html', {
+        'rows': rows,
+        'totals': selectors.summary_totals(rows),
+        'can_edit': can_edit_reserve(request.user),
+        'statuses': {
+            'new': [str(s) for s in selectors.NEW_STATUSES],
+            'available': [str(s) for s in selectors.AVAILABLE_STATUSES],
+            'in_progress': [str(s) for s in selectors.IN_PROGRESS_STATUSES],
+        },
+    })
+
+
+@login_required
 def candidate_list(request):
     qs, sort = selectors.candidates(request.GET)
     paginator = Paginator(qs, 50)

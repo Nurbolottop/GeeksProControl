@@ -401,3 +401,84 @@ class ReserveFromInternTests(TestCase):
         self.client.post(reverse('reserve:from_intern'), {'intern': self.intern.pk})
         self.client.post(reverse('reserve:from_intern'), {'intern': self.intern.pk})
         self.assertEqual(ReserveCandidate.objects.filter(intern=self.intern).count(), 1)
+
+
+class ReserveOverviewTests(TestCase):
+    """Главная резерва: сводка по направлениям."""
+
+    def setUp(self):
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(
+            username='viewer', password='pass12345',
+        )
+        self.client.force_login(self.user)
+        self.url = reverse('reserve:overview')
+        self.backend = Specialization.objects.create(name='Backend')
+        self.design = Specialization.objects.create(name='UX/UI')
+        make = ReserveCandidate.objects.create
+        make(full_name='Новый', specialization=self.backend, status=CandidateStatus.NEW)
+        make(full_name='Проверяется', specialization=self.backend, status=CandidateStatus.REVIEW)
+        make(full_name='В резерве', specialization=self.backend, status=CandidateStatus.RESERVE)
+        make(full_name='На интервью', specialization=self.backend, status=CandidateStatus.INTERVIEW)
+        make(full_name='С оффером', specialization=self.backend, status=CandidateStatus.OFFER)
+        make(full_name='Работает', specialization=self.backend, status=CandidateStatus.EMPLOYED)
+        make(full_name='Дизайнер', specialization=self.design, status=CandidateStatus.RESERVE)
+        make(full_name='Ничей', specialization=None, status=CandidateStatus.RESERVE)
+
+    def _row(self, response, key):
+        return next(row for row in response.context['rows'] if row['key'] == key)
+
+    def test_reserve_opens_on_the_summary(self):
+        response = self.client.get('/reserve/')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'reserve/overview.html')
+
+    def test_counts_split_by_stage(self):
+        response = self.client.get(self.url)
+        row = self._row(response, str(self.backend.pk))
+        self.assertEqual(row['total'], 6)
+        self.assertEqual(row['new'], 2)
+        self.assertEqual(row['available'], 1)
+        self.assertEqual(row['in_progress'], 2)
+        self.assertEqual(row['employed'], 1)
+
+    def test_totals_sum_every_direction(self):
+        totals = self.client.get(self.url).context['totals']
+        self.assertEqual(totals['total'], 8)
+        self.assertEqual(totals['available'], 3)
+
+    def test_candidates_without_direction_get_their_own_row(self):
+        response = self.client.get(self.url)
+        row = self._row(response, 'none')
+        self.assertIsNone(row['specialization'])
+        self.assertEqual(row['total'], 1)
+        self.assertContains(response, 'Без направления')
+
+    def test_direction_leads_to_the_filtered_list(self):
+        response = self.client.get(
+            reverse('reserve:list'), {'specialization': self.backend.pk},
+        )
+        names = [c.full_name for c in response.context['page'].object_list]
+        self.assertIn('В резерве', names)
+        self.assertNotIn('Дизайнер', names)
+
+    def test_row_without_direction_leads_to_its_own_people(self):
+        response = self.client.get(
+            reverse('reserve:list'), {'specialization': 'none'},
+        )
+        names = [c.full_name for c in response.context['page'].object_list]
+        self.assertEqual(names, ['Ничей'])
+
+    def test_archived_candidates_are_not_counted(self):
+        candidate = ReserveCandidate.objects.get(full_name='Дизайнер')
+        candidate.archive()
+        row = self._row(self.client.get(self.url), str(self.design.pk))
+        self.assertEqual(row['total'], 0)
+
+    def test_direction_without_candidates_is_still_listed(self):
+        from apps.training.models import Specialization
+
+        Specialization.objects.create(name='DevOps')
+        response = self.client.get(self.url)
+        self.assertContains(response, 'DevOps')

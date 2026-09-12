@@ -1,7 +1,7 @@
 """Выборки для списка резерва: поиск, фильтры, сортировка."""
 from django.db.models import Q
 
-from apps.reserve.models import ReserveCandidate
+from apps.reserve.models import CandidateStatus, ReserveCandidate
 
 # Подпись → выражение сортировки для ORM
 SORT_OPTIONS = [
@@ -41,8 +41,11 @@ def candidates(params) -> tuple:
             | Q(email__icontains=search)
             | Q(telegram__icontains=search),
         )
-    if params.get('specialization'):
-        qs = qs.filter(specialization_id=params['specialization'])
+    specialization = params.get('specialization')
+    if specialization == 'none':
+        qs = qs.filter(specialization__isnull=True)
+    elif specialization:
+        qs = qs.filter(specialization_id=specialization)
     if params.get('level'):
         qs = qs.filter(geekspro_level=params['level'])
     if params.get('skill'):
@@ -95,3 +98,53 @@ def cities() -> list[str]:
         ReserveCandidate.objects.active().exclude(city='')
         .values_list('city', flat=True).distinct().order_by('city'),
     )
+
+
+# Кандидат «в резерве» — доступен для рекомендации; «в работе» — уже
+# кому-то предложен; остальные статусы в сводке не считаем занятыми.
+AVAILABLE_STATUSES = [CandidateStatus.RESERVE]
+IN_PROGRESS_STATUSES = [
+    CandidateStatus.PROPOSED, CandidateStatus.INTERVIEW, CandidateStatus.OFFER,
+]
+NEW_STATUSES = [CandidateStatus.NEW, CandidateStatus.REVIEW]
+
+
+def summary_by_specialization() -> list[dict]:
+    """По каждому направлению: сколько кандидатов и в какой они стадии."""
+    from apps.training.models import Specialization
+
+    counters = {}
+    rows_by_spec = (
+        ReserveCandidate.objects.active()
+        .values_list('specialization_id', 'status')
+    )
+    for spec_id, status in rows_by_spec:
+        counts = counters.setdefault(
+            spec_id, {'total': 0, 'new': 0, 'available': 0, 'in_progress': 0, 'employed': 0},
+        )
+        counts['total'] += 1
+        if status in NEW_STATUSES:
+            counts['new'] += 1
+        elif status in AVAILABLE_STATUSES:
+            counts['available'] += 1
+        elif status in IN_PROGRESS_STATUSES:
+            counts['in_progress'] += 1
+        elif status == CandidateStatus.EMPLOYED:
+            counts['employed'] += 1
+
+    rows = []
+    for spec in Specialization.objects.all():
+        counts = counters.pop(spec.pk, None) or {
+            'total': 0, 'new': 0, 'available': 0, 'in_progress': 0, 'employed': 0,
+        }
+        rows.append({'specialization': spec, 'key': str(spec.pk), **counts})
+    for spec_id, counts in counters.items():
+        # кандидаты без направления — тоже строка, иначе их не найти
+        rows.append({'specialization': None, 'key': 'none', **counts})
+    rows.sort(key=lambda row: (-row['total'], str(row['specialization'] or 'я')))
+    return rows
+
+
+def summary_totals(rows) -> dict:
+    keys = ('total', 'new', 'available', 'in_progress', 'employed')
+    return {key: sum(row[key] for row in rows) for key in keys}
