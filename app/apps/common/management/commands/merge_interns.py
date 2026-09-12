@@ -96,6 +96,21 @@ class Command(BaseCommand):
             return
 
         with transaction.atomic():
+            # у Attendance и WorkScore ключ (собрание, стажёр) уникален: если
+            # отметка на это собрание уже есть у основной карточки, запись
+            # дубля не переносим, а удаляем — она дублирует ту же отметку
+            for model in (Attendance, WorkScore):
+                taken = set(
+                    model.objects.filter(intern=keep).values_list('meeting_id', flat=True),
+                )
+                clash = model.objects.filter(intern=dup, meeting_id__in=taken)
+                if clash.exists():
+                    self.stdout.write(
+                        f'  {model._meta.verbose_name_plural}: у обоих есть отметки '
+                        f'на одни и те же собрания ({clash.count()}) — оставляем '
+                        f'отметки основной карточки',
+                    )
+                    clash.delete()
             for label, qs in moves.items():
                 field = 'host' if label.startswith('собрания') else 'intern'
                 qs.update(**{field: keep})
