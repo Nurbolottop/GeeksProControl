@@ -34,6 +34,11 @@ class Command(BaseCommand):
             help='чьи личные данные важнее при конфликте (по умолчанию — дубля, '
                  'это обычно свежая анкета)',
         )
+        parser.add_argument(
+            '--skip', default='',
+            help='поля, которые не переносить из дубля, через запятую '
+                 '(например: city,telegram — когда в анкете мусор)',
+        )
         parser.add_argument('--apply', action='store_true',
                             help='записать изменения (без флага — предпросмотр)')
 
@@ -50,8 +55,16 @@ class Command(BaseCommand):
         self.stdout.write(f'Оставляем: {keep.pk} «{keep.full_name}»')
         self.stdout.write(f'Удаляем:   {dup.pk} «{dup.full_name}»')
 
+        skip = {name.strip() for name in options['skip'].split(',') if name.strip()}
+        unknown = skip - set(PERSONAL_FIELDS)
+        if unknown:
+            raise CommandError(f'Неизвестные поля в --skip: {", ".join(sorted(unknown))}')
+
         changes = {}
         for field in PERSONAL_FIELDS:
+            if field in skip:
+                self.stdout.write(f'  {field}: пропускаем по --skip')
+                continue
             mine, theirs = getattr(keep, field), getattr(dup, field)
             if not theirs or mine == theirs:
                 continue
