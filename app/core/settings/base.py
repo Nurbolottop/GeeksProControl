@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'apps.attendance',
     'apps.dailycheck',
     'apps.pm_portal',
+    'apps.scripts',
 ]
 
 # =============================================================================

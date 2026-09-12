@@ -40,6 +40,7 @@ urlpatterns = [
     path('resources/', include('apps.resources.urls')),
     path('reports/', include('apps.reports.urls')),
     path('pm/', include('apps.pm_portal.urls')),
+    path('scripts/', include('apps.scripts.urls')),
 ]
 
 if settings.DEBUG:
