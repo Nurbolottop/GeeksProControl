@@ -207,7 +207,8 @@ def project_detail(request, pk):
             ),
         )
         context['team_members'] = members
-        context['team_sections'] = team_selectors.group_by_role(members)
+        is_mobile = bool(project.project_type and project.project_type.is_mobile)
+        context['team_sections'] = team_selectors.group_by_role(members, is_mobile)
     elif tab == 'access':
         context['accesses'] = project.accesses.all()
         context['access_form'] = ProjectAccessForm()

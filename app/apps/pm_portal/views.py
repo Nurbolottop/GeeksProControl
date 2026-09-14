@@ -41,7 +41,8 @@ def project_detail(request, pk):
         context['reports'] = project.reports.select_related('author')
     elif tab == 'team':
         members = project.team_members.select_related('intern__specialization', 'user')
-        context['team_sections'] = group_by_role(members)
+        is_mobile = bool(project.project_type and project.project_type.is_mobile)
+        context['team_sections'] = group_by_role(members, is_mobile)
         context['team_members'] = list(members)
     elif tab == 'attendance':
         group = getattr(project, 'group', None)

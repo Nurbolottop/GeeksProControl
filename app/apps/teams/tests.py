@@ -192,6 +192,22 @@ class RoleSectionAddTests(TestCase):
         for role in ("pm", "team_lead", "uxui", "backend", "frontend", "qa"):
             self.assertIn(role, roles)
 
+    def test_mobile_project_shows_mobile_section_instead_of_empty_frontend(self):
+        """Тип проекта Mobile App — вместо пустого Frontend всегда Mobile
+        (как lifecycle_stages() меняет этап Frontend на «Мобильная
+        разработка»)."""
+        from apps.projects.models import ProjectType
+
+        self.project.project_type = ProjectType.objects.create(
+            name="Mobile App", is_mobile=True,
+        )
+        self.project.save(update_fields=["project_type"])
+
+        response = self.client.get(f"{self.project.get_absolute_url()}?tab=team")
+        roles = [s["role"] for s in response.context["team_sections"]]
+        self.assertIn("mobile", roles)
+        self.assertNotIn("frontend", roles)
+
 
 class LeadSectionTests(TestCase):
     """Раздел «Тимлиды»: назначить, снять, посмотреть по проектам."""

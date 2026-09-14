@@ -39,12 +39,22 @@ ALWAYS_SHOWN = [
 ]
 
 
-def group_by_role(members) -> list[dict]:
+def group_by_role(members, is_mobile: bool = False) -> list[dict]:
     """Разбивает состав команды на секции по направлениям.
 
     Пустые направления из ALWAYS_SHOWN тоже возвращаются — в каждую
-    секцию добавляют людей отдельной кнопкой.
+    секцию добавляют людей отдельной кнопкой. У мобильных проектов
+    (``project.project_type.is_mobile``) вместо пустого Frontend всегда
+    показываем Mobile — так же, как lifecycle_stages() меняет этап
+    Frontend на «Мобильная разработка».
     """
+    always_shown = ALWAYS_SHOWN
+    if is_mobile:
+        always_shown = [
+            TeamRole.MOBILE if role == TeamRole.FRONTEND else role
+            for role in ALWAYS_SHOWN
+        ]
+
     buckets: dict[str, list[TeamMember]] = {}
     for member in members:
         buckets.setdefault(member.role, []).append(member)
@@ -52,7 +62,7 @@ def group_by_role(members) -> list[dict]:
     sections = []
     for role in ROLE_ORDER:
         people = buckets.pop(role, [])
-        if people or role in ALWAYS_SHOWN:
+        if people or role in always_shown:
             sections.append({
                 'role': role,
                 'label': ROLE_LABELS.get(role, role),
