@@ -24,6 +24,7 @@ urlpatterns = [
     path('stages/<int:pk>/complete/', views.stage_complete, name='stage_complete'),
     path('stages/<int:pk>/extend/', views.stage_extend, name='stage_extend'),
     path('<int:pk>/section/<str:section>/', views.project_section, name='section'),
+    path('reports/', views.report_list, name='reports'),
     path('<int:pk>/reports/add/', views.report_create, name='report_create'),
     path('reports/<int:pk>/edit/', views.report_update, name='report_update'),
     path('reports/<int:pk>/delete/', views.report_delete, name='report_delete'),

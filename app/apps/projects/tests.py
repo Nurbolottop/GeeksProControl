@@ -399,6 +399,46 @@ class ProjectReportTests(TestCase):
         self.assertFalse(self.model.objects.filter(pk=report.pk).exists())
 
 
+class ReportListPageTests(TestCase):
+    """Отчёты по всем проектам сразу, с фильтром по проекту (пункт меню
+    «Проекты» → «Отчёты»)."""
+
+    def setUp(self):
+        from apps.projects.models import ProjectReport
+
+        self.user = User.objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.model = ProjectReport
+        self.project_a = create_project(make_project(name="Айгерим"))
+        self.project_b = create_project(make_project(name="Бермет"))
+
+    def test_shows_reports_from_all_projects(self):
+        self.model.objects.create(project=self.project_a, text="Отчёт по А")
+        self.model.objects.create(project=self.project_b, text="Отчёт по Б")
+
+        response = self.client.get(reverse("projects:reports"))
+        self.assertContains(response, "Отчёт по А")
+        self.assertContains(response, "Отчёт по Б")
+
+    def test_filter_by_project(self):
+        self.model.objects.create(project=self.project_a, text="Отчёт по А")
+        self.model.objects.create(project=self.project_b, text="Отчёт по Б")
+
+        response = self.client.get(
+            reverse("projects:reports"), {"project": self.project_a.pk},
+        )
+        self.assertContains(response, "Отчёт по А")
+        self.assertNotContains(response, "Отчёт по Б")
+
+    def test_filter_by_text(self):
+        self.model.objects.create(project=self.project_a, text="Сдали презентацию")
+        self.model.objects.create(project=self.project_b, text="Правим баги")
+
+        response = self.client.get(reverse("projects:reports"), {"q": "презентац"})
+        self.assertContains(response, "Сдали презентацию")
+        self.assertNotContains(response, "Правим баги")
+
+
 class LastReportOnOverviewTests(TestCase):
     """Последний отчёт по проекту виден сразу на «Обзоре»."""
 

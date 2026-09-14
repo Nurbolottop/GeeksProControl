@@ -582,6 +582,25 @@ def _stage_row(request, stage):
 
 
 @login_required
+def report_list(request):
+    """Отчёты по всем проектам сразу — что пишут ПМ, в одном списке."""
+    qs = ProjectReport.objects.select_related('project', 'author')
+    params = request.GET
+    if params.get('project'):
+        qs = qs.filter(project_id=params['project'])
+    if params.get('q'):
+        qs = qs.filter(text__icontains=params['q'])
+    paginator = Paginator(qs, 50)
+    page = paginator.get_page(params.get('page'))
+    context = {
+        'page': page,
+        'params': params,
+        'projects': Project.objects.active().order_by('name'),
+    }
+    return render(request, 'projects/report_list.html', context)
+
+
+@login_required
 def report_create(request, pk):
     """Новый отчёт по проекту."""
     project = get_object_or_404(Project, pk=pk)

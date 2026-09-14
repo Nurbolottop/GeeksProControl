@@ -53,6 +53,8 @@
                        class="{% if request.resolver_match.url_name == 'list_rejected' %}is-active{% endif %}">Отклонён</a>
                     <a href="{% url 'projects:list_completed' %}"
                        class="{% if request.resolver_match.url_name == 'list_completed' %}is-active{% endif %}">Завершён</a>
+                    <a href="{% url 'projects:reports' %}"
+                       class="{% if request.resolver_match.url_name == 'reports' %}is-active{% endif %}">Отчёты</a>
                 </div>
             </div>
             <a href="{% url 'clients:list' %}"
