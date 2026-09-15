@@ -627,9 +627,7 @@ def profile_apply(request, token):
         )
         request.session[session_key] = True
         return render(request, 'interns/profile_apply_done.html')
-    return render(request, 'interns/profile_apply.html', {
-        'form': form, 'mark_optional': True,
-    })
+    return render(request, 'interns/profile_apply.html', {'form': form})
 
 
 def talent_reserve_apply(request):

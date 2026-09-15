@@ -57,7 +57,8 @@ class ProfileApplyForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['phone'].required = True
+        for field in self.fields.values():
+            field.required = True
 
 
 class TalentReserveApplyForm(forms.ModelForm):
