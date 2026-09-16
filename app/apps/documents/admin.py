@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.documents.models import Document, DocumentType
+from apps.documents.models import Document, DocumentTemplate, DocumentType
 
 
 @admin.register(DocumentType)
@@ -17,3 +17,10 @@ class DocumentAdmin(admin.ModelAdmin):
     )
     list_filter = ('doc_type', 'status', 'is_signed', 'is_archived')
     search_fields = ('number', 'project__name')
+
+
+@admin.register(DocumentTemplate)
+class DocumentTemplateAdmin(admin.ModelAdmin):
+    list_display = ('doc_type', 'name', 'uploaded_by', 'created_at')
+    list_filter = ('doc_type',)
+    search_fields = ('name',)

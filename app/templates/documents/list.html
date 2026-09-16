@@ -13,6 +13,11 @@
     </div>
 </div>
 
+<div class="tabs">
+    <a href="{% url 'documents:list' %}" class="is-active">Документы проектов</a>
+    <a href="{% url 'documents:templates' %}">Шаблоны</a>
+</div>
+
 <form method="get" class="filters">
     <select name="project">
         <option value="">Проект: все</option>

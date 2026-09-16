@@ -5,8 +5,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.documents import services
-from apps.documents.forms import DocumentForm
-from apps.documents.models import Document, DocumentStatus, DocumentType
+from apps.documents.forms import DocumentForm, DocumentTemplateForm
+from apps.documents.models import (
+    Document, DocumentStatus, DocumentTemplate, DocumentType,
+)
 from apps.projects.models import Project, ProjectStatusHistory
 
 
@@ -89,3 +91,56 @@ def document_approve(request, pk):
         )
         messages.success(request, f"«{document.doc_type}» утверждён.")
     return redirect(f"{document.project.get_absolute_url()}?tab=documents")
+
+
+@login_required
+def template_list(request):
+    """Шаблоны документов — не привязаны к проекту, второй раздел
+    страницы «Документы» рядом со списком по проектам."""
+    services.ensure_default_types()
+    templates = DocumentTemplate.objects.select_related('doc_type', 'uploaded_by')
+    return render(request, 'documents/template_list.html', {
+        'templates': templates,
+    })
+
+
+@login_required
+def template_create(request):
+    services.ensure_default_types()
+    form = DocumentTemplateForm(request.POST or None, request.FILES or None)
+    if request.method == 'POST' and form.is_valid():
+        template = form.save(commit=False)
+        template.uploaded_by = request.user
+        template.save()
+        messages.success(request, f'Шаблон «{template}» добавлен.')
+        return redirect('documents:templates')
+    return render(
+        request, 'documents/template_form.html',
+        {'form': form, 'title': 'Новый шаблон документа'},
+    )
+
+
+@login_required
+def template_update(request, pk):
+    template = get_object_or_404(DocumentTemplate, pk=pk)
+    form = DocumentTemplateForm(
+        request.POST or None, request.FILES or None, instance=template,
+    )
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Шаблон обновлён.')
+        return redirect('documents:templates')
+    return render(
+        request, 'documents/template_form.html',
+        {'form': form, 'title': f'Редактирование шаблона: {template}'},
+    )
+
+
+@login_required
+def template_delete(request, pk):
+    template = get_object_or_404(DocumentTemplate, pk=pk)
+    if request.method == 'POST':
+        name = str(template)
+        template.delete()
+        messages.success(request, f'Шаблон «{name}» удалён.')
+    return redirect('documents:templates')

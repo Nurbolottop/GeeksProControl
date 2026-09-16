@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from apps.common.models import ArchivableModel, TimeStampedModel
@@ -80,3 +81,32 @@ class Document(TimeStampedModel, ArchivableModel):
     def __str__(self) -> str:
         label = f'{self.doc_type} {self.number}'.strip()
         return f'{label} — {self.project.code}'
+
+
+class DocumentTemplate(TimeStampedModel):
+    """Шаблон документа — не привязан к проекту.
+
+    ПМ берёт файл отсюда за основу, когда готовит настоящий документ по
+    проекту (Document). Один тип документа может иметь несколько
+    шаблонов — например, разные варианты договора.
+    """
+
+    doc_type = models.ForeignKey(
+        DocumentType, on_delete=models.CASCADE, related_name='templates',
+        verbose_name='Тип',
+    )
+    name = models.CharField('Название', max_length=150, blank=True)
+    file = models.FileField('Файл шаблона', upload_to='document_templates/%Y/%m/')
+    comment = models.TextField('Комментарий', blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        related_name='+', verbose_name='Загрузил', null=True, blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Шаблон документа'
+        verbose_name_plural = 'Шаблоны документов'
+        ordering = ['doc_type__name', '-created_at']
+
+    def __str__(self) -> str:
+        return self.name or str(self.doc_type)
