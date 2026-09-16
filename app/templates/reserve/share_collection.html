@@ -21,35 +21,38 @@
         <div class="apply-hero__to">Кандидатов в подборке: <strong>{{ candidates|length }}</strong></div>
     </header>
 
-    <div class="share-grid">
-        {% for candidate in candidates %}
-            <a href="?c={{ candidate.pk }}" class="acard share-card">
-                <div class="share-card__top">
-                    {% if candidate.photo %}
-                        <img src="{{ candidate.photo.url }}" alt="" class="share-card__photo">
-                    {% else %}
-                        <span class="share-card__photo share-card__photo--empty">{{ candidate.full_name|slice:':1' }}</span>
-                    {% endif %}
-                    <div class="share-card__who">
-                        <strong>{{ candidate.full_name }}</strong>
-                        <span>{{ candidate.recommended_position|default:candidate.desired_position|default:candidate.direction }}{% if candidate.city %} · {{ candidate.city }}{% endif %}</span>
+    {% for direction, group in groups %}
+        {% if groups|length > 1 %}<h2 class="share-group">{{ direction }} <span>{{ group|length }}</span></h2>{% endif %}
+        <div class="share-grid">
+            {% for candidate in group %}
+                <a href="?c={{ candidate.pk }}" class="acard share-card">
+                    <div class="share-card__top">
+                        {% if candidate.photo %}
+                            <img src="{{ candidate.photo.url }}" alt="" class="share-card__photo">
+                        {% else %}
+                            <span class="share-card__photo share-card__photo--empty">{{ candidate.full_name|slice:':1' }}</span>
+                        {% endif %}
+                        <div class="share-card__who">
+                            <strong>{{ candidate.full_name }}</strong>
+                            <span>{{ candidate.recommended_position|default:candidate.desired_position|default:candidate.direction }}{% if candidate.city %} · {{ candidate.city }}{% endif %}</span>
+                        </div>
+                        {% if candidate.rating %}<span class="share-card__rating">{{ candidate.rating }}</span>{% endif %}
                     </div>
-                    {% if candidate.rating %}<span class="share-card__rating">{{ candidate.rating }}</span>{% endif %}
-                </div>
-                <div class="reserve-head__badges">
-                    <span class="badge badge--gray">{{ candidate.direction }}</span>
-                    {% if candidate.geekspro_level %}<span class="badge badge--blue">{{ candidate.get_geekspro_level_display }}</span>{% endif %}
-                    {% if candidate.is_looking_for_job %}<span class="badge badge--green">{{ candidate.readiness }}</span>{% endif %}
-                </div>
-                <div>
-                    {% for skill in candidate.skills_list|slice:':6' %}<span class="chip">{{ skill }}</span>{% endfor %}
-                </div>
-                <span class="share-card__more">Открыть профиль →</span>
-            </a>
-        {% empty %}
-            <p class="share-foot">В подборке пока нет кандидатов.</p>
-        {% endfor %}
-    </div>
+                    <div class="reserve-head__badges">
+                        <span class="badge badge--gray">{{ candidate.direction }}</span>
+                        {% if candidate.geekspro_level %}<span class="badge badge--blue">{{ candidate.get_geekspro_level_display }}</span>{% endif %}
+                        {% if candidate.is_looking_for_job %}<span class="badge badge--green">{{ candidate.readiness }}</span>{% endif %}
+                    </div>
+                    <div>
+                        {% for skill in candidate.skills_list|slice:':6' %}<span class="chip">{{ skill }}</span>{% endfor %}
+                    </div>
+                    <span class="share-card__more">Открыть профиль →</span>
+                </a>
+            {% endfor %}
+        </div>
+    {% empty %}
+        <p class="share-foot">В подборке пока нет кандидатов.</p>
+    {% endfor %}
 
     <p class="share-foot">
         Кандидатов рекомендует GeeksPro.

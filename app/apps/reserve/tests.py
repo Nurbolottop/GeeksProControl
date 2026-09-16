@@ -655,3 +655,39 @@ class ReserveShareCollectionTests(TestCase):
         response = self.client.get(reverse('reserve:list'))
         self.assertContains(response, 'Для фронтенда')
         self.assertContains(response, 'Для бэкенда')
+
+    def test_overview_shares_all_directions_grouped(self):
+        frontend = Specialization.objects.create(name='Frontend')
+        ReserveCandidate.objects.create(full_name='Фронт Кандидат', specialization=frontend)
+        self.client.force_login(self.head)
+        overview = self.client.get(reverse('reserve:overview'))
+        self.assertContains(overview, 'Поделиться всеми направлениями')
+
+        response = self.client.post(reverse('reserve:share_collection_create'), {
+            'filters': '', 'next': 'overview', 'ttl_days': '30',
+        })
+        self.assertRedirects(
+            response, reverse('reserve:overview'), fetch_redirect_response=False,
+        )
+        link = ReserveShareLink.objects.get()
+        self.assertEqual(link.candidates.count(), 4)
+
+        public = self.client.get(link.get_absolute_url())
+        # Backend, Frontend и кандидат без направления
+        self.assertContains(public, 'class="share-group"', count=3)
+        self.assertContains(public, 'Без направления')
+        self.assertContains(public, 'Фронт Кандидат')
+
+        overview = self.client.get(reverse('reserve:overview'))
+        self.assertContains(overview, 'Подборки для работодателей')
+
+    def test_overview_shares_one_direction(self):
+        self.client.force_login(self.head)
+        self.client.post(reverse('reserve:share_collection_create'), {
+            'filters': f'specialization={self.spec.pk}', 'next': 'overview',
+            'ttl_days': '30',
+        })
+        link = ReserveShareLink.objects.get()
+        self.assertEqual(set(link.candidates.all()), {self.first, self.second})
+        public = self.client.get(link.get_absolute_url())
+        self.assertNotContains(public, 'class="share-group"')

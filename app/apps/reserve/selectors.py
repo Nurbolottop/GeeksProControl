@@ -184,3 +184,15 @@ def share_collections(params) -> list:
         link.names = [c.full_name for c in members]
         links.append(link)
     return links
+
+
+def group_by_direction(candidates) -> list[tuple[str, list]]:
+    """Кандидаты подборки по направлениям — в порядке их названий."""
+    no_direction = 'Без направления'
+    groups = {}
+    for candidate in candidates:
+        direction = candidate.direction if candidate.direction != '—' else no_direction
+        groups.setdefault(direction, []).append(candidate)
+    return sorted(
+        groups.items(), key=lambda item: (item[0] == no_direction, item[0].lower()),
+    )

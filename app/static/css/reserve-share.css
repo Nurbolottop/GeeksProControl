@@ -40,3 +40,17 @@
     font-weight: 800; font-size: 15px;
 }
 .share-card__more { margin-top: auto; font-size: 13px; font-weight: 650; color: var(--primary); }
+
+.reserve-share__modal { display: flex; flex-direction: column; gap: 10px; }
+.reserve-share__modal .cmodal__title { margin: 0; }
+.reserve-share__buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+.share-group {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 18px; margin: 28px 0 12px;
+}
+.share-group span {
+    font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    background: var(--primary-soft); color: var(--primary);
+}
+.reserve-share__modal input[type=text], .reserve-share__modal select { height: 36px; font-size: 13.5px; width: 100%; }

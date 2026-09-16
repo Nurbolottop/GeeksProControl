@@ -149,37 +149,7 @@
     </div>
 </form>
 
-{% if can_edit and share_collections %}
-    <div class="form-link">
-        <div class="form-link__body">
-            <div class="form-link__label">Подборки для работодателей</div>
-            {% for link in share_collections %}
-                <div class="form-link__row">
-                    <div>
-                        <strong>{{ link.recipient|default:'Без названия' }}</strong>
-                        · {{ link.directions|join:', '|default:'—' }} · кандидатов: {{ link.size }}
-                        <div class="form-link__meta">{{ link.names|slice:':6'|join:', ' }}{% if link.size > 6 %} и ещё {{ link.size|add:'-6' }}{% endif %}</div>
-                        <a class="form-link__url" id="collection-url-{{ link.pk }}" href="{{ link.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ link.get_absolute_url }}</a>
-                        <div class="form-link__meta">
-                            {% if link.show_contacts %}с контактами{% else %}без контактов{% endif %}
-                            · {% if link.expires_at %}действует до {{ link.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
-                            · {% if link.views %}просмотров: {{ link.views }}, последний {{ link.viewed_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}
-                        </div>
-                    </div>
-                    <div class="form-link__actions">
-                        <button type="button" class="btn btn--secondary btn--sm" data-copy="collection-url-{{ link.pk }}">Копировать</button>
-                        <form method="post" action="{% url 'reserve:share_disable' link.pk %}" style="margin: 0;"
-                              data-confirm="Отключить ссылку? Подборка по ней больше не откроется."
-                              data-confirm-ok="Отключить">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
-                        </form>
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
-{% endif %}
+{% include 'reserve/partials/share_collections.html' %}
 
 <div{% if can_edit %} x-data="{ selected: [], all: [{% for candidate in page.object_list %}'{{ candidate.pk }}'{% if not forloop.last %},{% endif %}{% endfor %}], open: false }"{% endif %}>
 {% if can_edit %}

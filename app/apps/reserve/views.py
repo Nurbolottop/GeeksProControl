@@ -38,6 +38,11 @@ def overview(request):
         'rows': rows,
         'totals': selectors.summary_totals(rows),
         'can_edit': can_edit_reserve(request.user),
+        'share_form': ShareLinkForm(),
+        'share_collections': (
+            selectors.share_collections({})
+            if can_edit_reserve(request.user) else []
+        ),
         'statuses': {
             'new': [str(s) for s in selectors.NEW_STATUSES],
             'available': [str(s) for s in selectors.AVAILABLE_STATUSES],
@@ -285,7 +290,12 @@ def share_collection_create(request):
     """Одна ссылка на подборку: отмеченные галочками кандидаты, а если
     никого не отметили — все, кто попал под текущий фильтр списка."""
     filters = request.POST.get('filters', '')
-    back = f"{reverse('reserve:list')}?{filters}" if filters else reverse('reserve:list')
+    if request.POST.get('next') == 'overview':
+        back = reverse('reserve:overview')
+    elif filters:
+        back = f"{reverse('reserve:list')}?{filters}"
+    else:
+        back = reverse('reserve:list')
     form = ShareLinkForm(request.POST or None)
     if request.method != 'POST' or not form.is_valid():
         return redirect(back)
@@ -317,6 +327,8 @@ def share_disable(request, pk):
         link.deactivate()
         messages.success(request, 'Ссылка отключена.')
     if link.is_collection:
+        if request.POST.get('next') == 'overview':
+            return redirect('reserve:overview')
         return redirect('reserve:list')
     return redirect(link.candidate.get_absolute_url())
 
@@ -405,8 +417,11 @@ def share_profile(request, token):
             request, link, candidate, back_url=link.get_absolute_url(),
         )
     services.register_share_view(link)
+    candidates = list(candidates)
     return render(request, 'reserve/share_collection.html', {
-        'link': link, 'candidates': candidates,
+        'link': link,
+        'candidates': candidates,
+        'groups': selectors.group_by_direction(candidates),
     })
 
 
