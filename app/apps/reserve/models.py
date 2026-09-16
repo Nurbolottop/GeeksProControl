@@ -403,6 +403,62 @@ class ReserveInvite(TimeStampedModel):
         self.save(update_fields=['is_active', 'updated_at'])
 
 
+class ReserveShareLink(TimeStampedModel):
+    """Ссылка на профиль кандидата для работодателя.
+
+    По ней открывается только витрина: то, что кандидат рассказал о себе,
+    навыки, проекты GeeksPro и наша оценка. Внутренних комментариев,
+    истории и рекомендаций другим компаниям не видно; контакты — только
+    если их явно разрешили показывать в этой ссылке. Ссылок на одного
+    кандидата может быть несколько — по одной на компанию, чтобы видеть,
+    кто открывал, и отключать каждую отдельно.
+    """
+
+    token = models.CharField('Токен', max_length=64, unique=True, default=generate_token)
+    candidate = models.ForeignKey(
+        ReserveCandidate, on_delete=models.CASCADE, related_name='share_links',
+        verbose_name='Кандидат',
+    )
+    recipient = models.CharField(
+        'Для кого', max_length=255, blank=True,
+        help_text='Компания или человек, которому отправили профиль.',
+    )
+    show_contacts = models.BooleanField('Показывать контакты', default=False)
+    is_active = models.BooleanField('Активна', default=True)
+    expires_at = models.DateTimeField('Действует до', null=True, blank=True)
+    views = models.PositiveIntegerField('Просмотров', default=0)
+    viewed_at = models.DateTimeField('Последний просмотр', null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name='+',
+        verbose_name='Создал', null=True, blank=True,
+    )
+
+    class Meta:
+        verbose_name = 'Ссылка на профиль кандидата'
+        verbose_name_plural = 'Ссылки на профили кандидатов'
+        ordering = ['-created_at']
+
+    def __str__(self) -> str:
+        return f'Профиль {self.candidate} /{self.token}/'
+
+    def get_absolute_url(self) -> str:
+        return reverse('reserve_share', args=[self.token])
+
+    @property
+    def is_expired(self) -> bool:
+        from django.utils import timezone
+
+        return bool(self.expires_at and self.expires_at <= timezone.now())
+
+    @property
+    def is_open(self) -> bool:
+        return self.is_active and not self.is_expired
+
+    def deactivate(self) -> None:
+        self.is_active = False
+        self.save(update_fields=['is_active', 'updated_at'])
+
+
 class RecommendationStatus(models.TextChoices):
     SENT = 'sent', 'Отправлено'
     REVIEW = 'review', 'Рассматривается'
@@ -471,6 +527,7 @@ class ReserveRecommendation(TimeStampedModel):
 class EventKind(models.TextChoices):
     CREATED = 'created', 'Кандидат добавлен'
     INVITED = 'invited', 'Отправлена ссылка на анкету'
+    SHARED = 'shared', 'Профиль отправлен по ссылке'
     SUBMITTED = 'submitted', 'Анкета заполнена'
     UPDATED = 'updated', 'Данные изменены'
     STATUS = 'status', 'Смена статуса'

@@ -18,11 +18,12 @@ from apps.interns.models import Intern
 from apps.reserve import selectors, services
 from apps.reserve.forms import (
     InviteForm, ReserveApplyForm, ReserveCandidateForm, ReserveEvaluationForm,
-    ReserveRecommendationForm, StatusChangeForm,
+    ReserveRecommendationForm, ShareLinkForm, StatusChangeForm,
 )
 from apps.reserve.models import (
     CandidateLevel, CandidateStatus, Employment, RecommendationStatus,
-    ReserveCandidate, ReserveInvite, ReserveRecommendation, WorkFormat,
+    ReserveCandidate, ReserveInvite, ReserveRecommendation, ReserveShareLink,
+    WorkFormat,
 )
 from apps.reserve.permissions import can_edit_reserve, reserve_editor_required
 from apps.training.models import Specialization
@@ -114,6 +115,11 @@ def candidate_detail(request, pk):
             if link.is_open
         ],
         'invite_form': InviteForm(),
+        'share_links': [
+            link for link in candidate.share_links.filter(is_active=True)
+            if link.is_open
+        ],
+        'share_form': ShareLinkForm(),
         'rec_statuses': RecommendationStatus.choices,
         'can_edit': can_edit_reserve(request.user),
     }
@@ -250,6 +256,34 @@ def invite_disable(request, pk):
 
 
 @reserve_editor_required
+def share_create(request, pk):
+    """Ссылка на профиль кандидата, чтобы отправить её работодателю."""
+    candidate = get_object_or_404(ReserveCandidate, pk=pk)
+    form = ShareLinkForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        link = services.issue_share_link(
+            candidate, user=request.user, ttl_days=form.ttl(),
+            recipient=form.cleaned_data['recipient'],
+            show_contacts=form.cleaned_data['show_contacts'],
+        )
+        messages.success(
+            request,
+            f'Ссылка на профиль создана: '
+            f'{request.build_absolute_uri(link.get_absolute_url())}',
+        )
+    return redirect(candidate.get_absolute_url())
+
+
+@reserve_editor_required
+def share_disable(request, pk):
+    link = get_object_or_404(ReserveShareLink, pk=pk)
+    if request.method == 'POST':
+        link.deactivate()
+        messages.success(request, 'Ссылка на профиль отключена.')
+    return redirect(link.candidate.get_absolute_url())
+
+
+@reserve_editor_required
 def recommendation_create(request, pk):
     candidate = get_object_or_404(ReserveCandidate, pk=pk)
     form = ReserveRecommendationForm(request.POST or None)
@@ -299,4 +333,24 @@ def apply_form(request, token):
         'form': form, 'invite': invite, 'is_edit': invite.is_edit_link,
         'direction_groups': json.dumps(services.direction_groups_map()),
         'mark_optional': True,
+    })
+
+
+def share_profile(request, token):
+    """Профиль кандидата для работодателя — только по действующей ссылке."""
+    link = (
+        ReserveShareLink.objects
+        .select_related('candidate__specialization')
+        .filter(token=token, candidate__is_archived=False)
+        .first()
+    )
+    if link is None or not link.is_open:
+        return render(request, 'reserve/share_expired.html', status=404)
+    services.register_share_view(link)
+    candidate = link.candidate
+    return render(request, 'reserve/share.html', {
+        'link': link,
+        'candidate': candidate,
+        'memberships': candidate.project_memberships,
+        'has_scores': any(value for _, value in candidate.scores),
     })

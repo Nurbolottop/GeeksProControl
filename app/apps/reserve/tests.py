@@ -9,8 +9,8 @@ from apps.clients.models import Client as Company
 from apps.interns.models import Intern
 from apps.reserve import services
 from apps.reserve.models import (
-    CandidateStatus, RecommendationStatus, ReserveCandidate, ReserveInvite,
-    ReserveRecommendation,
+    CandidateStatus, EventKind, RecommendationStatus, ReserveCandidate,
+    ReserveInvite, ReserveRecommendation, ReserveShareLink,
 )
 from apps.training.models import Specialization
 
@@ -482,3 +482,86 @@ class ReserveOverviewTests(TestCase):
         Specialization.objects.create(name='DevOps')
         response = self.client.get(self.url)
         self.assertContains(response, 'DevOps')
+
+
+class ReserveShareLinkTests(TestCase):
+    """Ссылка на профиль кандидата для работодателя."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(
+            username='head', password='pass12345', role=User.Role.HEAD,
+        )
+        self.candidate = ReserveCandidate.objects.create(
+            full_name='Профиль Кандидатов', phone='0700111222',
+            email='candidate@example.com', skills='Python, Django',
+            comment_pm='Внутренний комментарий PM', improvements='Тайное улучшение',
+        )
+
+    def test_head_creates_link_and_it_is_logged(self):
+        self.client.force_login(self.head)
+        self.client.post(
+            reverse('reserve:share_create', args=[self.candidate.pk]),
+            {'recipient': 'ОсОО Ромашка', 'ttl_days': '30', 'show_contacts': 'on'},
+        )
+        link = ReserveShareLink.objects.get(candidate=self.candidate)
+        self.assertEqual(link.recipient, 'ОсОО Ромашка')
+        self.assertTrue(link.show_contacts)
+        self.assertIsNotNone(link.expires_at)
+        self.assertTrue(self.candidate.events.filter(kind=EventKind.SHARED).exists())
+
+    def test_viewer_without_role_cannot_create_link(self):
+        lead = User.objects.create_user(
+            username='lead', password='pass12345', role=User.Role.TEAM_LEAD,
+        )
+        self.client.force_login(lead)
+        response = self.client.post(
+            reverse('reserve:share_create', args=[self.candidate.pk]), {},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ReserveShareLink.objects.exists())
+
+    def test_public_profile_hides_internal_data_and_counts_views(self):
+        link = services.issue_share_link(self.candidate, user=self.head)
+        response = self.client.get(link.get_absolute_url())
+        self.assertContains(response, 'Профиль Кандидатов')
+        self.assertContains(response, 'Django')
+        self.assertNotContains(response, 'Внутренний комментарий PM')
+        self.assertNotContains(response, 'Тайное улучшение')
+        self.assertNotContains(response, '0700111222')
+        link.refresh_from_db()
+        self.assertEqual(link.views, 1)
+        self.assertIsNotNone(link.viewed_at)
+
+    def test_contacts_shown_only_when_allowed(self):
+        link = services.issue_share_link(self.candidate, show_contacts=True)
+        response = self.client.get(link.get_absolute_url())
+        self.assertContains(response, '0700111222')
+        self.assertContains(response, 'candidate@example.com')
+
+    def test_several_links_live_side_by_side(self):
+        first = services.issue_share_link(self.candidate, recipient='Первая')
+        services.issue_share_link(self.candidate, recipient='Вторая')
+        first.refresh_from_db()
+        self.assertTrue(first.is_open)
+
+    def test_disabled_or_expired_link_does_not_open(self):
+        disabled = services.issue_share_link(self.candidate)
+        disabled.deactivate()
+        self.assertEqual(self.client.get(disabled.get_absolute_url()).status_code, 404)
+        expired = services.issue_share_link(self.candidate)
+        expired.expires_at = timezone.now() - timedelta(minutes=1)
+        expired.save()
+        self.assertEqual(self.client.get(expired.get_absolute_url()).status_code, 404)
+
+    def test_archived_candidate_is_not_shown(self):
+        link = services.issue_share_link(self.candidate)
+        self.candidate.is_archived = True
+        self.candidate.save()
+        self.assertEqual(self.client.get(link.get_absolute_url()).status_code, 404)
+
+    def test_detail_page_lists_active_links(self):
+        services.issue_share_link(self.candidate, recipient='ОсОО Ромашка')
+        self.client.force_login(self.head)
+        response = self.client.get(self.candidate.get_absolute_url())
+        self.assertContains(response, 'Поделиться профилем')
+        self.assertContains(response, 'ОсОО Ромашка')

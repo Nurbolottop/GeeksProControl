@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from apps.reserve.models import (
     CandidateStatus, EventKind, RecommendationStatus, ReserveCandidate,
-    ReserveEvent, ReserveInvite,
+    ReserveEvent, ReserveInvite, ReserveShareLink,
 )
 
 # Результат по рекомендации двигает и статус самого кандидата
@@ -131,6 +131,41 @@ def issue_invite(
             detail=invite.get_absolute_url(), user=user,
         )
     return invite
+
+
+def issue_share_link(
+    candidate, *, user=None, ttl_days: int | None = 30, recipient='',
+    show_contacts=False,
+) -> ReserveShareLink:
+    """Ссылка на профиль кандидата для работодателя.
+
+    Прежние ссылки не гасим: профиль могли отправить нескольким
+    компаниям, и у каждой своя ссылка со своим сроком.
+    """
+    link = ReserveShareLink.objects.create(
+        candidate=candidate,
+        recipient=recipient,
+        show_contacts=show_contacts,
+        created_by=user if user and user.is_authenticated else None,
+        expires_at=timezone.now() + timedelta(days=ttl_days) if ttl_days else None,
+    )
+    log_event(
+        candidate, EventKind.SHARED,
+        f'Создана ссылка на профиль{f" для «{recipient}»" if recipient else ""}',
+        detail=' · '.join([
+            link.get_absolute_url(),
+            'с контактами' if show_contacts else 'без контактов',
+        ]),
+        user=user,
+    )
+    return link
+
+
+def register_share_view(link: ReserveShareLink) -> None:
+    """Профиль открыли по ссылке — считаем просмотры."""
+    ReserveShareLink.objects.filter(pk=link.pk).update(
+        views=models.F('views') + 1, viewed_at=timezone.now(),
+    )
 
 
 def accept_application(invite: ReserveInvite, form) -> ReserveCandidate:

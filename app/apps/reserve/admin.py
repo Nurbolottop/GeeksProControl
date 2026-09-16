@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from apps.reserve.models import (
     ReserveCandidate, ReserveEvent, ReserveInvite, ReserveRecommendation,
+    ReserveShareLink,
 )
 
 
@@ -36,3 +37,13 @@ class ReserveEventAdmin(admin.ModelAdmin):
     list_display = ('candidate', 'kind', 'title', 'user', 'created_at')
     list_filter = ('kind',)
     search_fields = ('candidate__full_name', 'title')
+
+
+@admin.register(ReserveShareLink)
+class ReserveShareLinkAdmin(admin.ModelAdmin):
+    list_display = (
+        'candidate', 'recipient', 'show_contacts', 'is_active', 'expires_at',
+        'views', 'viewed_at',
+    )
+    list_filter = ('is_active', 'show_contacts')
+    search_fields = ('candidate__full_name', 'recipient', 'token')

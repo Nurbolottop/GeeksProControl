@@ -77,6 +77,25 @@
                 </select>
                 <button type="submit" class="btn btn--secondary btn--sm">Ссылка для редактирования</button>
             </form>
+            <div class="reserve-share" x-data="{ open: false }" @keydown.escape="open = false">
+                <button type="button" class="btn btn--sm" @click="open = !open">Поделиться профилем</button>
+                <form method="post" action="{% url 'reserve:share_create' candidate.pk %}" class="reserve-share__form" x-show="open" x-cloak @click.outside="open = false">
+                    {% csrf_token %}
+                    <div class="reserve-share__title">Ссылка на профиль для работодателя</div>
+                    <p class="reserve-share__hint">Откроется без входа в систему. Внутренние комментарии, история и рекомендации другим компаниям не видны.</p>
+                    <input type="text" name="recipient" maxlength="255" placeholder="Для кого (компания, контакт)">
+                    <select name="ttl_days" title="Срок действия ссылки">
+                        {% for value, label in share_form.fields.ttl_days.choices %}
+                            <option value="{{ value }}" {% if value == '30' %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="reserve-share__check">
+                        <input type="checkbox" name="show_contacts">
+                        <span>Показывать контакты (телефон, Telegram, email)</span>
+                    </label>
+                    <button type="submit" class="btn btn--sm">Создать ссылку</button>
+                </form>
+            </div>
         </div>
     {% endif %}
 </div>
@@ -108,6 +127,39 @@
             {% endfor %}
         </div>
     </div>
+{% endif %}
+
+{% if can_edit and share_links %}
+    <div class="form-link">
+        <div class="form-link__body">
+            <div class="form-link__label">Ссылки на профиль для работодателей</div>
+            {% for link in share_links %}
+                <div class="form-link__row">
+                    <div>
+                        {% if link.recipient %}<strong>{{ link.recipient }}</strong><br>{% endif %}
+                        <a class="form-link__url" id="share-link-{{ link.pk }}" href="{{ link.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ link.get_absolute_url }}</a>
+                        <div class="form-link__meta">
+                            {% if link.show_contacts %}с контактами{% else %}без контактов{% endif %}
+                            · {% if link.expires_at %}действует до {{ link.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
+                            · {% if link.views %}просмотров: {{ link.views }}, последний {{ link.viewed_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}
+                        </div>
+                    </div>
+                    <div class="form-link__actions">
+                        <button type="button" class="btn btn--secondary btn--sm" data-copy="share-link-{{ link.pk }}">Копировать</button>
+                        <form method="post" action="{% url 'reserve:share_disable' link.pk %}" style="margin: 0;"
+                              data-confirm="Отключить ссылку? Профиль по ней больше не откроется."
+                              data-confirm-ok="Отключить">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+{% if can_edit %}
     <script>
         document.querySelectorAll('[data-copy]').forEach(function (button) {
             button.addEventListener('click', function () {

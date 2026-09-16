@@ -185,3 +185,25 @@ class InviteForm(forms.Form):
     def ttl(self) -> int | None:
         raw = self.cleaned_data.get('ttl_days') or ''
         return int(raw) if raw.isdigit() else None
+
+
+class ShareLinkForm(forms.Form):
+    """Ссылка на профиль кандидата для работодателя."""
+
+    TTL_CHOICES = [
+        ('30', '30 дней'), ('14', '14 дней'), ('7', '7 дней'),
+        ('90', '90 дней'), ('', 'Без срока'),
+    ]
+
+    recipient = forms.CharField(
+        label='Для кого', max_length=255, required=False,
+        help_text='Компания или контакт — чтобы видеть, кому ушёл профиль.',
+    )
+    ttl_days = forms.ChoiceField(
+        label='Срок действия', choices=TTL_CHOICES, required=False, initial='30',
+    )
+    show_contacts = forms.BooleanField(label='Показывать контакты', required=False)
+
+    def ttl(self) -> int | None:
+        raw = self.cleaned_data.get('ttl_days') or ''
+        return int(raw) if raw.isdigit() else None
