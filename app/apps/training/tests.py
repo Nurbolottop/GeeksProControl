@@ -52,19 +52,19 @@ class AcademyImportTests(TestCase):
         self.specs = make_specializations()
 
     def test_whole_message_is_understood(self):
-        rows = importer.parse(ACADEMY_MESSAGE)
+        rows = importer.parse(ACADEMY_MESSAGE, 'Бишкек')
         self.assertEqual(len(rows), 18)
         self.assertEqual([row.errors for row in rows if row.errors], [])
 
     def test_academy_names_map_to_our_directions(self):
-        rows = importer.parse(ACADEMY_MESSAGE)
+        rows = importer.parse(ACADEMY_MESSAGE, 'Бишкек')
         by_header = {row.direction_name: row.specialization.name for row in rows}
         self.assertEqual(by_header['Design'], 'UX/UI')
         self.assertEqual(by_header['Flutter'], 'Mobile')
         self.assertEqual(by_header['Backend'], 'Backend')
 
     def test_dates_and_count(self):
-        row = importer.parse(ACADEMY_MESSAGE)[0]
+        row = importer.parse(ACADEMY_MESSAGE, 'Бишкек')[0]
         self.assertEqual(row.number, '39')
         self.assertEqual(row.start_date, datetime.date(2026, 6, 9))
         self.assertEqual(row.end_date, datetime.date(2026, 10, 6))
@@ -72,7 +72,7 @@ class AcademyImportTests(TestCase):
         self.assertEqual(row.students_note, '')
 
     def test_unknown_range_and_at_start_counts(self):
-        rows = {(row.specialization.name, row.number): row for row in importer.parse(ACADEMY_MESSAGE)}
+        rows = {(row.specialization.name, row.number): row for row in importer.parse(ACADEMY_MESSAGE, 'Бишкек')}
         unknown = rows[('Frontend', '48')]
         self.assertIsNone(unknown.students_count)
         self.assertIn('неизвестно', unknown.students_note)
@@ -84,25 +84,25 @@ class AcademyImportTests(TestCase):
         self.assertEqual(at_start.students_note, '11 студентов на старте')
 
     def test_same_number_in_different_directions_are_different_groups(self):
-        importer.apply(importer.parse(ACADEMY_MESSAGE))
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
         self.assertEqual(TrainingGroup.objects.filter(number='39').count(), 2)
         self.assertEqual(TrainingGroup.objects.count(), 18)
 
     def test_pasting_again_does_not_duplicate(self):
-        importer.apply(importer.parse(ACADEMY_MESSAGE))
-        rows = importer.parse(ACADEMY_MESSAGE)
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        rows = importer.parse(ACADEMY_MESSAGE, 'Бишкек')
         self.assertTrue(all(row.action == 'same' for row in rows))
         result = importer.apply(rows)
         self.assertEqual(result['created'], 0)
         self.assertEqual(TrainingGroup.objects.count(), 18)
 
     def test_updated_message_changes_dates_and_count(self):
-        importer.apply(importer.parse(ACADEMY_MESSAGE))
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
         updated = ACADEMY_MESSAGE.replace(
             '* 48 группа — старт: 28.09.2026 · конец: 11.03.2027 — количество студентов пока неизвестно',
             '* 48 группа — старт: 30.09.2026 · конец: 11.03.2027 — 10 студентов',
         )
-        row = next(r for r in importer.parse(updated) if r.number == '48')
+        row = next(r for r in importer.parse(updated, 'Бишкек') if r.number == '48')
         self.assertEqual(row.action, 'update')
         self.assertIn('студентов', row.changes)
         importer.apply([row])
@@ -111,15 +111,124 @@ class AcademyImportTests(TestCase):
         self.assertEqual(group.start_date, datetime.date(2026, 9, 30))
 
     def test_unknown_direction_is_an_error_not_a_guess(self):
-        rows = importer.parse('🧪 Кибербезопасность\n* 1 группа — старт: 01.09.2026 · конец: 01.03.2027 — 5 студентов')
+        rows = importer.parse('🧪 Кибербезопасность\n* 1 группа — старт: 01.09.2026 · конец: 01.03.2027 — 5 студентов', 'Бишкек')
         self.assertEqual(rows[0].action, 'error')
         self.assertIn('Кибербезопасность', rows[0].errors[0])
         importer.apply(rows)
         self.assertFalse(TrainingGroup.objects.exists())
 
     def test_broken_line_is_reported(self):
-        rows = importer.parse('💻 Frontend\n* 49 группа — старт скоро')
+        rows = importer.parse('💻 Frontend\n* 49 группа — старт скоро', 'Бишкек')
         self.assertEqual(rows[0].action, 'error')
+
+
+class AcademyBranchTests(TestCase):
+    """Бишкек и Ош — отдельно."""
+
+    OSH_MESSAGE = """⚙️Backend
+* 39 группа — старт: 01.04.2026 · конец: 01.10.2026 — 6 студентов
+
+📱Flutter
+* 2 группа — старт: 01.07.2026 · конец: 01.01.2027 — 4 студента
+"""
+
+    def setUp(self):
+        self.specs = make_specializations()
+        self.user = User.objects.create_user(username='head', password='pass12345')
+        self.client.force_login(self.user)
+
+    def test_branch_is_required(self):
+        rows = importer.parse(ACADEMY_MESSAGE)
+        self.assertTrue(all(row.action == 'error' for row in rows))
+        self.assertIn('филиал', rows[0].errors[0])
+
+    def test_branch_from_the_form(self):
+        importer.apply(importer.parse(self.OSH_MESSAGE, 'Ош'))
+        self.assertEqual(set(TrainingGroup.objects.values_list('branch', flat=True)), {'Ош'})
+
+    def test_same_number_in_both_branches_are_two_groups(self):
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        importer.apply(importer.parse(self.OSH_MESSAGE, 'Ош'))
+        backend_39 = TrainingGroup.objects.filter(number='39', specialization=self.specs['Backend'])
+        self.assertEqual(sorted(backend_39.values_list('branch', flat=True)), ['Бишкек', 'Ош'])
+        self.assertEqual(TrainingGroup.objects.count(), 20)
+
+    def test_branch_headers_inside_the_message(self):
+        text = '📍 Бишкек\n' + ACADEMY_MESSAGE + '\nФилиал Ош\n' + self.OSH_MESSAGE
+        rows = importer.parse(text, 'Бишкек')
+        self.assertEqual([r.errors for r in rows if r.errors], [])
+        branches = [row.branch for row in rows]
+        self.assertEqual(branches.count('Бишкек'), 18)
+        self.assertEqual(branches.count('Ош'), 2)
+
+    def test_find_branch(self):
+        self.assertEqual(importer.find_branch('📍 Ош'), 'Ош')
+        self.assertEqual(importer.find_branch('Филиал Бишкек:'), 'Бишкек')
+        self.assertEqual(importer.find_branch('БИШКЕК'), 'Бишкек')
+        self.assertEqual(importer.find_branch('⚙️Backend'), '')
+        self.assertEqual(importer.find_branch('Ош и Бишкек'), '')
+
+    def test_groups_without_branch_are_claimed_not_duplicated(self):
+        legacy = TrainingGroup.objects.create(
+            number='39', specialization=self.specs['Backend'],
+            start_date=datetime.date(2026, 3, 25), end_date=datetime.date(2026, 9, 26),
+            students_count=8,
+        )
+        rows = importer.parse(ACADEMY_MESSAGE, 'Бишкек')
+        row = next(r for r in rows if r.number == '39' and r.specialization.name == 'Backend')
+        self.assertEqual(row.action, 'update')
+        self.assertEqual(row.changes, ['филиал'])
+        importer.apply(rows)
+        legacy.refresh_from_db()
+        self.assertEqual(legacy.branch, 'Бишкек')
+        self.assertEqual(TrainingGroup.objects.filter(number='39', specialization=self.specs['Backend']).count(), 1)
+
+    def test_one_legacy_group_is_claimed_by_one_branch_only(self):
+        TrainingGroup.objects.create(number='39', specialization=self.specs['Backend'])
+        text = 'Бишкек\n' + ACADEMY_MESSAGE + '\nОш\n' + self.OSH_MESSAGE
+        importer.apply(importer.parse(text, 'Бишкек'))
+        backend_39 = TrainingGroup.objects.filter(number='39', specialization=self.specs['Backend'])
+        self.assertEqual(sorted(backend_39.values_list('branch', flat=True)), ['Бишкек', 'Ош'])
+
+    def test_page_shows_one_branch_at_a_time(self):
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        importer.apply(importer.parse(self.OSH_MESSAGE, 'Ош'))
+        response = self.client.get(reverse('training:plan'), {'branch': 'Ош'})
+        dirs = {d['specialization'].name: d for d in response.context['directions']}
+        self.assertEqual(sorted(dirs), ['Backend', 'Mobile'])
+        self.assertEqual([l['group'].number for l in dirs['Mobile']['lines']], ['2'])
+        response = self.client.get(reverse('training:plan'), {'branch': 'Бишкек'})
+        self.assertEqual(len(response.context['directions']), 4)
+
+    def test_tabs_carry_counts(self):
+        importer.apply(importer.parse(self.OSH_MESSAGE, 'Ош'))
+        tabs = {tab['value']: tab for tab in selectors.branch_tabs(today=TODAY)}
+        self.assertEqual(tabs['Ош']['groups'], 2)
+        self.assertEqual(tabs['Ош']['students'], 10)
+        self.assertEqual(tabs['Бишкек']['groups'], 0)
+        self.assertNotIn(selectors.NO_BRANCH, tabs)
+
+    def test_default_tab_is_a_branch_with_groups(self):
+        importer.apply(importer.parse(self.OSH_MESSAGE, 'Ош'))
+        response = self.client.get(reverse('training:plan'))
+        self.assertEqual(response.context['branch'], 'Ош')
+
+    def test_unassigned_tab_appears_only_when_needed(self):
+        TrainingGroup.objects.create(
+            number='1', specialization=self.specs['Backend'],
+            end_date=datetime.date(2027, 1, 1),
+        )
+        tabs = [tab['value'] for tab in selectors.branch_tabs(today=TODAY)]
+        self.assertIn(selectors.NO_BRANCH, tabs)
+        response = self.client.get(reverse('training:plan'), {'branch': selectors.NO_BRANCH})
+        self.assertContains(response, 'филиалов ещё не было')
+
+    def test_import_redirects_to_the_loaded_branch(self):
+        response = self.client.post(
+            reverse('training:group_import'),
+            {'text': self.OSH_MESSAGE, 'branch': 'Ош', 'confirm': '1'},
+        )
+        self.assertRedirects(response, reverse('training:plan') + '?branch=Ош')
 
 
 class AcademyListTests(TestCase):
@@ -127,7 +236,7 @@ class AcademyListTests(TestCase):
 
     def setUp(self):
         self.specs = make_specializations()
-        importer.apply(importer.parse(ACADEMY_MESSAGE))
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
 
     def _dirs(self, today=TODAY):
         return {d['specialization'].name: d for d in selectors.academy_list(today=today)}
@@ -201,20 +310,20 @@ class AcademyViewsTests(TestCase):
         self.specs = make_specializations()
 
     def test_import_shows_preview_before_saving(self):
-        response = self.client.post(reverse('training:group_import'), {'text': ACADEMY_MESSAGE})
+        response = self.client.post(reverse('training:group_import'), {'text': ACADEMY_MESSAGE, 'branch': 'Бишкек'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context['rows']), 18)
         self.assertFalse(TrainingGroup.objects.exists())
 
     def test_import_saves_on_confirm(self):
         response = self.client.post(
-            reverse('training:group_import'), {'text': ACADEMY_MESSAGE, 'confirm': '1'},
+            reverse('training:group_import'), {'text': ACADEMY_MESSAGE, 'branch': 'Бишкек', 'confirm': '1'},
         )
-        self.assertRedirects(response, reverse('training:plan'))
+        self.assertRedirects(response, reverse('training:plan') + '?branch=Бишкек')
         self.assertEqual(TrainingGroup.objects.count(), 18)
 
     def test_plan_page_in_academy_format(self):
-        importer.apply(importer.parse(ACADEMY_MESSAGE))
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
         response = self.client.get(reverse('training:plan'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context['directions']), 4)
@@ -225,7 +334,7 @@ class AcademyViewsTests(TestCase):
     def test_empty_academy_page_opens(self):
         response = self.client.get(reverse('training:plan'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Групп пока нет')
+        self.assertContains(response, 'групп пока нет')
 
     def test_create_group_by_hand_with_unknown_count(self):
         self.client.post(reverse('training:group_create'), {

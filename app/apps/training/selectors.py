@@ -10,7 +10,7 @@ import datetime
 
 from django.utils import timezone
 
-from apps.training.models import GroupStatus, Specialization, TrainingGroup
+from apps.training.models import BRANCHES, GroupStatus, Specialization, TrainingGroup
 
 # Порядок и значки — как в сообщении академии
 DIRECTION_ORDER = ['UX/UI', 'Frontend', 'Backend', 'Mobile']
@@ -45,21 +45,68 @@ def students_text(group: TrainingGroup) -> str:
     return f'{count} {plural(count, "студент", "студента", "студентов")}'
 
 
-def live_groups():
-    """Все группы, кроме не состоявшихся."""
-    return (
+NO_BRANCH = 'none'
+
+
+def live_groups(branch: str | None = None):
+    """Все группы, кроме не состоявшихся; `branch` — только этого филиала.
+
+    `NO_BRANCH` — группы, у которых филиал не указан.
+    """
+    qs = (
         TrainingGroup.objects.exclude(status=GroupStatus.CANCELLED)
         .select_related('specialization')
     )
+    if branch == NO_BRANCH:
+        qs = qs.filter(branch='')
+    elif branch:
+        qs = qs.filter(branch=branch)
+    return qs
 
 
-def academy_list(today: datetime.date | None = None) -> list[dict]:
-    """Группы по направлениям — те, что ещё учатся или набираются."""
+def current_groups(branch: str | None = None, today: datetime.date | None = None) -> list:
+    """Группы, которые ещё учатся или набираются."""
     today = today or timezone.localdate()
+    return [
+        group for group in live_groups(branch)
+        if group.stage_by_dates(today) != GroupStatus.GRADUATED
+    ]
+
+
+def branch_tabs(today: datetime.date | None = None) -> list[dict]:
+    """Вкладки филиалов со сводкой: сколько групп и студентов в каждом.
+
+    Вкладка «Филиал не указан» появляется, только если такие группы есть.
+    """
+    tabs = []
+    for value, label in BRANCHES:
+        groups = current_groups(value, today)
+        tabs.append({'value': value, 'label': label, **_count(groups)})
+    unassigned = current_groups(NO_BRANCH, today)
+    if unassigned:
+        tabs.append({'value': NO_BRANCH, 'label': 'Филиал не указан', **_count(unassigned)})
+    return tabs
+
+
+def _count(groups) -> dict:
+    students = sum(group.students_count or 0 for group in groups)
+    return {
+        'groups': len(groups),
+        'students': students,
+        'unknown': sum(1 for group in groups if group.students_count is None),
+        'groups_word': plural(len(groups), 'группа', 'группы', 'групп'),
+        'students_word': plural(students, 'студент', 'студента', 'студентов'),
+    }
+
+
+def academy_list(branch: str | None = None, today: datetime.date | None = None) -> list[dict]:
+    """Группы филиала по направлениям — те, что ещё учатся или набираются."""
     by_spec = {}
-    for group in live_groups().order_by('start_date', 'number'):
-        if group.stage_by_dates(today) == GroupStatus.GRADUATED:
-            continue
+    groups = sorted(
+        current_groups(branch, today),
+        key=lambda group: (group.start_date or datetime.date.max, group.number),
+    )
+    for group in groups:
         by_spec.setdefault(group.specialization_id, []).append(group)
 
     def order(spec):
@@ -68,36 +115,19 @@ def academy_list(today: datetime.date | None = None) -> list[dict]:
 
     result = []
     for spec in sorted(Specialization.objects.all(), key=order):
-        groups = by_spec.get(spec.pk)
-        if not groups:
+        own = by_spec.get(spec.pk)
+        if not own:
             continue
         result.append({
             'specialization': spec,
             'icon': DIRECTION_ICONS.get(spec.name, '•'),
             'academy_name': ACADEMY_NAMES.get(spec.name, ''),
-            'lines': [
-                {'group': group, 'students': students_text(group)}
-                for group in groups
-            ],
-            'students': sum(group.students_count or 0 for group in groups),
+            'lines': [{'group': group, 'students': students_text(group)} for group in own],
+            'students': sum(group.students_count or 0 for group in own),
         })
     return result
 
 
-def academy_totals(today: datetime.date | None = None) -> dict:
-    """Одна строка итога: сколько групп и студентов сейчас в академии."""
-    today = today or timezone.localdate()
-    groups = [
-        group for group in live_groups()
-        if group.stage_by_dates(today) != GroupStatus.GRADUATED
-    ]
-    return {
-        'groups': len(groups),
-        'students': sum(group.students_count or 0 for group in groups),
-        'unknown': sum(1 for group in groups if group.students_count is None),
-        'students_word': plural(
-            sum(group.students_count or 0 for group in groups),
-            'студент', 'студента', 'студентов',
-        ),
-        'groups_word': plural(len(groups), 'группа', 'группы', 'групп'),
-    }
+def academy_totals(branch: str | None = None, today: datetime.date | None = None) -> dict:
+    """Итог одной строкой: сколько групп и студентов в филиале."""
+    return _count(current_groups(branch, today))

@@ -1,18 +1,28 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from apps.training import importer, selectors
 from apps.training.forms import ImportForm, TrainingGroupForm
-from apps.training.models import GroupStatus, Specialization, TrainingGroup
+from apps.training.models import BRANCHES, GroupStatus, Specialization, TrainingGroup
 
 
 @login_required
 def plan(request):
-    """IT-академия: группы по направлениям — в том виде, как их присылает академия."""
+    """IT-академия: группы филиала по направлениям — как их присылает академия."""
+    tabs = selectors.branch_tabs()
+    values = [tab['value'] for tab in tabs]
+    branch = request.GET.get('branch')
+    if branch not in values:
+        # по умолчанию — первый филиал, где есть группы
+        branch = next((tab['value'] for tab in tabs if tab['groups']), values[0])
     return render(request, 'training/plan.html', {
-        'directions': selectors.academy_list(),
-        'totals': selectors.academy_totals(),
+        'tabs': tabs,
+        'branch': branch,
+        'current': next(tab for tab in tabs if tab['value'] == branch),
+        'directions': selectors.academy_list(branch),
+        'no_branch': selectors.NO_BRANCH,
     })
 
 
@@ -23,7 +33,9 @@ def group_list(request):
     params = request.GET
     if params.get('specialization'):
         qs = qs.filter(specialization_id=params['specialization'])
-    if params.get('branch'):
+    if params.get('branch') == selectors.NO_BRANCH:
+        qs = qs.filter(branch='')
+    elif params.get('branch'):
         qs = qs.filter(branch=params['branch'])
     groups = list(qs.order_by('end_date', 'specialization__name', 'number'))
     stage = params.get('status')
@@ -36,20 +48,18 @@ def group_list(request):
         'params': params,
         'statuses': GroupStatus.choices,
         'specializations': Specialization.objects.all(),
-        'branches': (
-            TrainingGroup.objects.exclude(branch='')
-            .values_list('branch', flat=True).distinct().order_by('branch')
-        ),
+        'branches': BRANCHES,
+        'no_branch': selectors.NO_BRANCH,
     })
 
 
 @login_required
 def group_import(request):
     """Вставить сообщение академии: сначала показываем, что поменяется."""
-    form = ImportForm(request.POST or None)
+    form = ImportForm(request.POST or None, initial={'branch': request.GET.get('branch')})
     rows = None
     if request.method == 'POST' and form.is_valid():
-        rows = importer.parse(form.cleaned_data['text'])
+        rows = importer.parse(form.cleaned_data['text'], form.cleaned_data['branch'])
         if request.POST.get('confirm') and rows:
             result = importer.apply(rows)
             parts = [
@@ -61,7 +71,9 @@ def group_import(request):
             if result['skipped']:
                 parts.append(f'пропущено с ошибками: {result["skipped"]}')
             messages.success(request, 'Группы академии загружены — ' + ', '.join(parts) + '.')
-            return redirect('training:plan')
+            branches = {row.branch for row in rows if row.branch}
+            target = branches.pop() if len(branches) == 1 else form.cleaned_data['branch']
+            return redirect(f"{reverse('training:plan')}?branch={target}")
     return render(request, 'training/import.html', {
         'form': form,
         'rows': rows,

@@ -18,6 +18,10 @@ class Specialization(models.Model):
         return self.name
 
 
+# Те же значения, что у филиала стажёра — чтобы данные сходились
+BRANCHES = [('Бишкек', 'Бишкек'), ('Ош', 'Ош')]
+
+
 class GroupStatus(models.TextChoices):
     """Где группа академии находится сейчас."""
 
@@ -40,7 +44,10 @@ class TrainingGroup(TimeStampedModel):
         Specialization, on_delete=models.PROTECT, related_name='groups',
         verbose_name='Направление',
     )
-    branch = models.CharField('Филиал', max_length=100, blank=True)
+    branch = models.CharField(
+        'Филиал', max_length=100, blank=True, choices=BRANCHES, db_index=True,
+        help_text='Бишкек и Ош набирают группы независимо, номера могут совпадать.',
+    )
     start_date = models.DateField('Дата начала', null=True, blank=True)
     end_date = models.DateField('Дата окончания', null=True, blank=True, db_index=True)
     status = models.CharField(

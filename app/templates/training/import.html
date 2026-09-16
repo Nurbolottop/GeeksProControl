@@ -7,6 +7,14 @@
     .import-text textarea { width: 100%; font-family: ui-monospace, Menlo, monospace; font-size: 13px; line-height: 1.55; }
     .import-row--error td { background: var(--red-bg); }
     .import-row--same td { color: var(--text-muted); }
+    .branch-choice { display: flex; gap: 10px; margin-top: 2px; }
+    .branch-choice__item {
+        display: flex; align-items: center; gap: 8px; cursor: pointer;
+        padding: 8px 16px; border: 1px solid var(--border-strong); border-radius: 10px;
+        font-size: 14px; font-weight: 600; color: var(--text) !important;
+    }
+    .branch-choice__item:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+    .branch-choice__item input { accent-color: var(--primary); margin: 0; }
 </style>
 
 <div class="page-head">
@@ -26,12 +34,22 @@
     {% csrf_token %}
     <div class="panel import-text">
         <div class="form-field">
+            <label>{{ form.branch.label }}</label>
+            <div class="branch-choice">
+                {% for radio in form.branch %}
+                    <label class="branch-choice__item">{{ radio.tag }} {{ radio.choice_label }}</label>
+                {% endfor %}
+            </div>
+            <div class="sub">{{ form.branch.help_text }}</div>
+            {% if form.branch.errors %}<div class="form-errors">Выберите филиал.</div>{% endif %}
+        </div>
+        <div class="form-field" style="margin-top: 16px;">
             <label for="{{ form.text.id_for_label }}">{{ form.text.label }}</label>
             {{ form.text }}
             {% if form.text.errors %}<div class="form-errors">{{ form.text.errors.0 }}</div>{% endif %}
         </div>
         <div class="sub" style="margin-top: 8px;">
-            Повторная вставка того же сообщения не создаёт дубли: группа узнаётся по направлению и номеру, у неё обновятся даты и численность.
+            Повторная вставка того же сообщения не создаёт дубли: группа узнаётся по филиалу, направлению и номеру, у неё обновятся даты и численность.
             Design считается как UX/UI, Flutter — как Mobile.
         </div>
         <div class="form-actions">
@@ -46,6 +64,7 @@
                     <thead>
                     <tr>
                         <th>Что будет</th>
+                        <th>Филиал</th>
                         <th>Направление</th>
                         <th>Группа</th>
                         <th>Старт</th>
@@ -62,6 +81,7 @@
                                 {% elif row.action == 'same' %}<span class="badge badge--gray">без изменений</span>
                                 {% else %}<span class="badge badge--red">ошибка</span>{% endif %}
                             </td>
+                            <td>{{ row.branch|default:'—' }}</td>
                             <td>
                                 {% if row.specialization %}{{ row.specialization }}{% if row.direction_name|lower != row.specialization.name|lower %} <span class="sub">({{ row.direction_name }})</span>{% endif %}
                                 {% else %}{{ row.direction_name|default:'—' }}{% endif %}
@@ -83,7 +103,7 @@
                             {% endif %}
                         </tr>
                     {% empty %}
-                        <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">
+                        <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">
                             В тексте не нашлось ни одной группы. Нужны строки вида «39 группа — старт: 09.06.2026 · конец: 06.10.2026 — 4 студента».
                         </td></tr>
                     {% endfor %}

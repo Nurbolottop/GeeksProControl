@@ -1,6 +1,6 @@
 from django import forms
 
-from apps.training.models import GroupStatus, TrainingGroup
+from apps.training.models import BRANCHES, GroupStatus, TrainingGroup
 
 
 class TrainingGroupForm(forms.ModelForm):
@@ -21,7 +21,6 @@ class TrainingGroupForm(forms.ModelForm):
         ]
         widgets = {
             'number': forms.TextInput(attrs={'placeholder': 'Например: 44'}),
-            'branch': forms.TextInput(attrs={'placeholder': 'Бишкек / Ош'}),
             'start_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'end_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'students_note': forms.TextInput(attrs={'placeholder': '5–7, на старте…'}),
@@ -62,6 +61,10 @@ class TrainingGroupForm(forms.ModelForm):
 
 
 class ImportForm(forms.Form):
+    branch = forms.ChoiceField(
+        label='Филиал', choices=BRANCHES, widget=forms.RadioSelect,
+        help_text='Если в тексте есть строка «Бишкек» или «Ош», группы ниже неё уйдут в этот филиал.',
+    )
     text = forms.CharField(
         label='Сообщение от академии',
         widget=forms.Textarea(attrs={

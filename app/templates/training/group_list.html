@@ -28,14 +28,13 @@
             <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
     </select>
-    {% if branches %}
-        <select name="branch">
-            <option value="">Филиал: все</option>
-            {% for branch in branches %}
-                <option value="{{ branch }}" {% if params.branch == branch %}selected{% endif %}>{{ branch }}</option>
-            {% endfor %}
-        </select>
-    {% endif %}
+    <select name="branch">
+        <option value="">Филиал: все</option>
+        {% for value, label in branches %}
+            <option value="{{ value }}" {% if params.branch == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+        <option value="{{ no_branch }}" {% if params.branch == no_branch %}selected{% endif %}>Филиал не указан</option>
+    </select>
     <button type="submit" class="btn btn--sm">Применить</button>
     {% if params.specialization or params.status or params.branch %}
         <a href="{% url 'training:group_list' %}" class="btn btn--secondary btn--sm">Сбросить</a>
