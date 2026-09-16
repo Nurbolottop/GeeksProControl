@@ -11,7 +11,7 @@ class SpecializationAdmin(admin.ModelAdmin):
 @admin.register(TrainingGroup)
 class TrainingGroupAdmin(admin.ModelAdmin):
     list_display = (
-        'number', 'specialization', 'branch', 'end_date',
-        'students_count', 'expected_interns', 'actual_interns',
+        'number', 'specialization', 'branch', 'status', 'end_date',
+        'students_count', 'wants_internship', 'expected_interns', 'actual_interns',
     )
-    list_filter = ('specialization', 'branch')
+    list_filter = ('specialization', 'branch', 'status')

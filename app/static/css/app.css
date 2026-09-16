@@ -2711,3 +2711,5 @@ tr.is-dragging { opacity: .45; background: var(--bg-soft, #f3f4f6); }
     .roadmap__row--labels { margin-top: 0; }
     .roadmap__bar { margin-bottom: 6px; }
 }
+
+.plan-row--empty td { color: var(--text-muted); background: #fbfbfd; }

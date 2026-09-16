@@ -49,10 +49,8 @@ def forecast(request):
 
 @login_required
 def graduations(request):
-    """Будущие выпуски учебных групп (ТЗ §13)."""
-    return render(request, 'resources/graduations.html', {
-        'groups': services.upcoming_graduations(),
-    })
+    """Выпуски переехали в раздел «IT-академия» — там же план-график."""
+    return redirect('training:plan')
 
 
 @login_required
