@@ -14,17 +14,13 @@ def _horizon(request) -> int:
 
 @login_required
 def plan(request):
-    """План-график академии: кто выпускается по месяцам."""
+    """IT-академия по направлениям: когда и сколько студентов выпускается."""
     months = _horizon(request)
-    rows = selectors.plan(months)
-    totals = selectors.plan_totals(rows)
     return render(request, 'training/plan.html', {
-        'rows': rows,
-        'totals': totals,
-        # «Хотят» и прогноз академия не присылает — колонки только если внесли
-        'show_wants': bool(totals['wants'] or totals['expected']),
+        'grid': selectors.matrix(months),
+        'directions': selectors.directions(),
+        'silent': selectors.silent_directions(),
         'academy': selectors.academy_totals(),
-        'specs': selectors.by_specialization(months),
         'months': str(months),
         'horizons': selectors.HORIZONS,
     })

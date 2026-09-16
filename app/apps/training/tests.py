@@ -1,5 +1,4 @@
 import datetime
-from unittest import mock
 
 from django.test import TestCase
 from django.urls import reverse
@@ -44,10 +43,6 @@ def make_specializations():
         name: Specialization.objects.create(name=name)
         for name in ('Backend', 'Frontend', 'UX/UI', 'Mobile')
     }
-
-
-def frozen_today():
-    return mock.patch('django.utils.timezone.localdate', return_value=TODAY)
 
 
 class AcademyImportTests(TestCase):
@@ -128,33 +123,63 @@ class AcademyImportTests(TestCase):
 
 
 class AcademyPlanTests(TestCase):
-    """План-график и сводки — всё от дат на сегодня."""
+    """Выпуски по направлениям — всё от дат на сегодня."""
 
     def setUp(self):
         self.specs = make_specializations()
-        with frozen_today():
-            importer.apply(importer.parse(ACADEMY_MESSAGE))
+        importer.apply(importer.parse(ACADEMY_MESSAGE))
 
-    def test_months_start_from_the_current_one(self):
-        rows = selectors.plan(3, today=TODAY)
-        self.assertEqual(rows[0]['label'], 'сентябрь 2026')
-        self.assertEqual(rows[2]['month'], datetime.date(2026, 11, 1))
+    def _row(self, grid, name):
+        return next(row for row in grid['rows'] if row['specialization'].name == name)
 
-    def test_group_lands_in_the_month_it_ends(self):
-        october = selectors.plan(12, today=TODAY)[1]
-        numbers = sorted((str(g.specialization), g.number) for g in october['groups'])
-        self.assertEqual(numbers, [('Backend', '40'), ('UX/UI', '39')])
-        self.assertEqual(october['students'], 12)
+    def test_grid_columns_run_from_now_to_the_last_graduation(self):
+        grid = selectors.matrix(12, today=TODAY)
+        months = [column['month'] for column in grid['columns']]
+        self.assertEqual(months[0], datetime.date(2026, 9, 1))
+        self.assertEqual(months[-1], datetime.date(2027, 3, 1))
+        self.assertEqual(len(months), 7)
+
+    def test_grid_rows_are_directions(self):
+        grid = selectors.matrix(12, today=TODAY)
+        self.assertEqual(
+            sorted(row['specialization'].name for row in grid['rows']),
+            ['Backend', 'Frontend', 'Mobile', 'UX/UI'],
+        )
+
+    def test_cell_holds_students_graduating_that_month(self):
+        grid = selectors.matrix(12, today=TODAY)
+        backend = self._row(grid, 'Backend')
+        september, october, november = backend['cells'][:3]
+        self.assertEqual(september['students'], 8)
+        self.assertEqual([g.number for g in october['groups']], ['40'])
+        self.assertEqual(november['students'], 7)
+        # 8 + 8 + 7 + 7 + 5 (из «5–7») + 11
+        self.assertEqual(backend['students'], 46)
 
     def test_unknown_count_is_flagged_not_counted(self):
-        march = selectors.plan(12, today=TODAY)[6]
+        grid = selectors.matrix(12, today=TODAY)
+        frontend = self._row(grid, 'Frontend')
+        march = frontend['cells'][6]
         self.assertEqual(march['unknown'], 1)
-        self.assertEqual(march['students'], 11 + 9)
+        self.assertEqual(march['students'], 0)
+        self.assertEqual(grid['unknown'], 1)
+
+    def test_footer_sums_each_month(self):
+        grid = selectors.matrix(12, today=TODAY)
+        self.assertEqual(grid['footer'][1]['students'], 12)  # октябрь: Backend 8 + UX/UI 4
+        self.assertEqual(grid['students'], sum(cell['students'] for cell in grid['footer']))
 
     def test_horizon_cuts_later_graduations(self):
         # сентябрь–ноябрь: Frontend 43, 44 · Backend 39, 40, 41 · Design 39, 40
-        self.assertEqual(selectors.plan_totals(selectors.plan(3, today=TODAY))['groups'], 7)
-        self.assertEqual(selectors.plan_totals(selectors.plan(12, today=TODAY))['groups'], 18)
+        self.assertEqual(selectors.matrix(3, today=TODAY)['groups'], 7)
+        self.assertEqual(selectors.matrix(12, today=TODAY)['groups'], 18)
+
+    def test_cancelled_group_is_left_out(self):
+        group = TrainingGroup.objects.get(number='39', specialization=self.specs['UX/UI'])
+        group.status = GroupStatus.CANCELLED
+        group.save()
+        ux = self._row(selectors.matrix(12, today=TODAY), 'UX/UI')
+        self.assertEqual(ux['cells'][1]['groups'], [])
 
     def test_stage_follows_dates_without_resaving(self):
         group = TrainingGroup.objects.get(number='44', specialization=self.specs['Backend'])
@@ -162,26 +187,52 @@ class AcademyPlanTests(TestCase):
         self.assertEqual(group.stage_by_dates(datetime.date(2026, 10, 1)), GroupStatus.STUDYING)
         self.assertEqual(group.stage_by_dates(datetime.date(2027, 4, 1)), GroupStatus.GRADUATED)
 
+    def test_direction_cards_list_their_groups(self):
+        cards = {card['specialization'].name: card for card in selectors.directions(today=TODAY)}
+        mobile = cards['Mobile']
+        self.assertEqual([item['group'].number for item in mobile['items']], ['4', '5', '6'])
+        self.assertEqual(mobile['studying'], 5 + 7 + 9)
+        self.assertEqual(mobile['items'][0]['students'], '5 студентов')
+
+    def test_direction_card_soon_counts_three_months(self):
+        cards = {card['specialization'].name: card for card in selectors.directions(today=TODAY)}
+        # до конца ноября: Design 39 (4) и 40 (6)
+        self.assertEqual(cards['UX/UI']['soon'], 10)
+
+    def test_long_graduated_groups_drop_off_the_cards(self):
+        cards = {card['specialization'].name: card for card in selectors.directions(today=datetime.date(2027, 1, 20))}
+        numbers = [item['group'].number for item in cards['Frontend']['items']]
+        self.assertNotIn('43', numbers)       # выпустилась в сентябре — давно
+        self.assertIn('45', numbers)          # выпустилась в декабре — недавно
+
+    def test_silent_directions(self):
+        Specialization.objects.create(name='DevOps')
+        self.assertEqual([spec.name for spec in selectors.silent_directions()], ['DevOps'])
+
+    def test_when_label(self):
+        cards = {card['specialization'].name: card for card in selectors.directions(today=TODAY)}
+        backend = {item['group'].number: item['when'] for item in cards['Backend']['items']}
+        self.assertEqual(backend['39'], 'выпуск через 10 дней')
+        self.assertEqual(backend['40'], 'выпуск через 6 недель')
+        self.assertEqual(backend['44'], 'старт через 7 дней')
+        self.assertEqual(backend['43'], 'выпуск через 5 месяцев')
+        self.assertEqual(selectors.span_label(7), '7 дней')
+        self.assertEqual(selectors.span_label(21), '3 недели')
+        self.assertEqual(selectors.span_label(35), '5 недель')
+
+    def test_students_label_plurals(self):
+        self.assertEqual(selectors.students_label(1), '1 студент')
+        self.assertEqual(selectors.students_label(4), '4 студента')
+        self.assertEqual(selectors.students_label(11), '11 студентов')
+        self.assertEqual(selectors.students_label(22), '22 студента')
+        self.assertEqual(selectors.students_label(None), 'численность неизвестна')
+
     def test_academy_totals(self):
         totals = selectors.academy_totals(today=TODAY)
-        # не стартовали на 16.09: Frontend 48 (неизвестно), Backend 44 (11)
         self.assertEqual(totals['recruiting'], 11)
         self.assertEqual(totals['unknown'], 1)
         self.assertEqual(totals['groups'], 18)
         self.assertIsNone(totals['conversion'])
-
-    def test_cancelled_group_is_left_out(self):
-        group = TrainingGroup.objects.get(number='39', specialization=self.specs['UX/UI'])
-        group.status = GroupStatus.CANCELLED
-        group.save()
-        october = selectors.plan(12, today=TODAY)[1]
-        self.assertEqual([g.number for g in october['groups']], ['40'])
-
-    def test_by_specialization(self):
-        rows = {str(r['specialization']): r for r in selectors.by_specialization(12, today=TODAY)}
-        self.assertEqual(rows['Mobile']['graduating'], 5 + 7 + 9)
-        self.assertEqual(rows['Mobile']['groups'], 3)
-        self.assertEqual(rows['UX/UI']['graduating'], 4 + 6 + 8)
 
 
 class AcademyViewsTests(TestCase):
@@ -203,23 +254,24 @@ class AcademyViewsTests(TestCase):
         self.assertRedirects(response, reverse('training:plan'))
         self.assertEqual(TrainingGroup.objects.count(), 18)
 
-    def test_plan_page_hides_wants_columns_without_data(self):
+    def test_plan_page_is_by_direction(self):
         importer.apply(importer.parse(ACADEMY_MESSAGE))
         response = self.client.get(reverse('training:plan'))
-        self.assertFalse(response.context['show_wants'])
-        self.assertNotContains(response, 'Хотят на стажировку')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Сколько студентов выпускается')
+        self.assertEqual(len(response.context['directions']), 4)
 
-    def test_plan_page_shows_wants_once_entered(self):
-        importer.apply(importer.parse(ACADEMY_MESSAGE))
-        TrainingGroup.objects.filter(number='41').update(wants_internship=3)
-        response = self.client.get(reverse('training:plan'), {'months': '24'})
-        self.assertTrue(response.context['show_wants'])
+    def test_empty_academy_page_opens(self):
+        response = self.client.get(reverse('training:plan'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Групп академии пока нет')
 
     def test_horizon_switch(self):
-        response = self.client.get(reverse('training:plan'), {'months': '24'})
-        self.assertEqual(len(response.context['rows']), 24)
+        importer.apply(importer.parse(ACADEMY_MESSAGE))
+        response = self.client.get(reverse('training:plan'), {'months': '6'})
+        self.assertEqual(response.context['months'], '6')
         response = self.client.get(reverse('training:plan'), {'months': 'мусор'})
-        self.assertEqual(len(response.context['rows']), 12)
+        self.assertEqual(response.context['months'], '12')
 
     def test_create_group_by_hand_with_unknown_count(self):
         self.client.post(reverse('training:group_create'), {

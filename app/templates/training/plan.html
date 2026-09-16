@@ -4,17 +4,41 @@
 
 {% block content %}
 <style>
-    .plan-row--empty td { color: var(--text-muted); background: #fbfbfd; }
-    .plan-groups { display: flex; flex-wrap: wrap; gap: 6px; }
+    .grid-table th, .grid-table td { text-align: center; white-space: nowrap; }
+    .grid-table th:first-child, .grid-table td:first-child { text-align: left; }
+    .grid-table th small { display: block; font-weight: 500; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+    .grid-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 44px; }
+    .grid-cell strong { font-size: 16px; }
+    .grid-cell span { font-size: 11px; color: var(--text-muted); }
+    .grid-cell--empty { color: #c3c8d4; }
+    .grid-table .grid-total { background: var(--primary-soft); }
+
+    .academy-dirs { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; margin-top: 18px; }
+    @media (max-width: 720px) { .academy-dirs { grid-template-columns: 1fr; } }
+    .academy-dir { margin: 0; }
+    .academy-dir__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .academy-dir__head h2 { margin: 0; font-size: 18px; }
+    .academy-dir__stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
+    .academy-dir__stats div { display: flex; flex-direction: column; }
+    .academy-dir__stats strong { font-size: 20px; line-height: 1.1; }
+    .academy-dir__stats span { font-size: 11.5px; color: var(--text-muted); }
+    .academy-group { display: grid; grid-template-columns: 92px 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+    .academy-group__num { font-weight: 700; }
+    .academy-group__num a { color: var(--text); }
+    .academy-group__dates { font-size: 13px; }
+    .academy-group__dates .sub { font-size: 12px; }
+    .academy-group__count { text-align: right; font-size: 13px; }
+    .academy-group__count .sub { font-size: 11.5px; }
+    .academy-group--done { opacity: .6; }
 </style>
 
 <div class="page-head">
     <div>
-        <h1>IT-академия: план выпусков</h1>
-        <div class="sub">Какие группы и сколько студентов выпускаются по месяцам — отсюда к нам приходят стажёры</div>
+        <h1>IT-академия</h1>
+        <div class="sub">Сколько студентов учится по каждому направлению и когда они выпускаются к нам на стажировку</div>
     </div>
     <div class="page-actions">
-        <a href="{% url 'training:group_list' %}" class="btn btn--secondary">Группы</a>
+        <a href="{% url 'training:group_list' %}" class="btn btn--secondary">Все группы</a>
         <a href="{% url 'training:group_import' %}" class="btn">Вставить сообщение академии</a>
     </div>
 </div>
@@ -30,11 +54,11 @@
     </div>
     <div class="kpi-card">
         <div class="kpi-card__value">{{ academy.recruiting }}</div>
-        <div class="kpi-card__label">В группах, которые ещё не стартовали</div>
+        <div class="kpi-card__label">Ещё не начали учиться</div>
     </div>
     <div class="kpi-card">
         <div class="kpi-card__value">{{ academy.groups }}</div>
-        <div class="kpi-card__label">Групп в работе{% if academy.unknown %}, без численности: {{ academy.unknown }}{% endif %}</div>
+        <div class="kpi-card__label">Групп{% if academy.unknown %} · у {{ academy.unknown }} численность неизвестна{% endif %}</div>
     </div>
     {% if academy.conversion is not None %}
         <div class="kpi-card kpi-card--green">
@@ -44,114 +68,111 @@
     {% endif %}
 </div>
 
-<div class="filterbar">
-    <span class="sub">Горизонт:</span>
-    {% for value, label in horizons %}
-        <a href="?months={{ value }}" class="btn btn--sm {% if months != value %}btn--secondary{% endif %}">{{ label }}</a>
+<div class="panel" style="padding: 0;">
+    <div class="panel-head" style="padding: 16px 20px 4px; flex-wrap: wrap; gap: 10px;">
+        <div>
+            <h2 style="margin: 0;">Сколько студентов выпускается</h2>
+            <div class="sub">По направлениям и месяцам выпуска</div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+            {% for value, label in horizons %}
+                <a href="?months={{ value }}" class="btn btn--sm {% if months != value %}btn--secondary{% endif %}">{{ label }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    {% if grid.rows %}
+        <div class="table-wrap">
+            <table class="data grid-table">
+                <thead>
+                <tr>
+                    <th>Направление</th>
+                    {% for column in grid.columns %}
+                        <th>{{ column.short }}<small>{{ column.year }}</small></th>
+                    {% endfor %}
+                    <th class="grid-total">Всего</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in grid.rows %}
+                    <tr>
+                        <td><strong>{{ row.specialization }}</strong></td>
+                        {% for cell in row.cells %}
+                            <td>
+                                {% if cell.groups %}
+                                    <span class="grid-cell" title="{% for g in cell.groups %}{{ g.number }} группа — конец {{ g.end_date|date:'d.m.Y' }}{% if not forloop.last %}; {% endif %}{% endfor %}">
+                                        <strong>{% if cell.students %}{{ cell.students }}{% else %}?{% endif %}{% if cell.unknown and cell.students %}+?{% endif %}</strong>
+                                        <span>{% for g in cell.groups %}гр. {{ g.number }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                                    </span>
+                                {% else %}
+                                    <span class="grid-cell grid-cell--empty">·</span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                        <td class="grid-total"><strong>{{ row.students }}</strong>{% if row.unknown %} <span class="sub">+?</span>{% endif %}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                <tr>
+                    <td><strong>Всего</strong></td>
+                    {% for cell in grid.footer %}
+                        <td><strong>{{ cell.students|default:'·' }}</strong>{% if cell.unknown %} <span class="sub">+?</span>{% endif %}</td>
+                    {% endfor %}
+                    <td class="grid-total"><strong>{{ grid.students }}</strong>{% if grid.unknown %} <span class="sub">+?</span>{% endif %}</td>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% if grid.unknown %}
+            <div class="sub" style="padding: 10px 20px 16px;">«+?» — в этом месяце выпускается группа, численность которой академия ещё не сообщила.</div>
+        {% endif %}
+    {% else %}
+        <div class="sub" style="padding: 20px;">
+            В выбранном горизонте выпусков нет. Вставьте свежее сообщение академии или выберите период побольше.
+        </div>
+    {% endif %}
+</div>
+
+<div class="academy-dirs">
+    {% for dir in directions %}
+        <div class="panel academy-dir">
+            <div class="academy-dir__head">
+                <h2>{{ dir.specialization }}</h2>
+                <a href="{% url 'training:group_list' %}?specialization={{ dir.specialization.pk }}" class="sub">все группы →</a>
+            </div>
+            <div class="academy-dir__stats">
+                <div><strong>{{ dir.studying }}</strong><span>учатся сейчас</span></div>
+                <div><strong>{{ dir.soon }}</strong><span>выпуск за 3 месяца</span></div>
+                <div><strong>{{ dir.groups }}</strong><span>групп</span></div>
+                <div><strong>{{ dir.free_now }}</strong><span>свободных стажёров у нас</span></div>
+            </div>
+            {% for item in dir.items %}
+                <div class="academy-group {% if item.stage == 'graduated' %}academy-group--done{% endif %}">
+                    <div class="academy-group__num">
+                        <a href="{% url 'training:group_update' item.group.pk %}">{{ item.group.number }} группа</a>
+                    </div>
+                    <div class="academy-group__dates">
+                        {{ item.group.start_date|date:'d.m.Y'|default:'?' }} → {{ item.group.end_date|date:'d.m.Y'|default:'?' }}
+                        <div class="sub">{{ item.when }}</div>
+                    </div>
+                    <div class="academy-group__count">
+                        <span class="badge {% if item.stage == 'studying' %}badge--green{% elif item.stage == 'recruiting' %}badge--yellow{% else %}badge--blue{% endif %}">{{ item.stage_label }}</span>
+                        <div>{{ item.students }}</div>
+                        {% if item.group.students_note and item.group.students_count is not None %}<div class="sub">{{ item.group.students_note }}</div>{% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% empty %}
+        <div class="panel">
+            <div class="sub">Групп академии пока нет. Нажмите «Вставить сообщение академии» и вставьте присланный список.</div>
+        </div>
     {% endfor %}
 </div>
 
-<div class="panel" style="padding: 0;">
-    <div class="table-wrap">
-        <table class="data">
-            <thead>
-            <tr>
-                <th>Месяц выпуска</th>
-                <th>Группы</th>
-                <th>Студентов</th>
-                {% if show_wants %}<th>Хотят на стажировку</th><th>Прогноз</th>{% endif %}
-                <th>По направлениям</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for row in rows %}
-                <tr class="{% if not row.groups %}plan-row--empty{% endif %}">
-                    <td style="text-transform: capitalize;"><strong>{{ row.label }}</strong></td>
-                    <td>
-                        {% if row.groups %}
-                            <div class="plan-groups">
-                                {% for group in row.groups %}
-                                    <a href="{% url 'training:group_update' group.pk %}" class="badge badge--gray"
-                                       title="{{ group.start_date|date:'d.m.Y' }} — {{ group.end_date|date:'d.m.Y' }}">
-                                        {{ group.specialization }} {{ group.number }} · {{ group.end_date|date:'d.m' }}
-                                    </a>
-                                {% endfor %}
-                            </div>
-                        {% else %}<span class="sub">—</span>{% endif %}
-                    </td>
-                    <td>
-                        {% if row.groups %}
-                            <strong style="font-size: 15px;">{{ row.students }}</strong>
-                            {% if row.unknown %}<div class="sub">+ {{ row.unknown }} гр. без данных</div>{% endif %}
-                        {% else %}<span class="sub">—</span>{% endif %}
-                    </td>
-                    {% if show_wants %}
-                        <td>{% if row.wants %}<span class="badge badge--green">{{ row.wants }}</span>{% else %}<span class="sub">—</span>{% endif %}</td>
-                        <td>{% if row.expected %}{{ row.expected }}{% else %}<span class="sub">—</span>{% endif %}</td>
-                    {% endif %}
-                    <td>
-                        {% for name, count in row.specs %}
-                            <span class="badge badge--gray">{{ name }} · {{ count }}</span>
-                        {% empty %}<span class="sub">выпусков нет</span>{% endfor %}
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-            <tfoot>
-            <tr>
-                <td><strong>Итого за период</strong></td>
-                <td><strong>{{ totals.groups }}</strong> групп</td>
-                <td>
-                    <strong>{{ totals.students }}</strong>
-                    {% if totals.unknown %}<div class="sub">+ {{ totals.unknown }} гр. без данных</div>{% endif %}
-                </td>
-                {% if show_wants %}<td><strong>{{ totals.wants }}</strong></td><td><strong>{{ totals.expected }}</strong></td>{% endif %}
-                <td></td>
-            </tr>
-            </tfoot>
-        </table>
+{% if silent and directions %}
+    <div class="sub" style="margin-top: 16px;">
+        Академия не готовит: {% for spec in silent %}{{ spec }}{% if not forloop.last %}, {% endif %}{% endfor %} — стажёров этих направлений из академии ждать не стоит.
     </div>
-</div>
-
-<div class="panel" style="padding: 0; margin-top: 18px;">
-    <div class="panel-head" style="padding: 16px 20px 0;">
-        <h2>По направлениям</h2>
-        <span class="panel-bar__note">выпуск из академии против того, что есть сейчас</span>
-    </div>
-    <div class="table-wrap">
-        <table class="data">
-            <thead>
-            <tr>
-                <th>Направление</th>
-                <th>Групп в работе</th>
-                <th>Учатся сейчас</th>
-                <th>Ещё не стартовали</th>
-                <th>Выпустится за период</th>
-                <th>Свободных стажёров сейчас</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for row in specs %}
-                <tr>
-                    <td><strong>{{ row.specialization }}</strong></td>
-                    <td>{{ row.groups|default:'—' }}</td>
-                    <td>{{ row.studying|default:'—' }}</td>
-                    <td>{{ row.recruiting|default:'—' }}</td>
-                    <td>
-                        {% if row.graduating %}<span class="badge badge--green">{{ row.graduating }}</span>
-                        {% else %}<span class="badge badge--gray">0</span>{% endif %}
-                    </td>
-                    <td>
-                        {% if row.free_now %}{{ row.free_now }}
-                        {% elif row.graduating %}<span class="badge badge--gray">0</span>
-                        {% else %}<span class="badge badge--red" title="Свободных нет и из академии никто не выпускается">0</span>{% endif %}
-                    </td>
-                </tr>
-            {% empty %}
-                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Направлений нет.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+{% endif %}
 {% endblock %}
