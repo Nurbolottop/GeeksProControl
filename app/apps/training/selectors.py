@@ -1,4 +1,9 @@
-"""Выборки для IT-академии: план-график набора и сводки по направлениям."""
+"""Выборки для IT-академии: план-график выпусков и сводки по направлениям.
+
+Академия сообщает только направление, номер группы, даты и численность,
+поэтому всё считаем от дат на сегодняшний день, а «хотят на стажировку» и
+прогноз показываем, только если их кто-то внёс.
+"""
 import datetime
 
 from django.utils import timezone
@@ -24,12 +29,22 @@ def next_month(date: datetime.date) -> datetime.date:
     return (date.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
 
 
-def plan(months: int = 12, today: datetime.date | None = None) -> list[dict]:
-    """План-график: что академия выпускает по месяцам вперёд.
+def add_months(date: datetime.date, months: int) -> datetime.date:
+    for _ in range(months):
+        date = next_month(date)
+    return date
 
-    Считаем только группы, которые ещё учатся или набираются: выпущенные
-    уже пришли в стажёры, а не состоявшиеся не придут никогда.
-    """
+
+def live_groups():
+    """Все группы, кроме не состоявшихся."""
+    return (
+        TrainingGroup.objects.exclude(status=GroupStatus.CANCELLED)
+        .select_related('specialization')
+    )
+
+
+def plan(months: int = 12, today: datetime.date | None = None) -> list[dict]:
+    """План-график: какие группы академия выпускает по месяцам вперёд."""
     today = today or timezone.localdate()
     start = month_start(today)
     buckets = {}
@@ -37,36 +52,27 @@ def plan(months: int = 12, today: datetime.date | None = None) -> list[dict]:
     for _ in range(months):
         buckets[cursor] = {
             'month': cursor, 'label': month_label(cursor), 'groups': [],
-            'students': 0, 'wants': 0, 'expected': 0, 'specs': {},
+            'students': 0, 'unknown': 0, 'wants': 0, 'expected': 0, 'specs': {},
         }
         cursor = next_month(cursor)
-    limit = cursor
 
-    groups = (
-        TrainingGroup.objects
-        .filter(
-            status__in=[GroupStatus.RECRUITING, GroupStatus.STUDYING],
-            end_date__gte=start, end_date__lt=limit,
-        )
-        .select_related('specialization')
-        .order_by('end_date', 'number')
-    )
+    groups = live_groups().filter(
+        end_date__gte=start, end_date__lt=cursor,
+    ).order_by('end_date', 'specialization__name', 'number')
     for group in groups:
         bucket = buckets[month_start(group.end_date)]
         bucket['groups'].append(group)
-        bucket['students'] += group.students_count
+        if group.students_count is None:
+            bucket['unknown'] += 1
+        bucket['students'] += group.students_count or 0
         bucket['wants'] += group.wants_internship
         bucket['expected'] += group.expected_interns
         name = str(group.specialization)
-        spec = bucket['specs'].setdefault(name, {'wants': 0, 'students': 0})
-        spec['wants'] += group.wants_internship
-        spec['students'] += group.students_count
+        bucket['specs'][name] = bucket['specs'].get(name, 0) + (group.students_count or 0)
 
     rows = list(buckets.values())
     for row in rows:
-        row['specs'] = sorted(
-            row['specs'].items(), key=lambda item: (-item[1]['wants'], item[0]),
-        )
+        row['specs'] = sorted(row['specs'].items(), key=lambda item: (-item[1], item[0]))
     return rows
 
 
@@ -74,13 +80,14 @@ def plan_totals(rows) -> dict:
     return {
         'groups': sum(len(row['groups']) for row in rows),
         'students': sum(row['students'] for row in rows),
+        'unknown': sum(row['unknown'] for row in rows),
         'wants': sum(row['wants'] for row in rows),
         'expected': sum(row['expected'] for row in rows),
     }
 
 
 def by_specialization(months: int = 12, today: datetime.date | None = None) -> list[dict]:
-    """По направлениям: сколько учится сейчас и сколько придёт за период.
+    """По направлениям: сколько учится и сколько выпустится за период.
 
     Рядом — сколько стажёров этого направления свободно прямо сейчас,
     чтобы было видно, где дыра, а где людей и так хватает.
@@ -88,51 +95,59 @@ def by_specialization(months: int = 12, today: datetime.date | None = None) -> l
     from apps.resources.services import interns_summary
 
     today = today or timezone.localdate()
-    limit = month_start(today)
-    for _ in range(months):
-        limit = next_month(limit)
-
+    start = month_start(today)
+    limit = add_months(start, months)
     free_by_spec = {
         str(row['specialization']): row['free'] for row in interns_summary()
     }
+    groups = [group for group in live_groups() if group.is_open]
+
     rows = []
     for spec in Specialization.objects.all():
-        groups = [
-            group for group in
-            TrainingGroup.objects.filter(specialization=spec)
-            if group.is_open
-        ]
-        coming = [
-            group for group in groups
-            if group.end_date and month_start(today) <= group.end_date < limit
+        own = [group for group in groups if group.specialization_id == spec.pk]
+        studying = [g for g in own if g.stage == GroupStatus.STUDYING]
+        graduating = [
+            g for g in own if g.end_date and start <= g.end_date < limit
         ]
         rows.append({
             'specialization': spec,
-            'groups': len(groups),
-            'studying': sum(group.students_count for group in groups),
-            'wants': sum(group.wants_internship for group in groups),
-            'coming': sum(group.wants_internship for group in coming),
+            'groups': len(own),
+            'studying': sum(g.students_count or 0 for g in studying),
+            'recruiting': sum(
+                g.students_count or 0 for g in own if g.stage == GroupStatus.RECRUITING
+            ),
+            'graduating': sum(g.students_count or 0 for g in graduating),
+            'wants': sum(g.wants_internship for g in graduating),
             'free_now': free_by_spec.get(str(spec), 0),
         })
-    rows.sort(key=lambda row: (-row['studying'], str(row['specialization'])))
+    rows.sort(key=lambda row: (-(row['studying'] + row['recruiting']), str(row['specialization'])))
     return rows
 
 
-def academy_totals() -> dict:
-    """Сводка по академии целиком: сколько учится и сколько хотят к нам."""
-    open_groups = [
-        group for group in
-        TrainingGroup.objects.filter(
-            status__in=[GroupStatus.RECRUITING, GroupStatus.STUDYING],
-        )
+def academy_totals(today: datetime.date | None = None) -> dict:
+    """Сводка по академии: сколько учится, набирается и скоро выпустится."""
+    today = today or timezone.localdate()
+    groups = list(live_groups())
+    studying = [g for g in groups if g.stage_by_dates(today) == GroupStatus.STUDYING]
+    recruiting = [g for g in groups if g.stage_by_dates(today) == GroupStatus.RECRUITING]
+    soon_limit = add_months(month_start(today), 3)
+    soon = [
+        g for g in studying + recruiting
+        if g.end_date and g.end_date < soon_limit
     ]
-    graduated = TrainingGroup.objects.filter(status=GroupStatus.GRADUATED)
-    students = sum(group.students_count for group in graduated)
-    came = sum(group.actual_interns for group in graduated)
+    with_fact = [
+        g for g in groups
+        if g.stage_by_dates(today) == GroupStatus.GRADUATED
+        and g.actual_interns and g.students_count
+    ]
+    students = sum(g.students_count for g in with_fact)
+    came = sum(g.actual_interns for g in with_fact)
     return {
-        'groups': len(open_groups),
-        'studying': sum(group.students_count for group in open_groups),
-        'wants': sum(group.wants_internship for group in open_groups),
-        'expected': sum(group.expected_interns for group in open_groups),
+        'groups': len(studying) + len(recruiting),
+        'studying': sum(g.students_count or 0 for g in studying),
+        'recruiting': sum(g.students_count or 0 for g in recruiting),
+        'soon': sum(g.students_count or 0 for g in soon),
+        'wants': sum(g.wants_internship for g in studying + recruiting),
+        'unknown': sum(1 for g in studying + recruiting if g.students_count is None),
         'conversion': round(came / students * 100) if students else None,
     }

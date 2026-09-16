@@ -46,8 +46,16 @@ class TrainingGroup(TimeStampedModel):
     status = models.CharField(
         'Статус', max_length=12, choices=GroupStatus.choices,
         default=GroupStatus.STUDYING, db_index=True,
+        help_text='Ставится сам по датам; вручную — только «Не состоялась».',
     )
-    students_count = models.PositiveSmallIntegerField('Обучающихся', default=0)
+    students_count = models.PositiveSmallIntegerField(
+        'Обучающихся', null=True, blank=True,
+        help_text='Пусто — академия ещё не сообщила.',
+    )
+    students_note = models.CharField(
+        'Уточнение по студентам', max_length=100, blank=True,
+        help_text='Как прислали: «5–7», «на старте» и т.п.',
+    )
     wants_internship = models.PositiveSmallIntegerField(
         'Хотят на стажировку', default=0,
         help_text='Сколько студентов сами сказали, что пойдут на стажировку.',
@@ -73,14 +81,49 @@ class TrainingGroup(TimeStampedModel):
     def get_absolute_url(self) -> str:
         return reverse('training:group_list')
 
+    def save(self, *args, **kwargs):
+        # Академия присылает только даты, поэтому стадию группы не ведём
+        # руками, а выводим из них. «Не состоялась» — единственное, что
+        # нельзя узнать по датам, его и оставляем ручным.
+        if self.status != GroupStatus.CANCELLED:
+            self.status = self.stage_by_dates()
+        super().save(*args, **kwargs)
+
+    def stage_by_dates(self, today=None) -> str:
+        from django.utils import timezone
+
+        today = today or timezone.localdate()
+        if self.start_date and today < self.start_date:
+            return GroupStatus.RECRUITING
+        if self.end_date and today > self.end_date:
+            return GroupStatus.GRADUATED
+        return GroupStatus.STUDYING
+
+    @property
+    def stage(self) -> str:
+        """Стадия на сегодня: по датам, а не по сохранённому полю.
+
+        Сохранённый статус устаревает — группа, заведённая «учится»,
+        через полгода уже выпущена, хотя её никто не пересохранял.
+        """
+        if self.status == GroupStatus.CANCELLED:
+            return GroupStatus.CANCELLED
+        return self.stage_by_dates()
+
+    @property
+    def stage_label(self) -> str:
+        return GroupStatus(self.stage).label
+
     @property
     def is_open(self) -> bool:
         """Группа ещё в работе — её выпуск попадает в план-график."""
-        return self.status in (GroupStatus.RECRUITING, GroupStatus.STUDYING)
+        return self.stage in (GroupStatus.RECRUITING, GroupStatus.STUDYING)
 
     @property
     def conversion(self):
-        """Доля дошедших до стажировки, когда группа уже выпущена."""
-        if self.status != GroupStatus.GRADUATED or not self.students_count:
+        """Доля дошедших до стажировки — когда группа выпущена и факт внесён."""
+        if self.stage != GroupStatus.GRADUATED or not self.students_count:
+            return None
+        if not self.actual_interns:
             return None
         return round(self.actual_interns / self.students_count * 100)

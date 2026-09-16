@@ -10,7 +10,8 @@
     </div>
     <div class="page-actions">
         <a href="{% url 'training:plan' %}" class="btn btn--secondary">План-график</a>
-        <a href="{% url 'training:group_create' %}" class="btn">+ Новая группа</a>
+        <a href="{% url 'training:group_import' %}" class="btn btn--secondary">Вставить сообщение академии</a>
+        <a href="{% url 'training:group_create' %}" class="btn">+ Группа вручную</a>
     </div>
 </div>
 
@@ -22,7 +23,7 @@
         {% endfor %}
     </select>
     <select name="status">
-        <option value="">Статус: в работе</option>
+        <option value="">Стадия: учатся и набираются</option>
         {% for value, label in statuses %}
             <option value="{{ value }}" {% if params.status == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
@@ -50,10 +51,9 @@
                 <th>Направление</th>
                 <th>Филиал</th>
                 <th>Обучение</th>
-                <th>Статус</th>
-                <th>Учится</th>
+                <th>Стадия</th>
+                <th>Студентов</th>
                 <th>Хотят на стажировку</th>
-                <th>Прогноз</th>
                 <th>Пришло</th>
                 <th></th>
             </tr>
@@ -62,7 +62,7 @@
             {% for group in groups %}
                 <tr>
                     <td>
-                        <a href="{% url 'training:group_update' group.pk %}"><strong>{{ group.number }}</strong></a>
+                        <a href="{% url 'training:group_update' group.pk %}"><strong>{{ group.number }} группа</strong></a>
                         {% if group.teacher %}<div class="sub">{{ group.teacher }}</div>{% endif %}
                     </td>
                     <td>{{ group.specialization }}</td>
@@ -70,12 +70,15 @@
                     <td>
                         {{ group.start_date|date:'d.m.Y'|default:'?' }} — {{ group.end_date|date:'d.m.Y'|default:'?' }}
                     </td>
-                    <td><span class="badge {% if group.status == 'studying' %}badge--green{% elif group.status == 'recruiting' %}badge--yellow{% elif group.status == 'graduated' %}badge--blue{% else %}badge--gray{% endif %}">{{ group.get_status_display }}</span></td>
-                    <td><strong>{{ group.students_count }}</strong></td>
-                    <td>{{ group.wants_internship }}</td>
-                    <td>{{ group.expected_interns }}</td>
+                    <td><span class="badge {% if group.stage == 'studying' %}badge--green{% elif group.stage == 'recruiting' %}badge--yellow{% elif group.stage == 'graduated' %}badge--blue{% else %}badge--gray{% endif %}">{{ group.stage_label }}</span></td>
                     <td>
-                        {% if group.status == 'graduated' %}
+                        {% if group.students_count is None %}<span class="badge badge--gray">неизвестно</span>
+                        {% else %}<strong>{{ group.students_count }}</strong>{% endif %}
+                        {% if group.students_note %}<div class="sub">{{ group.students_note }}</div>{% endif %}
+                    </td>
+                    <td>{{ group.wants_internship|default:'—' }}</td>
+                    <td>
+                        {% if group.stage == 'graduated' and group.actual_interns %}
                             {{ group.actual_interns }}{% if group.conversion is not None %} <span class="sub">({{ group.conversion }}%)</span>{% endif %}
                         {% else %}<span class="sub">—</span>{% endif %}
                     </td>
@@ -89,8 +92,8 @@
                     </td>
                 </tr>
             {% empty %}
-                <tr><td colspan="10" class="empty" style="text-align:center; padding: 24px;">
-                    Групп пока нет. Добавьте первую — и она появится в плане-графике.
+                <tr><td colspan="9" class="empty" style="text-align:center; padding: 24px;">
+                    Групп пока нет. Вставьте сообщение академии — группы появятся здесь и в плане-графике.
                 </td></tr>
             {% endfor %}
             </tbody>
