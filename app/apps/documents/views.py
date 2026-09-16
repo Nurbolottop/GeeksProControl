@@ -5,9 +5,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from apps.documents import services
-from apps.documents.forms import DocumentForm, DocumentTemplateForm
+from apps.documents.forms import (
+    DocumentForm, DocumentTemplateForm, ProjectBriefApplyForm,
+)
 from apps.documents.models import (
-    Document, DocumentStatus, DocumentTemplate, DocumentType,
+    Document, DocumentStatus, DocumentTemplate, DocumentType, ProjectBriefLink,
 )
 from apps.projects.models import Project, ProjectStatusHistory
 
@@ -91,6 +93,43 @@ def document_approve(request, pk):
         )
         messages.success(request, f"«{document.doc_type}» утверждён.")
     return redirect(f"{document.project.get_absolute_url()}?tab=documents")
+
+
+@login_required
+def brief_link_create(request, project_pk):
+    """Новая ссылка на бриф проекта — ПМ копирует и отправляет заказчику сам."""
+    project = get_object_or_404(Project, pk=project_pk)
+    if request.method == 'POST':
+        services.issue_brief_link(project, user=request.user)
+        messages.success(request, 'Ссылка на бриф создана.')
+    return redirect(f'{project.get_absolute_url()}?tab=documents')
+
+
+def brief_apply(request, token):
+    """Публичный бриф проекта — без входа в систему.
+
+    Ссылка выпускается под конкретный проект (`ProjectBriefLink`), поэтому
+    здесь не спрашиваем «какой проект» — он уже известен по токену.
+    Повторная отправка по действующей ссылке правит тот же ``ProjectBrief``,
+    а не создаёт новый.
+    """
+    link = ProjectBriefLink.objects.select_related('project').filter(
+        token=token,
+    ).first()
+    if link is None or not link.is_open:
+        return render(request, 'documents/brief_apply_expired.html', status=404)
+    project = link.project
+    existing = getattr(project, 'brief', None)
+    form = ProjectBriefApplyForm(
+        request.POST or None, request.FILES or None,
+        instance=existing, client=project.client,
+    )
+    if request.method == 'POST' and form.is_valid():
+        services.accept_brief_submission(link, form)
+        return render(request, 'documents/brief_apply_done.html', {'project': project})
+    return render(request, 'documents/brief_apply.html', {
+        'form': form, 'project': project,
+    })
 
 
 @login_required

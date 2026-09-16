@@ -1,0 +1,49 @@
+<div class="panel">
+    <div class="pm-stages__head">
+        <div>
+            <h2 style="margin: 0;">Этапы проекта</h2>
+            <div class="sub">
+                Отмечайте, на каком этапе проект на самом деле. Готовый этап — «Завершён»,
+                тот, над которым работаете, — «В процессе».
+            </div>
+        </div>
+        {% if stage_check_needed %}
+            <form method="post" action="{% url 'pm_portal:stages_confirm' project.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--sm">Всё верно, этап актуален</button>
+            </form>
+        {% else %}
+            <span class="badge badge--green">Сегодня сверено ✓</span>
+        {% endif %}
+    </div>
+
+    <ol class="pm-stages">
+        {% for stage in stages %}
+            <li class="pm-stages__row is-{{ stage.status }}{% if stage.key == project.current_stage %} is-current{% endif %}">
+                <span class="pm-stages__num">{% if stage.status == 'done' %}✓{% else %}{{ forloop.counter }}{% endif %}</span>
+                <div class="pm-stages__name">
+                    <b>{{ stage.get_key_display }}</b>
+                    <span>
+                        {% if stage.key == project.current_stage %}текущий этап{% endif %}
+                        {% if stage.end_date %}
+                            {% if stage.key == project.current_stage %} · {% endif %}завершён {{ stage.end_date|date:'d.m.Y' }}
+                        {% elif stage.start_date %}
+                            {% if stage.key == project.current_stage %} · {% endif %}начат {{ stage.start_date|date:'d.m.Y' }}
+                        {% endif %}
+                    </span>
+                </div>
+                <form method="post" action="{% url 'pm_portal:stage_set' project.pk stage.pk %}" class="pm-stages__form">
+                    {% csrf_token %}
+                    <div class="pm-stages__switch">
+                        {% for value, label in stage_statuses %}
+                            <button type="submit" name="status" value="{{ value }}"
+                                    class="pm-stages__opt{% if stage.status == value %} is-on{% endif %} pm-stages__opt--{{ value }}">
+                                {{ label }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </form>
+            </li>
+        {% endfor %}
+    </ol>
+</div>

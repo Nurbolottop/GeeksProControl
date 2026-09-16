@@ -249,6 +249,8 @@ def project_detail(request, pk):
         ]
         context['documents'] = documents
         context['doc_progress'] = doc_services.document_progress(project)
+        context['brief_link'] = doc_services.active_brief_link(project)
+        context['project_brief'] = getattr(project, 'brief', None)
     elif tab == 'report':
         context['reports'] = project.reports.select_related('author')
     elif tab == 'daily':

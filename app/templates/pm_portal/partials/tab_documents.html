@@ -7,6 +7,46 @@
     </div>
 </div>
 
+<div class="form-link {% if not brief_link %}form-link--off{% endif %}" style="margin-bottom: 16px;">
+    <div class="form-link__body">
+        <div class="form-link__label">Ссылка на бриф</div>
+        {% if brief_link %}
+            <a class="form-link__url" id="brief-link-url" href="{{ brief_link.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ brief_link.get_absolute_url }}</a>
+            <div class="form-link__meta">
+                Отправьте заказчику сами — заполнит без входа в систему
+                · заполнений: {{ brief_link.submissions }}
+            </div>
+        {% else %}
+            <div class="form-link__meta">Ссылки ещё нет — создайте кнопкой справа и отправьте заказчику.</div>
+        {% endif %}
+    </div>
+    <div class="form-link__actions">
+        {% if brief_link %}
+            <button type="button" class="btn btn--secondary btn--sm" data-copy-link="brief-link-url">Копировать</button>
+        {% endif %}
+        <form method="post" action="{% url 'pm_portal:brief_link_create' project.pk %}"
+              {% if brief_link %}data-confirm="Создать новую ссылку на бриф? Прежняя перестанет работать." data-confirm-ok="Создать ссылку"{% endif %}
+              style="margin: 0;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn--secondary btn--sm">{% if brief_link %}Новая ссылка{% else %}Создать ссылку{% endif %}</button>
+        </form>
+    </div>
+</div>
+{% if brief_link %}
+    <script>
+        document.querySelector('[data-copy-link="brief-link-url"]')?.addEventListener('click', function () {
+            var button = this;
+            var url = document.getElementById('brief-link-url').href;
+            navigator.clipboard.writeText(url).then(function () {
+                button.textContent = 'Скопировано';
+                setTimeout(function () { button.textContent = 'Копировать'; }, 1500);
+            });
+        });
+    </script>
+{% endif %}
+
+{% include 'documents/partials/brief_readonly.html' %}
+
 <div class="doc-list">
     {% for item in checklist %}
         <div class="doc-row {% if item.document %}doc-row--done{% endif %}">

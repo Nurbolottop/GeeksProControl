@@ -7,6 +7,8 @@ app_name = 'pm_portal'
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('<int:pk>/', views.project_detail, name='project_detail'),
+    path('<int:pk>/stages/<int:stage_pk>/', views.stage_set, name='stage_set'),
+    path('<int:pk>/stages/confirm/', views.stages_confirm, name='stages_confirm'),
     path('<int:pk>/report/', views.report_create, name='report_create'),
     path(
         '<int:pk>/report/<int:report_pk>/edit/', views.report_update,
@@ -54,6 +56,10 @@ urlpatterns = [
     path(
         '<int:pk>/documents/<int:document_pk>/approve/', views.document_approve,
         name='document_approve',
+    ),
+    path(
+        '<int:pk>/documents/brief-link/', views.brief_link_create,
+        name='brief_link_create',
     ),
     path('<int:pk>/client/', views.client_edit, name='client_edit'),
 ]

@@ -3,7 +3,7 @@ import os
 from django import forms
 from django.conf import settings
 
-from apps.documents.models import Document, DocumentTemplate
+from apps.documents.models import Document, DocumentTemplate, ProjectBrief
 
 
 def validate_upload_file(file):
@@ -59,3 +59,57 @@ class DocumentTemplateForm(forms.ModelForm):
 
     def clean_file(self):
         return validate_upload_file(self.cleaned_data.get('file'))
+
+
+class ProjectBriefApplyForm(forms.ModelForm):
+    """Публичный бриф проекта — без входа в систему.
+
+    Контакты (организация/ФИО/телефон/email) — не поля ``ProjectBrief``,
+    это данные карточки клиента проекта; сюда добавлены отдельно и
+    сохраняются в ``Client`` уже во view/сервисе.
+    """
+
+    organization = forms.CharField(label='Название компании', max_length=255)
+    contact_name = forms.CharField(label='ФИО контактного лица', max_length=255)
+    phone = forms.CharField(label='Телефон', max_length=32)
+    email = forms.EmailField(label='Email')
+
+    REQUIRED_FIELDS = [
+        'about_business', 'goal', 'target_audience', 'required_features',
+        'references', 'deadline_wish', 'existing_site_url', 'domain',
+        'integrations', 'languages', 'content_owner', 'social_links',
+    ]
+
+    class Meta:
+        model = ProjectBrief
+        fields = [
+            'about_business', 'goal', 'target_audience', 'required_features',
+            'references', 'deadline_wish', 'existing_site_url', 'domain',
+            'integrations', 'languages', 'content_owner', 'social_links',
+            'competitors', 'brand_materials', 'decision_maker',
+            'requirements_file', 'preferred_contact', 'additional_notes',
+        ]
+        widgets = {
+            'about_business': forms.Textarea(attrs={'rows': 3}),
+            'goal': forms.Textarea(attrs={'rows': 3}),
+            'target_audience': forms.Textarea(attrs={'rows': 2}),
+            'required_features': forms.Textarea(attrs={'rows': 4}),
+            'references': forms.Textarea(attrs={'rows': 2}),
+            'integrations': forms.Textarea(attrs={'rows': 2}),
+            'social_links': forms.Textarea(attrs={'rows': 2}),
+            'competitors': forms.Textarea(attrs={'rows': 2}),
+            'additional_notes': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, client=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if client is not None:
+            self.fields['organization'].initial = client.organization
+            self.fields['contact_name'].initial = client.contact_name
+            self.fields['phone'].initial = client.phone
+            self.fields['email'].initial = client.email
+        for name in self.REQUIRED_FIELDS:
+            self.fields[name].required = True
+
+    def clean_requirements_file(self):
+        return validate_upload_file(self.cleaned_data.get('requirements_file'))

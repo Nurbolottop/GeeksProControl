@@ -1,4 +1,4 @@
-{% load static %}
+{% load static pm_alerts %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Портал ПМ — GeeksPro Control{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'css/pm-alerts.css' %}">
     <script src="{% static 'js/htmx.min.js' %}" defer></script>
     <script src="{% static 'js/alpine.min.js' %}" defer></script>
     <script src="{% static 'js/confirm-modal.js' %}" defer></script>
@@ -23,6 +24,7 @@
         </div>
     </header>
     <main class="pm-main">
+        {% stage_alerts %}
         {% if messages %}
             {% for message in messages %}
                 <div class="message message--{{ message.tags }}">{{ message }}</div>

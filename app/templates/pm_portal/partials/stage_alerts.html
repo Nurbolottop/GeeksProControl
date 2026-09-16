@@ -1,0 +1,20 @@
+{% for project in alerts %}
+    <div class="stage-alert" role="alert">
+        <span class="stage-alert__beacon" aria-hidden="true"></span>
+        <div class="stage-alert__text">
+            <b>{{ reminder_from }} просит обновить этап проекта «{{ project.name }}» на актуальный.</b>
+            <span>
+                Сейчас указан этап «{{ project.get_current_stage_display }}».
+                Если он уже другой — отметьте в «Этапах»; если всё верно — подтвердите.
+            </span>
+        </div>
+        <div class="stage-alert__actions">
+            <a href="{% url 'pm_portal:project_detail' project.pk %}?tab=stages" class="stage-alert__btn">Обновить этап</a>
+            <form method="post" action="{% url 'pm_portal:stages_confirm' project.pk %}">
+                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="stage-alert__btn stage-alert__btn--ghost">Этап актуален</button>
+            </form>
+        </div>
+    </div>
+{% endfor %}

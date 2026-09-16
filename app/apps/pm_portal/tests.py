@@ -539,6 +539,29 @@ class PmDocumentTests(PmProjectOwnershipTests):
             f"{reverse('pm_portal:document_upload', args=[self.project_a.pk])}?type={brief.pk}",
         )
 
+    def test_can_create_brief_link_for_own_project(self):
+        from apps.documents.models import ProjectBriefLink
+
+        self.client.post(
+            reverse("pm_portal:brief_link_create", args=[self.project_a.pk]),
+        )
+        self.assertTrue(
+            ProjectBriefLink.objects.filter(
+                project=self.project_a, is_active=True,
+            ).exists(),
+        )
+
+    def test_cannot_create_brief_link_for_foreign_project(self):
+        from apps.documents.models import ProjectBriefLink
+
+        response = self.client.post(
+            reverse("pm_portal:brief_link_create", args=[self.project_b.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(
+            ProjectBriefLink.objects.filter(project=self.project_b).exists(),
+        )
+
 
 class PmClientTests(PmProjectOwnershipTests):
     """Данные клиента заполняет ПМ по своему проекту."""
@@ -619,8 +642,11 @@ class PmClientTests(PmProjectOwnershipTests):
 
 
 class PmPortalExcludedActionsTests(TestCase):
-    """Статус/этап/завершение/«Проблемный» — этих действий в портале ПМ
-    просто нет: не спрятаны, а физически отсутствуют в urls.py."""
+    """Статус проекта, его завершение, «Проблемный» и правка карточки —
+    этих действий в портале ПМ просто нет: не спрятаны, а физически
+    отсутствуют в urls.py. Статусы отдельных этапов ПМ двигает сам
+    (см. PmStageTests), но не через общий stage_update основного
+    приложения."""
 
     def test_no_status_stage_or_completion_routes_exist(self):
         from django.urls import NoReverseMatch
@@ -631,3 +657,140 @@ class PmPortalExcludedActionsTests(TestCase):
         ):
             with self.assertRaises(NoReverseMatch):
                 reverse(name, args=[1])
+
+
+class PmStageTests(PmProjectOwnershipTests):
+    """ПМ сам двигает этапы и видит красное напоминание, пока не сверит их."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.projects.services import create_project
+
+        create_project(self.project_a)
+        create_project(self.project_b)
+        self.project_a.refresh_from_db()
+        self.stages_url = (
+            reverse("pm_portal:project_detail", args=[self.project_a.pk]) + "?tab=stages"
+        )
+
+    def _stage(self, project, key):
+        return project.stages.get(key=key)
+
+    def test_alert_shown_until_checked(self):
+        response = self.client.get(reverse("pm_portal:dashboard"))
+        self.assertContains(response, "просит обновить этап проекта «Проект A»")
+        # чужой проект в напоминаниях не светится
+        self.assertNotContains(response, "«Проект B»")
+
+    def test_alert_names_the_requester(self):
+        from apps.pm_portal import stages
+
+        response = self.client.get(reverse("pm_portal:dashboard"))
+        self.assertContains(response, f"{stages.REMINDER_FROM} просит обновить этап")
+
+    def test_setting_stage_updates_project_and_hides_alert(self):
+        from apps.projects.models import ProjectStage
+
+        stage = self._stage(self.project_a, "new")
+        response = self.client.post(
+            reverse("pm_portal:stage_set", args=[self.project_a.pk, stage.pk]),
+            {"status": ProjectStage.Status.DONE},
+        )
+        self.assertRedirects(response, self.stages_url, fetch_redirect_response=False)
+        stage.refresh_from_db()
+        self.project_a.refresh_from_db()
+        self.assertEqual(stage.status, ProjectStage.Status.DONE)
+        self.assertIsNotNone(stage.end_date)
+        self.assertNotEqual(self.project_a.current_stage, "new")
+        self.assertGreater(self.project_a.progress, 0)
+        self.assertIsNotNone(self.project_a.stages_checked_at)
+        self.assertTrue(
+            self.project_a.history.filter(field="Этап «Новый»", user=self.pm_user).exists()
+        )
+        dashboard = self.client.get(reverse("pm_portal:dashboard"))
+        self.assertNotContains(dashboard, "просит обновить этап")
+
+    def test_confirm_hides_alert_without_changes(self):
+        response = self.client.post(
+            reverse("pm_portal:stages_confirm", args=[self.project_a.pk]),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.project_a.refresh_from_db()
+        self.assertIsNotNone(self.project_a.stages_checked_at)
+        dashboard = self.client.get(reverse("pm_portal:dashboard"))
+        self.assertNotContains(dashboard, "просит обновить этап")
+
+    def test_alert_comes_back_next_day(self):
+        from django.utils import timezone
+
+        from apps.pm_portal import stages
+
+        self.project_a.stages_checked_at = timezone.now() - datetime.timedelta(days=1)
+        self.project_a.save(update_fields=["stages_checked_at"])
+        self.assertTrue(stages.needs_stage_check(self.project_a))
+        dashboard = self.client.get(reverse("pm_portal:dashboard"))
+        self.assertContains(dashboard, "просит обновить этап проекта «Проект A»")
+
+    def test_no_alert_for_inactive_project(self):
+        from apps.pm_portal import stages
+        from apps.projects.models import ProjectStatus
+
+        self.project_a.status = ProjectStatus.COMPLETED
+        self.assertFalse(stages.needs_stage_check(self.project_a))
+
+    def test_cannot_touch_foreign_project_stage(self):
+        stage = self._stage(self.project_b, "new")
+        response = self.client.post(
+            reverse("pm_portal:stage_set", args=[self.project_b.pk, stage.pk]),
+            {"status": "done"},
+        )
+        self.assertEqual(response.status_code, 404)
+        stage.refresh_from_db()
+        self.assertEqual(stage.status, "not_started")
+
+    def test_stage_of_other_project_rejected_via_own_url(self):
+        stage = self._stage(self.project_b, "new")
+        response = self.client.post(
+            reverse("pm_portal:stage_set", args=[self.project_a.pk, stage.pk]),
+            {"status": "done"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_completed_service_stage_not_editable(self):
+        stage = self._stage(self.project_a, "completed")
+        response = self.client.post(
+            reverse("pm_portal:stage_set", args=[self.project_a.pk, stage.pk]),
+            {"status": "done"},
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_invalid_status_rejected(self):
+        stage = self._stage(self.project_a, "new")
+        self.client.post(
+            reverse("pm_portal:stage_set", args=[self.project_a.pk, stage.pk]),
+            {"status": "hacked"},
+        )
+        stage.refresh_from_db()
+        self.assertEqual(stage.status, "not_started")
+
+    def test_get_does_not_change_stage(self):
+        stage = self._stage(self.project_a, "new")
+        self.client.get(
+            reverse("pm_portal:stage_set", args=[self.project_a.pk, stage.pk]),
+        )
+        stage.refresh_from_db()
+        self.assertEqual(stage.status, "not_started")
+
+    def test_stages_tab_lists_stages_without_service_stage(self):
+        response = self.client.get(self.stages_url)
+        self.assertEqual(response.status_code, 200)
+        keys = [stage.key for stage in response.context["stages"]]
+        self.assertIn("new", keys)
+        self.assertNotIn("completed", keys)
+
+    def test_confirm_ignores_external_next(self):
+        response = self.client.post(
+            reverse("pm_portal:stages_confirm", args=[self.project_a.pk]),
+            {"next": "https://evil.example.com/"},
+        )
+        self.assertEqual(response["Location"], self.stages_url)

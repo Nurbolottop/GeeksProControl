@@ -1,6 +1,8 @@
 from django.contrib import admin
 
-from apps.documents.models import Document, DocumentTemplate, DocumentType
+from apps.documents.models import (
+    Document, DocumentTemplate, DocumentType, ProjectBrief, ProjectBriefLink,
+)
 
 
 @admin.register(DocumentType)
@@ -24,3 +26,16 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ('doc_type', 'name', 'uploaded_by', 'created_at')
     list_filter = ('doc_type',)
     search_fields = ('name',)
+
+
+@admin.register(ProjectBriefLink)
+class ProjectBriefLinkAdmin(admin.ModelAdmin):
+    list_display = ('project', 'is_active', 'submissions', 'used_at', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('project__name', 'token')
+
+
+@admin.register(ProjectBrief)
+class ProjectBriefAdmin(admin.ModelAdmin):
+    list_display = ('project', 'submitted_at', 'created_at')
+    search_fields = ('project__name',)

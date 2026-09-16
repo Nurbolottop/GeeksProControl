@@ -162,6 +162,11 @@ class Project(TimeStampedModel, ArchivableModel):
     is_favorite = models.BooleanField('Избранный', default=False)
     is_problematic = models.BooleanField('Проблемный', default=False)
     last_activity_at = models.DateTimeField('Последняя активность', null=True, blank=True)
+    # Когда ПМ последний раз обновил или подтвердил этапы в своём портале.
+    # Пока сегодня этого не было, у ПМ горит красное напоминание.
+    stages_checked_at = models.DateTimeField(
+        'ПМ сверил этапы', null=True, blank=True,
+    )
 
     class Meta:
         verbose_name = 'Проект'

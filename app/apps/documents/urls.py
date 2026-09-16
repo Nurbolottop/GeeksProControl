@@ -19,4 +19,8 @@ urlpatterns = [
         'templates/<int:pk>/delete/', views.template_delete,
         name='template_delete',
     ),
+    path(
+        'brief-link/<int:project_pk>/create/', views.brief_link_create,
+        name='brief_link_create',
+    ),
 ]

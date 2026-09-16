@@ -1,0 +1,109 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бриф проекта — GeeksPro</title>
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="apply-body">
+<div class="apply-page">
+    <header class="apply-hero">
+        <div class="apply-hero__brand">Geeks<span>Pro</span></div>
+        <h1>Бриф проекта «{{ project.name }}»</h1>
+        <p>
+            Заполните, пожалуйста, эту анкету — по ней команда будет
+            готовить проект. Если что-то не знаете точно — напишите
+            примерно, это нормально.
+        </p>
+        <div class="apply-hero__legend"><span class="afield__req">*</span> — обязательные поля, остальные можно пропустить</div>
+    </header>
+
+    <form method="post" enctype="multipart/form-data" class="aform" novalidate>
+        {% csrf_token %}
+        {% if form.errors %}
+            <div class="apply-alert">
+                Проверьте выделенные поля — бриф не отправлен.
+                {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+            </div>
+        {% endif %}
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">1</span>
+                <div>
+                    <h2>Компания и контакты</h2>
+                    <p>Кто вы и как с вами связаться.</p>
+                </div>
+            </div>
+            <div class="agrid">
+                {% include 'partials/apply_field.html' with field=form.organization %}
+                {% include 'partials/apply_field.html' with field=form.contact_name %}
+                {% include 'partials/apply_field.html' with field=form.phone %}
+                {% include 'partials/apply_field.html' with field=form.email %}
+            </div>
+        </section>
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">2</span>
+                <div>
+                    <h2>О проекте</h2>
+                    <p>Что делаем и для кого.</p>
+                </div>
+            </div>
+            <div class="agrid">
+                {% include 'partials/apply_field.html' with field=form.about_business wide=1 %}
+                {% include 'partials/apply_field.html' with field=form.goal wide=1 %}
+                {% include 'partials/apply_field.html' with field=form.target_audience wide=1 %}
+                {% include 'partials/apply_field.html' with field=form.required_features wide=1 %}
+                {% include 'partials/apply_field.html' with field=form.references wide=1 %}
+                {% include 'partials/apply_field.html' with field=form.deadline_wish %}
+            </div>
+        </section>
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">3</span>
+                <div>
+                    <h2>Технические детали</h2>
+                    <p>Если чего-то ещё нет — так и напишите «нет».</p>
+                </div>
+            </div>
+            <div class="agrid">
+                {% include 'partials/apply_field.html' with field=form.existing_site_url %}
+                {% include 'partials/apply_field.html' with field=form.domain %}
+                {% include 'partials/apply_field.html' with field=form.integrations wide=1 %}
+                {% include 'partials/apply_field.html' with field=form.languages %}
+                {% include 'partials/apply_field.html' with field=form.content_owner %}
+                {% include 'partials/apply_field.html' with field=form.social_links wide=1 %}
+            </div>
+        </section>
+
+        <section class="acard">
+            <div class="acard__head">
+                <span class="acard__num">4</span>
+                <div>
+                    <h2>Дополнительно</h2>
+                    <p>Необязательно, но поможет команде — если есть под рукой.</p>
+                </div>
+            </div>
+            <div class="agrid">
+                {% include 'partials/apply_field.html' with field=form.competitors wide=1 mark_optional=1 %}
+                {% include 'partials/apply_field.html' with field=form.brand_materials mark_optional=1 %}
+                {% include 'partials/apply_field.html' with field=form.decision_maker mark_optional=1 %}
+                {% include 'partials/apply_field.html' with field=form.requirements_file wide=1 mark_optional=1 %}
+                {% include 'partials/apply_field.html' with field=form.preferred_contact mark_optional=1 %}
+                {% include 'partials/apply_field.html' with field=form.additional_notes wide=1 mark_optional=1 %}
+            </div>
+        </section>
+
+        <div class="aform__actions">
+            <button type="submit" class="btn btn--lg">Отправить бриф</button>
+            <span>Поля со звёздочкой обязательны.</span>
+        </div>
+    </form>
+</div>
+</body>
+</html>

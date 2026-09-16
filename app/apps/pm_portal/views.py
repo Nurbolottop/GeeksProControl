@@ -6,14 +6,15 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.attendance import services as attendance_services
 from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
 from apps.documents import services as document_services
 from apps.documents.models import Document, DocumentStatus
-from apps.pm_portal import services
+from apps.pm_portal import services, stages as stage_reminders
 from apps.pm_portal.forms import PMClientForm, PMDocumentForm
-from apps.projects.models import ProjectReport
+from apps.projects.models import ProjectReport, ProjectStage
 from apps.projects.services import calculate_deadline_status
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
@@ -25,19 +26,27 @@ from apps.training.models import Specialization
 @login_required
 def dashboard(request):
     """Список проектов, где текущий пользователь — активный ПМ."""
-    return render(request, 'pm_portal/dashboard.html', {
-        'projects': services.pm_projects(request.user),
-    })
+    projects = list(services.pm_projects(request.user))
+    for project in projects:
+        project.stage_check_needed = stage_reminders.needs_stage_check(project)
+    return render(request, 'pm_portal/dashboard.html', {'projects': projects})
 
 
 @login_required
 def project_detail(request, pk):
-    """Обзор проекта — только чтение: статус/этап/дедлайн менять здесь нельзя."""
+    """Проект глазами ПМ. Этапы ПМ двигает сам; статус проекта, дедлайн
+    и завершение — только у руководителя в основном приложении."""
     project = services.pm_project_or_404(request.user, pk)
     project.deadline_status = calculate_deadline_status(project)
     tab = request.GET.get('tab', 'overview')
-    context = {'project': project, 'tab': tab}
-    if tab == 'report':
+    context = {
+        'project': project, 'tab': tab,
+        'stage_check_needed': stage_reminders.needs_stage_check(project),
+    }
+    if tab == 'stages':
+        context['stages'] = stage_reminders.editable_stages(project)
+        context['stage_statuses'] = ProjectStage.Status.choices
+    elif tab == 'report':
         context['reports'] = project.reports.select_related('author')
     elif tab == 'team':
         members = project.team_members.select_related('intern__specialization', 'user')
@@ -65,9 +74,54 @@ def project_detail(request, pk):
         ]
         context['documents'] = documents
         context['doc_progress'] = document_services.document_progress(project)
+        context['brief_link'] = document_services.active_brief_link(project)
+        context['project_brief'] = getattr(project, 'brief', None)
     elif tab == 'client':
         context['client'] = project.client
     return render(request, 'pm_portal/project_detail.html', context)
+
+
+def _stages_url(project):
+    return f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=stages"
+
+
+@login_required
+def stage_set(request, pk, stage_pk):
+    """ПМ меняет статус одного этапа: не начат / в процессе / завершён."""
+    project = services.pm_project_or_404(request.user, pk)
+    if request.method != 'POST':
+        return redirect(_stages_url(project))
+    stage = get_object_or_404(
+        ProjectStage.objects.exclude(key='completed'), pk=stage_pk, project=project,
+    )
+    status = request.POST.get('status', '')
+    if status not in dict(ProjectStage.Status.choices):
+        messages.error(request, 'Выберите статус этапа из списка.')
+        return redirect(_stages_url(project))
+    if stage_reminders.set_stage_status(project, stage, status, user=request.user):
+        messages.success(
+            request,
+            f'Этап «{stage.get_key_display()}»: {stage.get_status_display().lower()}.',
+        )
+    else:
+        messages.info(request, 'Этап уже в этом статусе — отметили, что этапы сверены.')
+    return redirect(_stages_url(project))
+
+
+@login_required
+def stages_confirm(request, pk):
+    """«Этап актуален» — ничего не менялось, но ПМ сверил этапы сегодня."""
+    project = services.pm_project_or_404(request.user, pk)
+    if request.method == 'POST':
+        stage_reminders.mark_checked(project)
+        messages.success(request, 'Спасибо! Этапы сверены — напоминание погасло до завтра.')
+    # возвращаем туда, где нажали кнопку, но только внутри сайта
+    next_url = request.POST.get('next', '')
+    if not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure(),
+    ):
+        next_url = _stages_url(project)
+    return redirect(next_url)
 
 
 def _group_or_404(project):
@@ -408,6 +462,16 @@ def document_approve(request, pk, document_pk):
             'status', 'is_signed', 'signed_date', 'updated_at',
         ])
         messages.success(request, f'«{document.doc_type}» утверждён.')
+    return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=documents")
+
+
+@login_required
+def brief_link_create(request, pk):
+    """Новая ссылка на бриф проекта — ПМ копирует и отправляет заказчику сам."""
+    project = services.pm_project_or_404(request.user, pk)
+    if request.method == 'POST':
+        document_services.issue_brief_link(project, user=request.user)
+        messages.success(request, 'Ссылка на бриф создана.')
     return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=documents")
 
 
