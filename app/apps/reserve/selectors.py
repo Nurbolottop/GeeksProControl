@@ -1,7 +1,7 @@
 """Выборки для списка резерва: поиск, фильтры, сортировка."""
 from django.db.models import Q
 
-from apps.reserve.models import CandidateStatus, ReserveCandidate
+from apps.reserve.models import CandidateStatus, ReserveCandidate, ReserveShareLink
 
 # Подпись → выражение сортировки для ORM
 SORT_OPTIONS = [
@@ -155,3 +155,32 @@ def summary_by_specialization() -> list[dict]:
 def summary_totals(rows) -> dict:
     keys = ('total', 'new', 'available', 'in_progress', 'employed')
     return {key: sum(row[key] for row in rows) for key in keys}
+
+
+def share_collections(params) -> list:
+    """Действующие подборки для работодателей над списком кандидатов.
+
+    Если список отфильтрован по направлению, показываем только подборки,
+    где есть кандидаты этого направления, — иначе подборка «Backend»
+    видна и на странице Frontend и её легко отправить не туда. Каждой
+    подборке подписываем направления и имена, чтобы было видно, что внутри.
+    """
+    qs = (
+        ReserveShareLink.objects.filter(is_active=True, candidate__isnull=True)
+        .prefetch_related('candidates__specialization')
+    )
+    specialization = params.get('specialization')
+    if specialization == 'none':
+        qs = qs.filter(candidates__specialization__isnull=True).distinct()
+    elif specialization:
+        qs = qs.filter(candidates__specialization_id=specialization).distinct()
+    links = []
+    for link in qs[:20]:
+        if not link.is_open:
+            continue
+        members = [c for c in link.candidates.all() if not c.is_archived]
+        link.size = len(members)
+        link.directions = sorted({c.direction for c in members})
+        link.names = [c.full_name for c in members]
+        links.append(link)
+    return links

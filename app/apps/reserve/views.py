@@ -10,7 +10,6 @@ import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Count
 from django.http import JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -75,12 +74,10 @@ def candidate_list(request):
         'open_invites': open_invites,
         'invite_form': InviteForm(),
         'share_form': ShareLinkForm(),
-        'share_collections': [
-            link for link in
-            ReserveShareLink.objects.filter(is_active=True, candidate__isnull=True)
-            .annotate(size=Count('candidates'))[:20]
-            if link.is_open
-        ] if can_edit_reserve(request.user) else [],
+        'share_collections': (
+            selectors.share_collections(request.GET)
+            if can_edit_reserve(request.user) else []
+        ),
         'can_edit': can_edit_reserve(request.user),
         # перетаскивать строки есть смысл только в режиме «Свой порядок»
         'can_drag': (

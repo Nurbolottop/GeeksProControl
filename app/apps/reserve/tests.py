@@ -638,3 +638,20 @@ class ReserveShareCollectionTests(TestCase):
         response = self.client.get(reverse('reserve:list'))
         self.assertContains(response, 'Подборки для работодателей')
         self.assertContains(response, 'ОсОО Ромашка')
+
+    def test_list_shows_only_collections_of_filtered_direction(self):
+        frontend = Specialization.objects.create(name='Frontend')
+        front = ReserveCandidate.objects.create(
+            full_name='Фронт Кандидат', specialization=frontend,
+        )
+        services.issue_share_collection([self.first], recipient='Для бэкенда')
+        services.issue_share_collection([front], recipient='Для фронтенда')
+        self.client.force_login(self.head)
+        response = self.client.get(
+            reverse('reserve:list'), {'specialization': frontend.pk},
+        )
+        self.assertContains(response, 'Для фронтенда')
+        self.assertNotContains(response, 'Для бэкенда')
+        response = self.client.get(reverse('reserve:list'))
+        self.assertContains(response, 'Для фронтенда')
+        self.assertContains(response, 'Для бэкенда')
