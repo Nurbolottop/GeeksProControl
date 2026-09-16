@@ -185,6 +185,11 @@ def project_detail(request, pk):
     )
     project.deadline_status = services.calculate_deadline_status(project)
     tab = request.GET.get('tab', 'overview')
+    if tab not in {
+        'overview', 'stages', 'tasks', 'team', 'documents', 'access',
+        'report', 'graphics', 'daily', 'history',
+    }:
+        tab = 'overview'
     context = {
         'project': project,
         'tab': tab,

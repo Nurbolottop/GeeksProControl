@@ -48,6 +48,7 @@
     <a href="?tab=documents" class="{% if tab == 'documents' %}is-active{% endif %}">Документы</a>
     <a href="?tab=access" class="{% if tab == 'access' %}is-active{% endif %}">Доступы</a>
     <a href="?tab=report" class="{% if tab == 'report' %}is-active{% endif %}">Отчёт</a>
+    <a href="?tab=graphics" class="{% if tab == 'graphics' %}is-active{% endif %}">Графика</a>
     <a href="?tab=daily" class="{% if tab == 'daily' %}is-active{% endif %}">
         Ежедневно{% if daily_left %}<span class="tab-count">{{ daily_left }}</span>{% endif %}
     </a>
@@ -313,6 +314,8 @@
     </div>
 {% elif tab == 'report' %}
     {% include 'projects/partials/tab_report.html' %}
+{% elif tab == 'graphics' %}
+    {% include 'projects/partials/tab_graphics.html' %}
 {% elif tab == 'daily' %}
     {% include 'projects/partials/tab_daily.html' %}
 {% elif tab == 'history' %}

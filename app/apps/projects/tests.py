@@ -472,7 +472,11 @@ class LastReportOnOverviewTests(TestCase):
 
 
 class ProjectListLastReportColumnTests(TestCase):
-    """В общем списке проектов виден последний отчёт по каждому."""
+    """Последний отчёт по каждому проекту цепляется к списку одним запросом.
+
+    Колонки «Отчёт» в таблице больше нет — на её месте кнопка «Графика»,
+    но сам отчёт по-прежнему доступен строкам списка.
+    """
 
     def setUp(self):
         from apps.projects.models import ProjectReport
@@ -483,9 +487,12 @@ class ProjectListLastReportColumnTests(TestCase):
         create_project(self.project)
         self.model = ProjectReport
 
-    def test_no_report_shows_placeholder(self):
+    def test_graphics_button_shown_for_every_project(self):
         response = self.client.get(reverse("projects:list"))
-        self.assertContains(response, "Нет отчёта")
+        self.assertContains(
+            response, f"{self.project.get_absolute_url()}?tab=graphics",
+        )
+        self.assertNotContains(response, "Нет отчёта")
 
     def test_latest_report_date_shown(self):
         self.model.objects.create(project=self.project, text="старый")
