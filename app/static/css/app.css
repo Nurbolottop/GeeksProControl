@@ -2545,3 +2545,93 @@ body.cmodal-open { overflow: hidden; }
 }
 .drag-handle:active { cursor: grabbing; }
 tr.is-dragging { opacity: .45; background: var(--bg-soft, #f3f4f6); }
+
+/* Вкладка «Графика»: дорожка этапов проекта */
+.roadmap__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 26px;
+}
+.roadmap__percent {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--green);
+}
+.roadmap {
+    display: flex;
+    align-items: flex-end;
+    width: 100%;
+}
+.roadmap__col { min-width: 0; }
+.roadmap__top {
+    height: 20px;
+    text-align: right;
+    line-height: 1;
+}
+.roadmap__here {
+    color: var(--blue, #2f57d4);
+    font-size: 15px;
+    margin-right: -4px;
+}
+/* сама полоса: пунктир, как дорожная разметка, и флажок на конце этапа */
+.roadmap__seg {
+    position: relative;
+    height: 16px;
+    border-radius: 3px;
+    background:
+        repeating-linear-gradient(
+            90deg, #fff 0 7px, transparent 7px 16px
+        ),
+        var(--seg-color);
+    box-shadow: inset 0 0 0 1.5px var(--seg-color);
+}
+.roadmap__col--done   { --seg-color: #2e9e52; }
+.roadmap__col--current{ --seg-color: #2f57d4; }
+.roadmap__col--next   { --seg-color: #d3d7e0; }
+.roadmap__col + .roadmap__col .roadmap__seg { margin-left: 2px; }
+.roadmap__flag {
+    position: absolute;
+    right: -2px;
+    bottom: 10px;
+    color: var(--seg-color);
+}
+.roadmap__col--next .roadmap__flag { color: #9aa1b1; }
+.roadmap__label {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 8px 6px 0 0;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.25;
+}
+.roadmap__label strong {
+    font-size: 12px;
+    color: var(--text);
+    overflow-wrap: anywhere;
+}
+.roadmap__col--next .roadmap__label strong { color: var(--text-muted); }
+.roadmap__date { font-size: 10.5px; }
+.roadmap__legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.roadmap__dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 5px;
+}
+.roadmap__dot--done { background: #2e9e52; }
+.roadmap__dot--current { background: #2f57d4; }
+.roadmap__dot--next { background: #d3d7e0; }
+@media (max-width: 720px) {
+    .roadmap { flex-wrap: wrap; gap: 10px 0; }
+    .roadmap__col { width: 50% !important; }
+}

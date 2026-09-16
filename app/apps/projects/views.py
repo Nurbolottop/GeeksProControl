@@ -198,7 +198,10 @@ def project_detail(request, pk):
         'today': timezone.localdate(),
         'daily_left': _daily_left(project),
     }
-    if tab == 'tasks':
+    if tab == 'graphics':
+        from apps.projects import graphics
+        context['roadmap'] = graphics.stage_roadmap(project)
+    elif tab == 'tasks':
         from apps.tasks.models import TaskStatus
         context['tasks'] = (
             project.tasks.active().select_related('assignee', 'project')

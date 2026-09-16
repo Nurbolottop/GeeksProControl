@@ -1,6 +1,54 @@
 <div class="panel">
-    <h2>Графика — {{ project.name }}</h2>
-    <div class="empty">
-        Графики по проекту появятся здесь.
+    <div class="roadmap__head">
+        <div>
+            <h2 style="margin: 0;">Путь проекта</h2>
+            <div class="sub">
+                {% if roadmap.current %}
+                    Сейчас идёт этап «{{ roadmap.current.title }}» ·
+                {% endif %}
+                пройдено {{ roadmap.done }} из {{ roadmap.total }} этапов
+            </div>
+        </div>
+        <div class="roadmap__percent">{{ roadmap.percent }}%</div>
     </div>
+
+    {% if roadmap.segments %}
+        <div class="roadmap">
+            {% for segment in roadmap.segments %}
+                <div class="roadmap__col roadmap__col--{{ segment.state }}"
+                     style="width: {{ segment.share }}%">
+                    <div class="roadmap__top">
+                        {% if segment.is_current %}
+                            <span class="roadmap__here" title="Проект сейчас здесь">▼</span>
+                        {% endif %}
+                    </div>
+                    <div class="roadmap__seg">
+                        <span class="roadmap__flag" aria-hidden="true">
+                            <svg viewBox="0 0 12 20" width="12" height="20">
+                                <path d="M2 20V1" stroke="currentColor" stroke-width="1.6" fill="none"/>
+                                <path d="M2.8 2h8l-2 3.2 2 3.2h-8z" fill="currentColor"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="roadmap__label">
+                        <strong>{{ segment.title }}</strong>
+                        <span>{{ segment.share }}%</span>
+                        {% if segment.date %}
+                            <span class="roadmap__date">
+                                {% if segment.date_is_plan %}до {% endif %}{{ segment.date|date:'d.m.y' }}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="roadmap__legend">
+            <span><i class="roadmap__dot roadmap__dot--done"></i> Пройдено</span>
+            <span><i class="roadmap__dot roadmap__dot--current"></i> Идёт сейчас</span>
+            <span><i class="roadmap__dot roadmap__dot--next"></i> Впереди</span>
+        </div>
+    {% else %}
+        <div class="empty">У проекта пока нет этапов.</div>
+    {% endif %}
 </div>
