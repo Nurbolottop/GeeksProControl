@@ -7,22 +7,12 @@ from apps.training.forms import ImportForm, TrainingGroupForm
 from apps.training.models import GroupStatus, Specialization, TrainingGroup
 
 
-def _horizon(request) -> int:
-    raw = request.GET.get('months', '12')
-    return int(raw) if raw in dict(selectors.HORIZONS) else 12
-
-
 @login_required
 def plan(request):
-    """IT-академия по направлениям: когда и сколько студентов выпускается."""
-    months = _horizon(request)
+    """IT-академия: группы по направлениям — в том виде, как их присылает академия."""
     return render(request, 'training/plan.html', {
-        'grid': selectors.matrix(months),
-        'directions': selectors.directions(),
-        'silent': selectors.silent_directions(),
-        'academy': selectors.academy_totals(),
-        'months': str(months),
-        'horizons': selectors.HORIZONS,
+        'directions': selectors.academy_list(),
+        'totals': selectors.academy_totals(),
     })
 
 

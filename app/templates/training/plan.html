@@ -4,38 +4,27 @@
 
 {% block content %}
 <style>
-    .grid-table th, .grid-table td { text-align: center; white-space: nowrap; }
-    .grid-table th:first-child, .grid-table td:first-child { text-align: left; }
-    .grid-table th small { display: block; font-weight: 500; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
-    .grid-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 44px; }
-    .grid-cell strong { font-size: 16px; }
-    .grid-cell span { font-size: 11px; color: var(--text-muted); }
-    .grid-cell--empty { color: #c3c8d4; }
-    .grid-table .grid-total { background: var(--primary-soft); }
-
-    .academy-dirs { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; margin-top: 18px; }
-    @media (max-width: 720px) { .academy-dirs { grid-template-columns: 1fr; } }
-    .academy-dir { margin: 0; }
-    .academy-dir__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-    .academy-dir__head h2 { margin: 0; font-size: 18px; }
-    .academy-dir__stats { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
-    .academy-dir__stats div { display: flex; flex-direction: column; }
-    .academy-dir__stats strong { font-size: 20px; line-height: 1.1; }
-    .academy-dir__stats span { font-size: 11.5px; color: var(--text-muted); }
-    .academy-group { display: grid; grid-template-columns: 92px 1fr auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
-    .academy-group__num { font-weight: 700; }
-    .academy-group__num a { color: var(--text); }
-    .academy-group__dates { font-size: 13px; }
-    .academy-group__dates .sub { font-size: 12px; }
-    .academy-group__count { text-align: right; font-size: 13px; }
-    .academy-group__count .sub { font-size: 11.5px; }
-    .academy-group--done { opacity: .6; }
+    .academy-list { max-width: 820px; }
+    .academy-dir { margin-bottom: 14px; padding: 20px 24px; }
+    .academy-dir h2 { margin: 0 0 10px; font-size: 18px; display: flex; align-items: baseline; gap: 8px; }
+    .academy-dir h2 .sub { font-size: 13px; font-weight: 500; }
+    .academy-line { font-size: 15px; line-height: 1.9; }
+    .academy-line b { font-weight: 700; }
+    .academy-line a { color: inherit; }
+    .academy-line a:hover b { color: var(--primary); }
+    .academy-line .muted { color: var(--text-muted); }
 </style>
 
 <div class="page-head">
     <div>
         <h1>IT-академия</h1>
-        <div class="sub">Сколько студентов учится по каждому направлению и когда они выпускаются к нам на стажировку</div>
+        <div class="sub">
+            {% if totals.groups %}
+                Сейчас в академии {{ totals.groups }} {{ totals.groups_word }}, {{ totals.students }} {{ totals.students_word }}{% if totals.unknown %} и ещё {{ totals.unknown }} гр. с неизвестной численностью{% endif %}
+            {% else %}
+                Группы академии, из которых к нам приходят стажёры
+            {% endif %}
+        </div>
     </div>
     <div class="page-actions">
         <a href="{% url 'training:group_list' %}" class="btn btn--secondary">Все группы</a>
@@ -43,136 +32,26 @@
     </div>
 </div>
 
-<div class="kpi-grid">
-    <div class="kpi-card kpi-card--info">
-        <div class="kpi-card__value">{{ academy.studying }}</div>
-        <div class="kpi-card__label">Учатся сейчас</div>
-    </div>
-    <div class="kpi-card kpi-card--yellow">
-        <div class="kpi-card__value">{{ academy.soon }}</div>
-        <div class="kpi-card__label">Выпустятся за 3 месяца</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-card__value">{{ academy.recruiting }}</div>
-        <div class="kpi-card__label">Ещё не начали учиться</div>
-    </div>
-    <div class="kpi-card">
-        <div class="kpi-card__value">{{ academy.groups }}</div>
-        <div class="kpi-card__label">Групп{% if academy.unknown %} · у {{ academy.unknown }} численность неизвестна{% endif %}</div>
-    </div>
-    {% if academy.conversion is not None %}
-        <div class="kpi-card kpi-card--green">
-            <div class="kpi-card__value">{{ academy.conversion }}%</div>
-            <div class="kpi-card__label">Доходят до стажировки</div>
-        </div>
-    {% endif %}
-</div>
-
-<div class="panel" style="padding: 0;">
-    <div class="panel-head" style="padding: 16px 20px 4px; flex-wrap: wrap; gap: 10px;">
-        <div>
-            <h2 style="margin: 0;">Сколько студентов выпускается</h2>
-            <div class="sub">По направлениям и месяцам выпуска</div>
-        </div>
-        <div style="display: flex; gap: 6px;">
-            {% for value, label in horizons %}
-                <a href="?months={{ value }}" class="btn btn--sm {% if months != value %}btn--secondary{% endif %}">{{ label }}</a>
-            {% endfor %}
-        </div>
-    </div>
-    {% if grid.rows %}
-        <div class="table-wrap">
-            <table class="data grid-table">
-                <thead>
-                <tr>
-                    <th>Направление</th>
-                    {% for column in grid.columns %}
-                        <th>{{ column.short }}<small>{{ column.year }}</small></th>
-                    {% endfor %}
-                    <th class="grid-total">Всего</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for row in grid.rows %}
-                    <tr>
-                        <td><strong>{{ row.specialization }}</strong></td>
-                        {% for cell in row.cells %}
-                            <td>
-                                {% if cell.groups %}
-                                    <span class="grid-cell" title="{% for g in cell.groups %}{{ g.number }} группа — конец {{ g.end_date|date:'d.m.Y' }}{% if not forloop.last %}; {% endif %}{% endfor %}">
-                                        <strong>{% if cell.students %}{{ cell.students }}{% else %}?{% endif %}{% if cell.unknown and cell.students %}+?{% endif %}</strong>
-                                        <span>{% for g in cell.groups %}гр. {{ g.number }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
-                                    </span>
-                                {% else %}
-                                    <span class="grid-cell grid-cell--empty">·</span>
-                                {% endif %}
-                            </td>
-                        {% endfor %}
-                        <td class="grid-total"><strong>{{ row.students }}</strong>{% if row.unknown %} <span class="sub">+?</span>{% endif %}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-                <tfoot>
-                <tr>
-                    <td><strong>Всего</strong></td>
-                    {% for cell in grid.footer %}
-                        <td><strong>{{ cell.students|default:'·' }}</strong>{% if cell.unknown %} <span class="sub">+?</span>{% endif %}</td>
-                    {% endfor %}
-                    <td class="grid-total"><strong>{{ grid.students }}</strong>{% if grid.unknown %} <span class="sub">+?</span>{% endif %}</td>
-                </tr>
-                </tfoot>
-            </table>
-        </div>
-        {% if grid.unknown %}
-            <div class="sub" style="padding: 10px 20px 16px;">«+?» — в этом месяце выпускается группа, численность которой академия ещё не сообщила.</div>
-        {% endif %}
-    {% else %}
-        <div class="sub" style="padding: 20px;">
-            В выбранном горизонте выпусков нет. Вставьте свежее сообщение академии или выберите период побольше.
-        </div>
-    {% endif %}
-</div>
-
-<div class="academy-dirs">
+<div class="academy-list">
     {% for dir in directions %}
         <div class="panel academy-dir">
-            <div class="academy-dir__head">
-                <h2>{{ dir.specialization }}</h2>
-                <a href="{% url 'training:group_list' %}?specialization={{ dir.specialization.pk }}" class="sub">все группы →</a>
-            </div>
-            <div class="academy-dir__stats">
-                <div><strong>{{ dir.studying }}</strong><span>учатся сейчас</span></div>
-                <div><strong>{{ dir.soon }}</strong><span>выпуск за 3 месяца</span></div>
-                <div><strong>{{ dir.groups }}</strong><span>групп</span></div>
-                <div><strong>{{ dir.free_now }}</strong><span>свободных стажёров у нас</span></div>
-            </div>
-            {% for item in dir.items %}
-                <div class="academy-group {% if item.stage == 'graduated' %}academy-group--done{% endif %}">
-                    <div class="academy-group__num">
-                        <a href="{% url 'training:group_update' item.group.pk %}">{{ item.group.number }} группа</a>
-                    </div>
-                    <div class="academy-group__dates">
-                        {{ item.group.start_date|date:'d.m.Y'|default:'?' }} → {{ item.group.end_date|date:'d.m.Y'|default:'?' }}
-                        <div class="sub">{{ item.when }}</div>
-                    </div>
-                    <div class="academy-group__count">
-                        <span class="badge {% if item.stage == 'studying' %}badge--green{% elif item.stage == 'recruiting' %}badge--yellow{% else %}badge--blue{% endif %}">{{ item.stage_label }}</span>
-                        <div>{{ item.students }}</div>
-                        {% if item.group.students_note and item.group.students_count is not None %}<div class="sub">{{ item.group.students_note }}</div>{% endif %}
-                    </div>
+            <h2>
+                {{ dir.icon }} {{ dir.specialization }}
+                {% if dir.academy_name %}<span class="sub">в академии — {{ dir.academy_name }}</span>{% endif %}
+            </h2>
+            {% for line in dir.lines %}
+                <div class="academy-line">
+                    * <a href="{% url 'training:group_update' line.group.pk %}"><b>{{ line.group.number }} группа</b></a>
+                    <span class="muted">— старт:</span> <b>{{ line.group.start_date|date:'d.m.Y'|default:'?' }}</b>
+                    <span class="muted">· конец:</span> <b>{{ line.group.end_date|date:'d.m.Y'|default:'?' }}</b>
+                    — <b>{{ line.students }}</b>
                 </div>
             {% endfor %}
         </div>
     {% empty %}
         <div class="panel">
-            <div class="sub">Групп академии пока нет. Нажмите «Вставить сообщение академии» и вставьте присланный список.</div>
+            <div class="sub">Групп пока нет. Нажмите «Вставить сообщение академии» и вставьте присланный список.</div>
         </div>
     {% endfor %}
 </div>
-
-{% if silent and directions %}
-    <div class="sub" style="margin-top: 16px;">
-        Академия не готовит: {% for spec in silent %}{{ spec }}{% if not forloop.last %}, {% endif %}{% endfor %} — стажёров этих направлений из академии ждать не стоит.
-    </div>
-{% endif %}
 {% endblock %}
