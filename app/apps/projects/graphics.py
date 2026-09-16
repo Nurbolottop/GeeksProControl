@@ -93,8 +93,7 @@ def stage_roadmap(project) -> dict:
 
 
 def project_pulse(project, roadmap: dict) -> list[dict]:
-    """Главные цифры проекта для плиток: сроки, работа, задачи, команда."""
-    from apps.tasks.models import TaskStatus
+    """Главные цифры проекта для плиток: сроки, работа, отчёты, команда."""
     from apps.teams.models import TeamMember
 
     today = timezone.localdate()
@@ -128,17 +127,23 @@ def project_pulse(project, roadmap: dict) -> list[dict]:
         'hint': f'с {started:%d.%m.%Y}', 'tone': 'blue',
     })
 
-    tasks = project.tasks.active().exclude(status=TaskStatus.CANCELLED)
-    total_tasks = tasks.count()
-    done_tasks = tasks.filter(status=TaskStatus.DONE).count()
-    tiles.append({
-        'value': done_tasks, 'unit': f'из {total_tasks}', 'label': 'задач закрыто',
-        'hint': (
-            f'{round(100 * done_tasks / total_tasks)}% задач'
-            if total_tasks else 'задач пока нет'
-        ),
-        'tone': 'violet',
-    })
+    # отчёт ПМ сдаётся раз в неделю: неделя — норма, две — тревожно
+    reports = project.reports.all()
+    last_report = reports.first()
+    if last_report:
+        ago = max((today - last_report.date).days, 0)
+        tiles.append({
+            'value': ago, 'unit': _days(ago) + ' назад', 'label': 'последний отчёт',
+            'hint': (
+                f'{last_report.date:%d.%m.%Y} · всего {reports.count()}'
+            ),
+            'tone': 'green' if ago <= 7 else 'yellow' if ago <= 14 else 'red',
+        })
+    else:
+        tiles.append({
+            'text': 'нет', 'label': 'последний отчёт',
+            'hint': 'ПМ ещё не сдавал отчёт', 'tone': 'red',
+        })
 
     team = project.team_members.filter(status=TeamMember.Status.ACTIVE).count()
     tiles.append({
