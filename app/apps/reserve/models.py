@@ -404,7 +404,7 @@ class ReserveInvite(TimeStampedModel):
 
 
 class ReserveShareLink(TimeStampedModel):
-    """Ссылка на профиль кандидата для работодателя.
+    """Ссылка для работодателя: на один профиль или на подборку.
 
     По ней открывается только витрина: то, что кандидат рассказал о себе,
     навыки, проекты GeeksPro и наша оценка. Внутренних комментариев,
@@ -412,12 +412,20 @@ class ReserveShareLink(TimeStampedModel):
     если их явно разрешили показывать в этой ссылке. Ссылок на одного
     кандидата может быть несколько — по одной на компанию, чтобы видеть,
     кто открывал, и отключать каждую отдельно.
+
+    Подборка (`candidate` пустой, заполнен `candidates`) — одна ссылка на
+    список кандидатов, из которого работодатель открывает каждый профиль.
     """
 
     token = models.CharField('Токен', max_length=64, unique=True, default=generate_token)
     candidate = models.ForeignKey(
         ReserveCandidate, on_delete=models.CASCADE, related_name='share_links',
-        verbose_name='Кандидат',
+        verbose_name='Кандидат', null=True, blank=True,
+        help_text='Пусто — ссылка на подборку из нескольких кандидатов.',
+    )
+    candidates = models.ManyToManyField(
+        ReserveCandidate, related_name='share_collections',
+        verbose_name='Кандидаты подборки', blank=True,
     )
     recipient = models.CharField(
         'Для кого', max_length=255, blank=True,
@@ -439,7 +447,13 @@ class ReserveShareLink(TimeStampedModel):
         ordering = ['-created_at']
 
     def __str__(self) -> str:
+        if self.is_collection:
+            return f'Подборка /{self.token}/'
         return f'Профиль {self.candidate} /{self.token}/'
+
+    @property
+    def is_collection(self) -> bool:
+        return self.candidate_id is None
 
     def get_absolute_url(self) -> str:
         return reverse('reserve_share', args=[self.token])

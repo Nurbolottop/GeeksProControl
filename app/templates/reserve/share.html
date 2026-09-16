@@ -7,10 +7,12 @@
     <meta name="robots" content="noindex, nofollow">
     <title>{{ candidate.full_name }} — кандидат GeeksPro</title>
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
+    <link rel="stylesheet" href="{% static 'css/reserve-share.css' %}">
 </head>
 <body class="apply-body">
 <div class="apply-page share-page">
     <div class="apply-hero__brand share-brand">Geeks<span>Pro</span> · резерв кадров</div>
+    {% if back_url %}<a href="{{ back_url }}" class="share-back">← Все кандидаты подборки</a>{% endif %}
 
     <section class="acard share-head">
         {% if candidate.photo %}

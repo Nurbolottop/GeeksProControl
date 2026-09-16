@@ -47,3 +47,4 @@ class ReserveShareLinkAdmin(admin.ModelAdmin):
     )
     list_filter = ('is_active', 'show_contacts')
     search_fields = ('candidate__full_name', 'recipient', 'token')
+    raw_id_fields = ('candidate', 'candidates')

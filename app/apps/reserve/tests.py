@@ -565,3 +565,76 @@ class ReserveShareLinkTests(TestCase):
         response = self.client.get(self.candidate.get_absolute_url())
         self.assertContains(response, 'Поделиться профилем')
         self.assertContains(response, 'ОсОО Ромашка')
+
+
+class ReserveShareCollectionTests(TestCase):
+    """Одна ссылка на подборку из нескольких кандидатов."""
+
+    def setUp(self):
+        self.head = User.objects.create_user(
+            username='head', password='pass12345', role=User.Role.HEAD,
+        )
+        self.spec = Specialization.objects.create(name='Backend')
+        self.first = ReserveCandidate.objects.create(
+            full_name='Первый Кандидат', specialization=self.spec, phone='0700000001',
+        )
+        self.second = ReserveCandidate.objects.create(
+            full_name='Второй Кандидат', specialization=self.spec,
+        )
+        self.other = ReserveCandidate.objects.create(full_name='Чужой Кандидат')
+
+    def test_selected_candidates_go_into_collection(self):
+        self.client.force_login(self.head)
+        self.client.post(reverse('reserve:share_collection_create'), {
+            'candidates': [self.first.pk, self.second.pk],
+            'recipient': 'ОсОО Ромашка', 'ttl_days': '30',
+        })
+        link = ReserveShareLink.objects.get()
+        self.assertTrue(link.is_collection)
+        self.assertEqual(set(link.candidates.all()), {self.first, self.second})
+        self.assertTrue(self.first.events.filter(kind=EventKind.SHARED).exists())
+
+    def test_without_selection_takes_current_filter(self):
+        self.client.force_login(self.head)
+        self.client.post(reverse('reserve:share_collection_create'), {
+            'filters': f'specialization={self.spec.pk}', 'ttl_days': '30',
+        })
+        link = ReserveShareLink.objects.get()
+        self.assertEqual(set(link.candidates.all()), {self.first, self.second})
+
+    def test_viewer_without_role_cannot_create_collection(self):
+        lead = User.objects.create_user(
+            username='lead', password='pass12345', role=User.Role.TEAM_LEAD,
+        )
+        self.client.force_login(lead)
+        response = self.client.post(
+            reverse('reserve:share_collection_create'), {'ttl_days': '30'},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(ReserveShareLink.objects.exists())
+
+    def test_public_collection_lists_and_opens_only_its_candidates(self):
+        link = services.issue_share_collection([self.first, self.second])
+        url = link.get_absolute_url()
+        response = self.client.get(url)
+        self.assertContains(response, 'Первый Кандидат')
+        self.assertContains(response, 'Второй Кандидат')
+        self.assertNotContains(response, 'Чужой Кандидат')
+        self.assertNotContains(response, '0700000001')
+
+        profile = self.client.get(url, {'c': self.first.pk})
+        self.assertContains(profile, 'Первый Кандидат')
+        self.assertContains(profile, 'Все кандидаты подборки')
+
+        foreign = self.client.get(url, {'c': self.other.pk})
+        self.assertRedirects(foreign, url, fetch_redirect_response=False)
+
+        link.refresh_from_db()
+        self.assertEqual(link.views, 1)
+
+    def test_list_page_shows_active_collections(self):
+        services.issue_share_collection([self.first], recipient='ОсОО Ромашка')
+        self.client.force_login(self.head)
+        response = self.client.get(reverse('reserve:list'))
+        self.assertContains(response, 'Подборки для работодателей')
+        self.assertContains(response, 'ОсОО Ромашка')

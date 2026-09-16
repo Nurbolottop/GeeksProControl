@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Резерв кадров — GeeksPro Control{% endblock %}
 
@@ -148,11 +149,73 @@
     </div>
 </form>
 
+{% if can_edit and share_collections %}
+    <div class="form-link">
+        <div class="form-link__body">
+            <div class="form-link__label">Подборки для работодателей</div>
+            {% for link in share_collections %}
+                <div class="form-link__row">
+                    <div>
+                        <strong>{{ link.recipient|default:'Без названия' }}</strong> · кандидатов: {{ link.size }}<br>
+                        <a class="form-link__url" id="collection-url-{{ link.pk }}" href="{{ link.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ link.get_absolute_url }}</a>
+                        <div class="form-link__meta">
+                            {% if link.show_contacts %}с контактами{% else %}без контактов{% endif %}
+                            · {% if link.expires_at %}действует до {{ link.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
+                            · {% if link.views %}просмотров: {{ link.views }}, последний {{ link.viewed_at|date:'d.m.Y H:i' }}{% else %}ещё не открывали{% endif %}
+                        </div>
+                    </div>
+                    <div class="form-link__actions">
+                        <button type="button" class="btn btn--secondary btn--sm" data-copy="collection-url-{{ link.pk }}">Копировать</button>
+                        <form method="post" action="{% url 'reserve:share_disable' link.pk %}" style="margin: 0;"
+                              data-confirm="Отключить ссылку? Подборка по ней больше не откроется."
+                              data-confirm-ok="Отключить">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+<div{% if can_edit %} x-data="{ selected: [], all: [{% for candidate in page.object_list %}'{{ candidate.pk }}'{% if not forloop.last %},{% endif %}{% endfor %}], open: false }"{% endif %}>
+{% if can_edit %}
+    <link rel="stylesheet" href="{% static 'css/reserve-share.css' %}">
+    <div class="reserve-bulk">
+        <span class="sub" x-text="selected.length ? 'Выбрано: ' + selected.length : 'Отметьте кандидатов галочками или поделитесь всем списком по фильтру'"></span>
+        <div class="reserve-share" @keydown.escape="open = false">
+            <button type="button" class="btn btn--sm" @click="open = !open"
+                    x-text="selected.length ? 'Поделиться выбранными (' + selected.length + ')' : 'Поделиться всем списком ({{ page.paginator.count }})'">Поделиться списком</button>
+            <form method="post" action="{% url 'reserve:share_collection_create' %}" class="reserve-share__form" x-show="open" x-cloak @click.outside="open = false">
+                {% csrf_token %}
+                <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
+                <template x-for="pk in selected" :key="pk"><input type="hidden" name="candidates" :value="pk"></template>
+                <div class="reserve-share__title">Одна ссылка на подборку</div>
+                <p class="reserve-share__hint" x-show="selected.length">В подборку попадут отмеченные кандидаты: <strong x-text="selected.length"></strong>.</p>
+                <p class="reserve-share__hint" x-show="!selected.length">Никто не отмечен — в подборку попадут все по текущему фильтру: <strong>{{ page.paginator.count }}</strong>.</p>
+                <p class="reserve-share__hint">Работодатель увидит список и откроет профиль каждого. Внутренние комментарии и история не видны.</p>
+                <input type="text" name="recipient" maxlength="255" placeholder="Для кого (компания, контакт)">
+                <select name="ttl_days" title="Срок действия ссылки">
+                    {% for value, label in share_form.fields.ttl_days.choices %}
+                        <option value="{{ value }}" {% if value == '30' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <label class="reserve-share__check">
+                    <input type="checkbox" name="show_contacts">
+                    <span>Показывать контакты (телефон, Telegram, email)</span>
+                </label>
+                <button type="submit" class="btn btn--sm">Создать ссылку</button>
+            </form>
+        </div>
+    </div>
+{% endif %}
 <div class="panel" style="padding: 0;">
     <div class="table-wrap">
         <table class="data">
             <thead>
                 <tr>
+                    {% if can_edit %}<th style="width: 28px;"><input type="checkbox" title="Отметить всех на странице" :checked="all.length && selected.length === all.length" @change="selected = $event.target.checked ? [...all] : []"></th>{% endif %}
                     {% if can_drag %}<th style="width: 28px;"></th>{% endif %}
                     <th>Кандидат</th>
                     <th>Направление</th>
@@ -167,6 +230,7 @@
             <tbody{% if can_drag %} id="reserve-rows"{% endif %}>
                 {% for candidate in page.object_list %}
                     <tr{% if can_drag %} draggable="true" data-id="{{ candidate.pk }}"{% endif %}>
+                        {% if can_edit %}<td><input type="checkbox" value="{{ candidate.pk }}" x-model="selected"></td>{% endif %}
                         {% if can_drag %}
                             <td class="drag-handle" title="Перетащите, чтобы поднять выше">⠿</td>
                         {% endif %}
@@ -200,11 +264,12 @@
                         <td><span class="badge badge--{{ candidate.status_tone }}">{{ candidate.get_status_display }}</span></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{% if can_drag %}9{% else %}8{% endif %}" class="empty" style="text-align:center; padding: 24px;">Кандидатов не найдено.</td></tr>
+                    <tr><td colspan="{% if can_drag %}10{% elif can_edit %}9{% else %}8{% endif %}" class="empty" style="text-align:center; padding: 24px;">Кандидатов не найдено.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+</div>
 </div>
 
 {% if page.paginator.num_pages > 1 %}

@@ -10,8 +10,10 @@ import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.db.models import Count
+from django.http import JsonResponse, QueryDict
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.interns.models import Intern
@@ -72,6 +74,13 @@ def candidate_list(request):
         'has_filters': selectors.any_filter_used(request.GET),
         'open_invites': open_invites,
         'invite_form': InviteForm(),
+        'share_form': ShareLinkForm(),
+        'share_collections': [
+            link for link in
+            ReserveShareLink.objects.filter(is_active=True, candidate__isnull=True)
+            .annotate(size=Count('candidates'))[:20]
+            if link.is_open
+        ] if can_edit_reserve(request.user) else [],
         'can_edit': can_edit_reserve(request.user),
         # перетаскивать строки есть смысл только в режиме «Свой порядок»
         'can_drag': (
@@ -275,11 +284,43 @@ def share_create(request, pk):
 
 
 @reserve_editor_required
+def share_collection_create(request):
+    """Одна ссылка на подборку: отмеченные галочками кандидаты, а если
+    никого не отметили — все, кто попал под текущий фильтр списка."""
+    filters = request.POST.get('filters', '')
+    back = f"{reverse('reserve:list')}?{filters}" if filters else reverse('reserve:list')
+    form = ShareLinkForm(request.POST or None)
+    if request.method != 'POST' or not form.is_valid():
+        return redirect(back)
+    ids = [pk for pk in request.POST.getlist('candidates') if pk.isdigit()]
+    if ids:
+        candidates = ReserveCandidate.objects.active().filter(pk__in=ids)
+    else:
+        candidates, _ = selectors.candidates(QueryDict(filters))
+    if not candidates.exists():
+        messages.error(request, 'В подборке нет ни одного кандидата.')
+        return redirect(back)
+    link = services.issue_share_collection(
+        candidates, user=request.user, ttl_days=form.ttl(),
+        recipient=form.cleaned_data['recipient'],
+        show_contacts=form.cleaned_data['show_contacts'],
+    )
+    messages.success(
+        request,
+        f'Ссылка на подборку ({link.candidates.count()} канд.) создана: '
+        f'{request.build_absolute_uri(link.get_absolute_url())}',
+    )
+    return redirect(back)
+
+
+@reserve_editor_required
 def share_disable(request, pk):
     link = get_object_or_404(ReserveShareLink, pk=pk)
     if request.method == 'POST':
         link.deactivate()
-        messages.success(request, 'Ссылка на профиль отключена.')
+        messages.success(request, 'Ссылка отключена.')
+    if link.is_collection:
+        return redirect('reserve:list')
     return redirect(link.candidate.get_absolute_url())
 
 
@@ -337,20 +378,46 @@ def apply_form(request, token):
 
 
 def share_profile(request, token):
-    """Профиль кандидата для работодателя — только по действующей ссылке."""
-    link = (
-        ReserveShareLink.objects
-        .select_related('candidate__specialization')
-        .filter(token=token, candidate__is_archived=False)
-        .first()
-    )
+    """Витрина для работодателя — только по действующей ссылке.
+
+    Ссылка на один профиль сразу показывает его. Ссылка на подборку
+    показывает список, а профиль из неё открывается как `?c=<id>` —
+    только тех кандидатов, кто в эту подборку входит.
+    """
+    link = ReserveShareLink.objects.filter(token=token).first()
     if link is None or not link.is_open:
         return render(request, 'reserve/share_expired.html', status=404)
+
+    if not link.is_collection:
+        candidate = ReserveCandidate.objects.active().filter(pk=link.candidate_id).first()
+        if candidate is None:
+            return render(request, 'reserve/share_expired.html', status=404)
+        services.register_share_view(link)
+        return _share_profile_page(request, link, candidate)
+
+    candidates = (
+        link.candidates.filter(is_archived=False)
+        .select_related('specialization')
+    )
+    chosen = request.GET.get('c', '')
+    if chosen:
+        candidate = candidates.filter(pk=chosen).first() if chosen.isdigit() else None
+        if candidate is None:
+            return redirect(link.get_absolute_url())
+        return _share_profile_page(
+            request, link, candidate, back_url=link.get_absolute_url(),
+        )
     services.register_share_view(link)
-    candidate = link.candidate
+    return render(request, 'reserve/share_collection.html', {
+        'link': link, 'candidates': candidates,
+    })
+
+
+def _share_profile_page(request, link, candidate, back_url=''):
     return render(request, 'reserve/share.html', {
         'link': link,
         'candidate': candidate,
+        'back_url': back_url,
         'memberships': candidate.project_memberships,
         'has_scores': any(value for _, value in candidate.scores),
     })

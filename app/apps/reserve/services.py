@@ -161,6 +161,32 @@ def issue_share_link(
     return link
 
 
+def issue_share_collection(
+    candidates, *, user=None, ttl_days: int | None = 30, recipient='',
+    show_contacts=False,
+) -> ReserveShareLink:
+    """Одна ссылка на подборку кандидатов — вместо ссылки на каждого."""
+    candidates = list(candidates)
+    link = ReserveShareLink.objects.create(
+        recipient=recipient,
+        show_contacts=show_contacts,
+        created_by=user if user and user.is_authenticated else None,
+        expires_at=timezone.now() + timedelta(days=ttl_days) if ttl_days else None,
+    )
+    link.candidates.set(candidates)
+    title = (
+        f'Профиль добавлен в подборку{f" для «{recipient}»" if recipient else ""}'
+    )
+    detail = ' · '.join([
+        link.get_absolute_url(),
+        f'кандидатов в подборке: {len(candidates)}',
+        'с контактами' if show_contacts else 'без контактов',
+    ])
+    for candidate in candidates:
+        log_event(candidate, EventKind.SHARED, title, detail=detail, user=user)
+    return link
+
+
 def register_share_view(link: ReserveShareLink) -> None:
     """Профиль открыли по ссылке — считаем просмотры."""
     ReserveShareLink.objects.filter(pk=link.pk).update(
