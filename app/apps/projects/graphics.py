@@ -50,6 +50,9 @@ def stage_roadmap(project) -> dict:
             'share': shares[index],
             'state': state,
             'is_current': index == current_index,
+            'is_last': index == len(stages) - 1,
+            # у текущего этапа полоса заполняется на его собственный процент
+            'progress': 100 if state == 'done' else stage.progress,
             'date': stage.end_date or stage.deadline,
             'date_is_plan': stage.end_date is None,
         })
