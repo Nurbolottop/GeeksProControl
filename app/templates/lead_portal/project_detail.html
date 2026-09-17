@@ -3,14 +3,16 @@
 {% block title %}{{ project.name }} — Портал тимлида{% endblock %}
 
 {% block content %}
-<div class="portal-hero portal-hero--compact">
-    <a href="{% url 'lead_portal:dashboard' %}" class="portal-hero__back">← Мои проекты</a>
-    <h1>{{ project.name }}</h1>
-    <div class="portal-hero__meta">
-        {% include 'projects/partials/status_badge.html' with status=project.status %}
-        {% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}
+<p><a href="{% url 'lead_portal:dashboard' %}">← Мои проекты</a></p>
+<div class="page-head">
+    <div>
+        <h1>{{ project.name }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            {% include 'projects/partials/status_badge.html' with status=project.status %}
+            {% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}
+        </div>
     </div>
-    <div class="portal-hero__progress">
+    <div class="progress" style="min-width: 160px;">
         <div class="progress__bar"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>
         <span class="progress__label">{{ project.progress }}%</span>
     </div>

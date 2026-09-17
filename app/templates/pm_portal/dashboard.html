@@ -3,34 +3,35 @@
 {% block title %}Мои проекты — Портал ПМ{% endblock %}
 
 {% block content %}
-<div class="portal-hero">
-    <div class="portal-hero__eyebrow">Портал ПМ</div>
-    <h1>Привет, {{ request.user.display_name }} 👋</h1>
-    <p>
-        {% if projects %}
-            Проектов в работе: {{ projects|length }} — выберите, с каким сейчас работаем.
-        {% else %}
-            Пока ни одного проекта не назначено — как только появится, он покажется здесь.
-        {% endif %}
-    </p>
+<div class="page-head">
+    <div>
+        <h1>Мои проекты</h1>
+        <div class="sub">Проектов в работе: {{ projects|length }}</div>
+    </div>
 </div>
-<div class="lead-grid">
-    {% for project in projects %}
-        <a href="{% url 'pm_portal:project_detail' project.pk %}" class="lead-card" style="text-decoration: none; display: block;">
-            <div class="lead-card__head">
-                <div class="lead-card__avatar">{{ project.name|first|upper }}</div>
-                <div class="lead-card__info">
-                    <span class="lead-card__name">
-                        {{ project.name }}{% if project.stage_check_needed %}<span class="pm-dot" title="Сверьте этапы"></span>{% endif %}
-                    </span>
-                    <span class="lead-card__count">
-                        {% include 'projects/partials/status_badge.html' with status=project.status %}
-                    </span>
-                </div>
-            </div>
-        </a>
-    {% empty %}
-        <div class="empty">Вы пока не назначены ПМ ни на один проект.</div>
-    {% endfor %}
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Проект</th>
+                <th>Статус</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for project in projects %}
+                <tr>
+                    <td>
+                        <a href="{% url 'pm_portal:project_detail' project.pk %}"><strong>{{ project.name }}</strong></a>
+                        {% if project.stage_check_needed %}<span class="pm-dot" title="Сверьте этапы"></span>{% endif %}
+                    </td>
+                    <td>{% include 'projects/partials/status_badge.html' with status=project.status %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="2" class="empty" style="text-align:center; padding: 24px;">Вы пока не назначены ПМ ни на один проект.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}

@@ -94,24 +94,33 @@ h2 {
     max-width: 1520px;
 }
 
-/* ---- Портал ПМ / тимлида: базовый каркас ----
-   Визуальный язык портала (топбар, карточки, вкладки) полностью в
-   отдельном файле static/css/portal.css — сознательно другой стиль,
-   не вариация цвета поверх обычных .panel/.badge/.btn. Тут только
-   структурный минимум на случай, если portal.css почему-то не
-   загрузится. */
+/* ---- Портал ПМ / тимлида: тот же вид, что и в основном приложении,
+   просто без сайдбара — плоский топбар, обычные .panel/.badge/.btn. ---- */
 .pm-shell { min-height: 100vh; background: var(--bg); }
 .pm-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 28px;
+    padding: 14px 24px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
 }
 .pm-topbar__brand { font-weight: 800; color: var(--text); text-decoration: none; }
-.pm-topbar__user { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-muted); }
-.pm-main { padding: 28px 24px 40px; max-width: 1100px; margin: 0 auto; }
+.pm-topbar__brand span { color: var(--primary); }
+.pm-topbar__user { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--text-muted); }
+.pm-topbar__avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gray-bg);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+.pm-topbar__avatar svg { width: 15px; height: 15px; }
+.pm-main { padding: 24px; max-width: 1100px; margin: 0 auto; }
 
 /* ---- Sidebar ---- */
 .sidebar {
@@ -966,8 +975,6 @@ body.page-meetings { --accent: #a16207; --accent-dark: #854d0e; --accent-soft: #
 body.page-risks    { --accent: #be123c; --accent-dark: #9f1239; --accent-soft: #fdeaef; }
 body.page-reports  { --accent: #1e3a8a; --accent-dark: #172554; --accent-soft: #e6eaf7; }
 body.page-notifications { --accent: #c2410c; --accent-dark: #9a3412; --accent-soft: #fdece1; }
-body.page-pm-portal { --accent: #4353e8; --accent-dark: #3341d4; --accent-soft: #eaecfd; }
-body.page-lead-portal { --accent: #0d9488; --accent-dark: #0f766e; --accent-soft: #e0f5f2; }
 
 /* Заголовок страницы получает цветную метку раздела */
 .page-head > div:first-child > h1 {

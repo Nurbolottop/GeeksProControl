@@ -3,16 +3,11 @@
 {% block title %}Мои проекты — Портал тимлида{% endblock %}
 
 {% block content %}
-<div class="portal-hero">
-    <div class="portal-hero__eyebrow">Портал тимлида</div>
-    <h1>Привет, {{ request.user.display_name }} 👋</h1>
-    <p>
-        {% if projects %}
-            Команд под вашим руководством: {{ projects|length }} — выберите проект.
-        {% else %}
-            Пока ни одной команды не назначено — как только появится, она покажется здесь.
-        {% endif %}
-    </p>
+<div class="page-head">
+    <div>
+        <h1>Мои проекты</h1>
+        <div class="sub">Проектов в работе: {{ projects|length }}</div>
+    </div>
 </div>
 {% for note in notifications %}
     <div class="message message--{% if note.level == 'success' %}success{% elif note.level == 'critical' %}error{% else %}warning{% endif %}"
@@ -29,34 +24,33 @@
     </div>
 {% endfor %}
 {% if resume %}
-    <a href="{% url 'lead_portal:resume' %}" class="lead-card" style="text-decoration: none; display: block; margin-bottom: 16px;">
-        <div class="lead-card__head">
-            <div class="lead-card__avatar">📄</div>
-            <div class="lead-card__info">
-                <span class="lead-card__name">Моё резюме в резерве кадров</span>
-                <span class="lead-card__count">
-                    {% if resume.submitted_at %}обновлено {{ resume.submitted_at|date:'d.m.Y' }}{% else %}ещё не заполняли сами{% endif %}
-                    · открыть и отредактировать →
-                </span>
-            </div>
-        </div>
-    </a>
-{% endif %}
-<div class="lead-grid">
-    {% for project in projects %}
-        <a href="{% url 'lead_portal:project_detail' project.pk %}" class="lead-card" style="text-decoration: none; display: block;">
-            <div class="lead-card__head">
-                <div class="lead-card__avatar">{{ project.name|first|upper }}</div>
-                <div class="lead-card__info">
-                    <span class="lead-card__name">{{ project.name }}</span>
-                    <span class="lead-card__count">
-                        {% include 'projects/partials/status_badge.html' with status=project.status %}
-                    </span>
-                </div>
-            </div>
+    <div class="panel" style="padding: 12px 16px; margin-bottom: 16px;">
+        <a href="{% url 'lead_portal:resume' %}">
+            Моё резюме в резерве кадров —
+            {% if resume.submitted_at %}обновлено {{ resume.submitted_at|date:'d.m.Y' }}{% else %}ещё не заполняли сами{% endif %}
         </a>
-    {% empty %}
-        <div class="empty">Вы пока не назначены тимлидом ни на один проект.</div>
-    {% endfor %}
+    </div>
+{% endif %}
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Проект</th>
+                <th>Статус</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for project in projects %}
+                <tr>
+                    <td><a href="{% url 'lead_portal:project_detail' project.pk %}"><strong>{{ project.name }}</strong></a></td>
+                    <td>{% include 'projects/partials/status_badge.html' with status=project.status %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="2" class="empty" style="text-align:center; padding: 24px;">Вы пока не назначены тимлидом ни на один проект.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 {% endblock %}
