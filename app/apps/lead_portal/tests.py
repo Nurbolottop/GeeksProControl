@@ -1007,3 +1007,12 @@ class LeadOverviewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Путь проекта")
         self.assertNotContains(response, "Кладётся внутрь")
+
+    def test_finished_project_shows_status_instead_of_deadline(self):
+        from apps.projects.models import ProjectStatus
+
+        Project.objects.filter(pk=self.project.pk).update(status=ProjectStatus.COMPLETED)
+        response = self.client.get(self.url)
+        labels = [tile["label"] for tile in response.context["lead_tiles"]]
+        self.assertIn("завершён", labels)
+        self.assertNotIn("до дедлайна", labels)

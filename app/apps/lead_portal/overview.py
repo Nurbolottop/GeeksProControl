@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from apps.attendance.models import Attendance, GroupMeeting, WorkScore
 from apps.projects import graphics
+from apps.projects.models import ProjectStatus
 from apps.teams.models import TeamMember, TeamRole
 
 WINDOW_DAYS = 28
@@ -124,7 +125,17 @@ def lead_overview(project, own_role) -> dict:
             'hint': 'за 4 недели оценок нет', 'tone': 'violet',
         })
     deadline = project.planned_end_date
-    if deadline:
+    is_finished = project.status != ProjectStatus.ACTIVE
+    if is_finished:
+        # у закрытого проекта «до дедлайна» уже ничего не значит
+        finished_on = project.actual_end_date
+        tiles.append({
+            'text': '✓' if project.status == ProjectStatus.COMPLETED else '—',
+            'label': project.get_status_display().lower(),
+            'hint': f'{finished_on:%d.%m.%Y}' if finished_on else 'проект больше не в работе',
+            'tone': 'green' if project.status == ProjectStatus.COMPLETED else 'yellow',
+        })
+    elif deadline:
         left = (deadline - today).days
         tiles.append({
             'value': abs(left), 'unit': _days(left),
@@ -158,4 +169,5 @@ def lead_overview(project, own_role) -> dict:
         'unmarked': unmarked,
         'group': group,
         'pm': pm,
+        'is_finished': is_finished,
     }
