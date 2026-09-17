@@ -710,3 +710,72 @@ class ReserveShareCollectionTests(TestCase):
         self.assertEqual(set(link.candidates.all()), {self.first, self.second})
         public = self.client.get(link.get_absolute_url())
         self.assertNotContains(public, 'class="share-group"')
+
+
+class ReserveInternLinkTests(TestCase):
+    """Карточка в резерве связывается с карточкой человека по контактам."""
+
+    def setUp(self):
+        self.person = Intern.objects.create(
+            full_name='Болотбеков Алишер', phone='+996 (555) 12-34-56',
+            email='Alisher@Mail.com', telegram='@alisher_dev',
+        )
+
+    def _candidate(self, **fields):
+        data = {'full_name': 'Алишер', **fields}
+        return ReserveCandidate.objects.create(**data)
+
+    def test_phone_matches_in_any_format(self):
+        candidate = self._candidate(phone='0555123456')
+        self.assertEqual(services.find_intern_for(candidate), self.person)
+
+    def test_email_and_telegram_match(self):
+        self.assertEqual(
+            services.find_intern_for(self._candidate(email='alisher@mail.com')), self.person,
+        )
+        self.assertEqual(
+            services.find_intern_for(self._candidate(telegram='alisher_dev')), self.person,
+        )
+
+    def test_ambiguous_match_is_not_linked(self):
+        Intern.objects.create(full_name='Однофамилец', phone='0555123456')
+        candidate = self._candidate(phone='0555123456')
+        self.assertIsNone(services.link_to_intern(candidate))
+        candidate.refresh_from_db()
+        self.assertIsNone(candidate.intern_id)
+
+    def test_already_linked_person_is_not_taken_twice(self):
+        self._candidate(phone='0555123456', intern=self.person)
+        other = self._candidate(full_name='Второй', phone='0555123456')
+        self.assertIsNone(services.find_intern_for(other))
+
+    def test_no_contacts_no_link(self):
+        self.assertIsNone(services.find_intern_for(self._candidate()))
+
+    def test_link_writes_history(self):
+        candidate = self._candidate(phone='0555123456')
+        services.link_to_intern(candidate)
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.intern, self.person)
+        self.assertTrue(candidate.events.filter(title__startswith='Связан').exists())
+
+    def test_application_links_automatically(self):
+        invite = services.issue_invite()
+        self.client.post(invite.get_absolute_url(), dict(APPLICATION, phone='0555123456'))
+        candidate = ReserveCandidate.objects.get(phone='0555123456')
+        self.assertEqual(candidate.intern, self.person)
+
+    def test_command_previews_then_links(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        candidate = self._candidate(phone='0555123456')
+        out = StringIO()
+        call_command('link_reserve_candidates', stdout=out)
+        candidate.refresh_from_db()
+        self.assertIsNone(candidate.intern_id)
+        self.assertIn('Будет связано: 1', out.getvalue())
+        call_command('link_reserve_candidates', apply=True, stdout=StringIO())
+        candidate.refresh_from_db()
+        self.assertEqual(candidate.intern, self.person)

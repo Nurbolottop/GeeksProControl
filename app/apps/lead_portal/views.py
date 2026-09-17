@@ -20,8 +20,42 @@ from apps.training.models import Specialization
 @login_required
 def dashboard(request):
     """Список проектов, где текущий пользователь — активный тимлид."""
+    from apps.reserve.services import reserve_card_of
+
     return render(request, 'lead_portal/dashboard.html', {
         'projects': list(services.lead_projects(request.user)),
+        'resume': reserve_card_of(request.user),
+    })
+
+
+@login_required
+def resume(request):
+    """Моё резюме в резерве кадров: правлю сам, под своим логином, без ссылок.
+
+    Карточку в резерв заводит руководитель — здесь человек только ведёт
+    своё резюме. Оценки, статусы и комментарии сотрудников сюда не
+    попадают: форма та же, что у публичной анкеты.
+    """
+    import json
+
+    from apps.reserve import services as reserve_services
+    from apps.reserve.forms import ReserveApplyForm
+
+    candidate = reserve_services.reserve_card_of(request.user)
+    if candidate is None:
+        return render(request, 'lead_portal/resume.html', {'candidate': None})
+    form = ReserveApplyForm(
+        request.POST or None, request.FILES or None, instance=candidate,
+    )
+    if request.method == 'POST' and form.is_valid():
+        reserve_services.save_own_resume(candidate, form, request.user)
+        messages.success(request, 'Резюме сохранено — в резерве кадров уже новая версия.')
+        return redirect('lead_portal:resume')
+    return render(request, 'lead_portal/resume.html', {
+        'candidate': candidate,
+        'form': form,
+        'direction_groups': json.dumps(reserve_services.direction_groups_map()),
+        'mark_optional': True,
     })
 
 

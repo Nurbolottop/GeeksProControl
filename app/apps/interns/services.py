@@ -209,7 +209,9 @@ def branch_summary(interns) -> dict:
 # --- Архив сотрудников -------------------------------------------------------
 # Тимлид (или любой человек из базы), который у нас больше не работает, не
 # удаляется: его оценки, табели и история проектов остаются. Он пропадает из
-# рабочих списков, снимается со всех текущих проектов и теряет вход в систему.
+# рабочих списков и снимается со всех текущих проектов. Вход в систему
+# закрывается — кроме тех, кто есть в резерве кадров: им логин нужен, чтобы
+# самим вести резюме, а проектов и команд после архива у них уже нет.
 
 def archive_person(intern: Intern, user=None, reason: str = '') -> int:
     """Отправить человека в архив. Возвращает, со скольких проектов снят."""
@@ -229,7 +231,12 @@ def archive_person(intern: Intern, user=None, reason: str = '') -> int:
             status=TeamMember.Status.LEFT, left_at=timezone.localdate(),
         )
         intern.archive()
-        if intern.user_id and intern.user.is_active:
+        from apps.reserve.models import ReserveCandidate
+
+        in_reserve = ReserveCandidate.objects.filter(
+            intern=intern, is_archived=False,
+        ).exists()
+        if intern.user_id and intern.user.is_active and not in_reserve:
             intern.user.is_active = False
             intern.user.save(update_fields=['is_active'])
         audit_log(

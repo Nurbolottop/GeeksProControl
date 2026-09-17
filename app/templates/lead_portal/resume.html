@@ -1,0 +1,34 @@
+{% extends 'lead_portal/base.html' %}
+
+{% block title %}Моё резюме — Портал тимлида{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'lead_portal:dashboard' %}">← Мои проекты</a></p>
+
+{% if candidate %}
+    <div class="portal-hero">
+        <div class="portal-hero__eyebrow">Резерв кадров GeeksPro</div>
+        <h1>Моё резюме</h1>
+        <p>
+            Это ваша анкета в резерве кадров — по ней мы рекомендуем вас работодателям.
+            Держите её свежей: навыки, опыт, ссылки на работы, чего ищете.
+            {% if candidate.submitted_at %}Последнее обновление — {{ candidate.submitted_at|date:'d.m.Y' }}.{% endif %}
+        </p>
+        {% if candidate.intern %}
+            <p class="sub">Проекты, на которых вы работали у нас, добавляются в резюме сами — их вписывать не нужно.</p>
+        {% endif %}
+    </div>
+    <div class="apply-embed">
+        {% include 'reserve/partials/apply_form.html' with submit_label='Сохранить резюме' actions_note='Изменения сразу попадают в резерв кадров. Оценки и комментарии сотрудников вы здесь не видите — их нет в анкете.' %}
+    </div>
+{% else %}
+    <div class="portal-hero">
+        <div class="portal-hero__eyebrow">Резерв кадров GeeksPro</div>
+        <h1>Моё резюме</h1>
+        <p>
+            Вас пока нет в резерве кадров. Когда руководитель добавит вас туда,
+            здесь появится ваше резюме — и вы сможете сами его обновлять.
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

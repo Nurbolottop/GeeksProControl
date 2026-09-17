@@ -273,3 +273,117 @@ class LeadPortalExcludedActionsTests(TestCase):
         ):
             with self.assertRaises(NoReverseMatch):
                 reverse(name, args=[1])
+
+
+class LeadResumeTests(TestCase):
+    """Тимлид сам ведёт своё резюме в резерве кадров — под логином, без ссылок."""
+
+    def setUp(self):
+        from apps.reserve.models import CandidateStatus, ReserveCandidate
+
+        self.lead_user = Model.objects.create_user(
+            username="+996700000040", password="x", role=User.Role.TEAM_LEAD,
+        )
+        self.lead = Intern.objects.create(full_name="Резюмеев Тимлид", user=self.lead_user)
+        self.project = Project.objects.create(name="Омур")
+        TeamMember.objects.create(
+            project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.card = ReserveCandidate.objects.create(
+            full_name="Резюмеев Тимлид", phone="0700111222", intern=self.lead,
+            skills="Python", status=CandidateStatus.RESERVE, rating=7,
+            comment_pm="внутренний комментарий", consent_given=True,
+        )
+        self.url = reverse("lead_portal:resume")
+        self.client.force_login(self.lead_user)
+
+    def _payload(self, **extra):
+        return {
+            "full_name": "Резюмеев Тимлид", "phone": "0700111222",
+            "skills": "Python, Django, Docker", "desired_position": "Team Lead",
+            "consent_given": "on", **extra,
+        }
+
+    def test_lead_sees_own_resume(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["candidate"], self.card)
+        self.assertContains(response, "Сохранить резюме")
+        self.assertNotContains(response, "внутренний комментарий")
+
+    def test_lead_updates_resume(self):
+        response = self.client.post(self.url, self._payload())
+        self.assertRedirects(response, self.url, fetch_redirect_response=False)
+        self.card.refresh_from_db()
+        self.assertEqual(self.card.skills, "Python, Django, Docker")
+        self.assertEqual(self.card.desired_position, "Team Lead")
+        self.assertIsNotNone(self.card.submitted_at)
+        self.assertEqual(self.card.updated_by, self.lead_user)
+        self.assertTrue(
+            self.card.events.filter(title="Кандидат обновил резюме в своём портале").exists()
+        )
+
+    def test_lead_cannot_touch_internal_fields(self):
+        self.client.post(self.url, self._payload(
+            status="employed", rating="10", comment_pm="всё отлично", intern="",
+        ))
+        self.card.refresh_from_db()
+        self.assertEqual(self.card.status, "reserve")
+        self.assertEqual(self.card.rating, 7)
+        self.assertEqual(self.card.comment_pm, "внутренний комментарий")
+        self.assertEqual(self.card.intern, self.lead)
+
+    def test_dashboard_shows_resume_card(self):
+        response = self.client.get(reverse("lead_portal:dashboard"))
+        self.assertContains(response, "Моё резюме в резерве кадров")
+
+    def test_without_reserve_card_shows_empty_state(self):
+        self.card.intern = None
+        self.card.save()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["candidate"])
+        self.assertContains(response, "Вас пока нет в резерве кадров")
+        self.client.post(self.url, self._payload(skills="взлом"))
+        self.card.refresh_from_db()
+        self.assertEqual(self.card.skills, "Python")
+
+    def test_cannot_edit_someone_elses_resume(self):
+        other_user = Model.objects.create_user(
+            username="+996700000041", password="x", role=User.Role.TEAM_LEAD,
+        )
+        Intern.objects.create(full_name="Другой", user=other_user)
+        self.client.force_login(other_user)
+        self.client.post(self.url, self._payload(skills="чужое"))
+        self.card.refresh_from_db()
+        self.assertEqual(self.card.skills, "Python")
+
+    def test_pm_is_kept_out_of_lead_resume(self):
+        pm = Model.objects.create_user(
+            username="+996700000042", password="x", role=User.Role.PROJECT_MANAGER,
+        )
+        self.client.force_login(pm)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_archived_lead_in_reserve_keeps_login_for_resume(self):
+        from apps.interns.services import archive_person
+
+        archive_person(self.lead)
+        self.lead_user.refresh_from_db()
+        self.assertTrue(self.lead_user.is_active)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        # но команды у него больше нет
+        response = self.client.get(
+            reverse("lead_portal:project_detail", args=[self.project.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_archived_lead_without_reserve_loses_login(self):
+        from apps.interns.services import archive_person
+
+        self.card.delete()
+        archive_person(self.lead)
+        self.lead_user.refresh_from_db()
+        self.assertFalse(self.lead_user.is_active)

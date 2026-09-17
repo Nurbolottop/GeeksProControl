@@ -58,6 +58,7 @@ def create_candidate(candidate: ReserveCandidate, user=None) -> ReserveCandidate
         candidate, EventKind.CREATED, 'Кандидат добавлен в резерв',
         detail=f'Статус: {candidate.get_status_display()}', user=user,
     )
+    link_to_intern(candidate, user=user)
     return candidate
 
 
@@ -240,6 +241,7 @@ def accept_application(invite: ReserveInvite, form) -> ReserveCandidate:
         )
     else:
         log_event(candidate, EventKind.SUBMITTED, 'Кандидат обновил свою анкету')
+    link_to_intern(candidate)
     # Уже проверенного человека повторная правка анкеты не отбрасывает
     # назад по статусу — только новых и ещё не проверенных.
     if candidate.status in {CandidateStatus.NEW, CandidateStatus.REVIEW}:
@@ -362,3 +364,85 @@ def reorder_candidates(order: list[int], user=None) -> int:
     if changed:
         ReserveCandidate.objects.bulk_update(changed, ['priority'])
     return len(changed)
+
+
+# --- Связь резерва с карточками людей ----------------------------------------
+# Большая часть резерва — наши же бывшие и текущие тимлиды. Карточка в
+# резерве и карточка человека — это один человек: связываем их, чтобы в
+# резюме подтягивались проекты у нас, а сам человек мог править своё
+# резюме из портала без ссылок.
+
+def _digits(value: str) -> str:
+    """Телефон без кода страны и оформления: +996 (555) 12-34-56 → 555123456."""
+    import re
+
+    return re.sub(r'\D', '', value or '')[-9:]
+
+
+def _handle(value: str) -> str:
+    return (value or '').strip().lower().lstrip('@')
+
+
+def find_intern_for(candidate: ReserveCandidate):
+    """Карточка человека с тем же телефоном, почтой или telegram.
+
+    Совпадение должно быть однозначным и карточка — ещё ни к кому не
+    привязанной: сомнительные случаи не связываем, их решает человек.
+    """
+    from apps.interns.models import Intern
+
+    phone = _digits(candidate.phone)
+    email = (candidate.email or '').strip().lower()
+    handle = _handle(candidate.telegram)
+    if not (phone or email or handle):
+        return None
+    found = []
+    for person in Intern.objects.filter(reserve_card__isnull=True):
+        if (
+            (phone and len(phone) >= 9 and _digits(person.phone) == phone)
+            or (email and (person.email or '').strip().lower() == email)
+            or (handle and _handle(person.telegram) == handle)
+        ):
+            found.append(person)
+    return found[0] if len(found) == 1 else None
+
+
+def link_to_intern(candidate: ReserveCandidate, user=None):
+    """Привязать кандидата к карточке человека, если она однозначно нашлась."""
+    if candidate.intern_id:
+        return candidate.intern
+    person = find_intern_for(candidate)
+    if person is None:
+        return None
+    candidate.intern = person
+    candidate.save(update_fields=['intern', 'updated_at'])
+    log_event(
+        candidate, EventKind.UPDATED, 'Связан(а) с карточкой в базе людей',
+        detail=f'{person.full_name}: проекты у нас подтягиваются в резюме',
+        user=user,
+    )
+    return person
+
+
+def reserve_card_of(user):
+    """Карточка в резерве того, кто вошёл в портал (через его карточку человека)."""
+    person = getattr(user, 'intern_profile', None)
+    if person is None:
+        return None
+    return ReserveCandidate.objects.filter(intern=person, is_archived=False).first()
+
+
+def save_own_resume(candidate: ReserveCandidate, form, user) -> ReserveCandidate:
+    """Человек сам обновил резюме из портала — без ссылки, под своим логином."""
+    candidate = form.save(commit=False)
+    now = timezone.now()
+    candidate.submitted_at = now
+    candidate.consent_at = candidate.consent_at or now
+    candidate.updated_by = user
+    candidate.save()
+    changed = ', '.join(form.changed_data)
+    log_event(
+        candidate, EventKind.SUBMITTED, 'Кандидат обновил резюме в своём портале',
+        detail=changed, user=user,
+    )
+    return candidate

@@ -39,7 +39,7 @@
             </form>
         {% elif is_lead or was_lead %}
             <form method="post" action="{% url 'interns:archive' intern.pk %}" style="margin:0"
-                  data-confirm="Отправить {{ intern.full_name|escapejs }} в архив? Человек будет снят со всех текущих проектов{% if intern.user %}, вход в систему закроется{% endif %}. Оценки и история проектов сохранятся."
+                  data-confirm="Отправить {{ intern.full_name|escapejs }} в архив? Человек будет снят со всех текущих проектов{% if intern.user %}{% if intern.reserve_card %}. Вход останется — только чтобы вести резюме в резерве кадров{% else %}, вход в систему закроется{% endif %}{% endif %}. Оценки и история проектов сохранятся."
                   data-confirm-ok="В архив">
                 {% csrf_token %}
                 <button type="submit" class="btn btn--secondary">В архив</button>
@@ -57,7 +57,7 @@
     <div class="panel" style="border-left: 4px solid var(--red, #dc2626); padding-block: 14px;">
         <strong>В архиве с {{ intern.archived_at|date:'d.m.Y' }}.</strong>
         <span class="sub">
-            У нас больше не работает: снят(а) с текущих проектов{% if intern.user %}, вход в систему закрыт{% endif %}.
+            У нас больше не работает: снят(а) с текущих проектов{% if intern.user %}{% if intern.reserve_card %}, вход оставлен — чтобы вести резюме в резерве кадров{% elif not intern.user.is_active %}, вход в систему закрыт{% endif %}{% endif %}.
             Оценки и история проектов сохранены.
         </span>
     </div>

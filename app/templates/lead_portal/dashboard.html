@@ -14,6 +14,20 @@
         {% endif %}
     </p>
 </div>
+{% if resume %}
+    <a href="{% url 'lead_portal:resume' %}" class="lead-card" style="text-decoration: none; display: block; margin-bottom: 16px;">
+        <div class="lead-card__head">
+            <div class="lead-card__avatar">📄</div>
+            <div class="lead-card__info">
+                <span class="lead-card__name">Моё резюме в резерве кадров</span>
+                <span class="lead-card__count">
+                    {% if resume.submitted_at %}обновлено {{ resume.submitted_at|date:'d.m.Y' }}{% else %}ещё не заполняли сами{% endif %}
+                    · открыть и отредактировать →
+                </span>
+            </div>
+        </div>
+    </a>
+{% endif %}
 <div class="lead-grid">
     {% for project in projects %}
         <a href="{% url 'lead_portal:project_detail' project.pk %}" class="lead-card" style="text-decoration: none; display: block;">
