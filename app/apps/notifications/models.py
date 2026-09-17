@@ -29,6 +29,15 @@ class Notification(TimeStampedModel):
     dedup_key = models.CharField(
         'Ключ дедупликации', max_length=255, blank=True, db_index=True,
     )
+    # Кому лично. Пусто — общая лента руководителя (как было всегда).
+    # Заполнено — уведомление в портале этого человека (например, тимлиду
+    # о закрытии его проекта); в общую ленту оно не попадает. Привязка к
+    # карточке, а не к логину: уведомление дождётся, даже если доступ в
+    # портал выдадут позже.
+    intern = models.ForeignKey(
+        'interns.Intern', on_delete=models.CASCADE, related_name='notifications',
+        verbose_name='Кому (в портале)', null=True, blank=True,
+    )
     is_read = models.BooleanField('Просмотрено', default=False, db_index=True)
     is_closed = models.BooleanField('Закрыто', default=False, db_index=True)
 

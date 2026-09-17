@@ -48,13 +48,20 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
     Если проект завершён успешно (не отменён и не отказ клиента),
     освобождённые стажёры попадают в «Выпускники» на проверку — надо
     решить, продолжают ли они стажировку дальше.
+
+    Тимлидам уходит личное уведомление в портал: проект после этого из
+    их портала пропадает, и без уведомления это выглядело бы как сбой.
     """
     from apps.interns.models import GraduateStatus, Intern
-    from apps.teams.models import TeamMember
+    from apps.teams.models import TeamMember, TeamRole
 
     members = project.team_members.filter(status=TeamMember.Status.ACTIVE)
     intern_ids = list(
         members.filter(intern__isnull=False).values_list('intern_id', flat=True),
+    )
+    lead_ids = set(
+        members.filter(role=TeamRole.TEAM_LEAD, intern__isnull=False)
+        .values_list('intern_id', flat=True),
     )
     members.update(
         status=TeamMember.Status.LEFT, left_at=when or timezone.localdate(),
@@ -62,6 +69,33 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
     if project.status == ProjectStatus.COMPLETED and intern_ids:
         Intern.objects.filter(pk__in=intern_ids).update(
             graduate_status=GraduateStatus.PENDING,
+        )
+    notify_leads_project_closed(project, Intern.objects.filter(pk__in=lead_ids))
+
+
+def notify_leads_project_closed(project: Project, leads) -> None:
+    """«Проект завершён / закрыт» — каждому тимлиду в его портал."""
+    from apps.notifications.models import NotificationLevel
+    from apps.notifications.services import notify
+
+    if project.status == ProjectStatus.COMPLETED:
+        title = f'Проект «{project.name}» завершён'
+        description = (
+            'Проект сдан, команда освобождена. Спасибо за работу! '
+            'Проект остался в вашей истории, а из портала он пропал.'
+        )
+        level = NotificationLevel.SUCCESS
+    else:
+        title = f'Проект «{project.name}» закрыт: {project.get_status_display().lower()}'
+        description = (
+            'Работа по проекту остановлена, команда освобождена — '
+            'проект больше не показывается в вашем портале.'
+        )
+        level = NotificationLevel.WARNING
+    for person in leads:
+        notify(
+            title, level=level, description=description, intern=person,
+            dedup_key=f'project-closed:{project.pk}:{project.status}',
         )
 
 

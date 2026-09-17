@@ -20,12 +20,34 @@ from apps.training.models import Specialization
 @login_required
 def dashboard(request):
     """Список проектов, где текущий пользователь — активный тимлид."""
+    from apps.notifications.services import personal
     from apps.reserve.services import reserve_card_of
 
-    return render(request, 'lead_portal/dashboard.html', {
+    notifications = list(personal(getattr(request.user, 'intern_profile', None)))
+    response = render(request, 'lead_portal/dashboard.html', {
         'projects': list(services.lead_projects(request.user)),
         'resume': reserve_card_of(request.user),
+        'notifications': notifications,
     })
+    # показали на главной — значит прочитано; висит, пока не нажмут «Понятно»
+    unread = [note.pk for note in notifications if not note.is_read]
+    if unread:
+        from apps.notifications.models import Notification
+
+        Notification.objects.filter(pk__in=unread).update(is_read=True)
+    return response
+
+
+@login_required
+def notification_close(request, pk):
+    """«Понятно» — закрыть своё уведомление. Чужие закрыть нельзя."""
+    from apps.notifications.services import personal
+
+    if request.method == 'POST':
+        personal(getattr(request.user, 'intern_profile', None)).filter(pk=pk).update(
+            is_closed=True, is_read=True,
+        )
+    return redirect('lead_portal:dashboard')
 
 
 @login_required

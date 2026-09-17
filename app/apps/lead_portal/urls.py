@@ -7,6 +7,10 @@ app_name = 'lead_portal'
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('resume/', views.resume, name='resume'),
+    path(
+        'notifications/<int:pk>/close/', views.notification_close,
+        name='notification_close',
+    ),
     path('<int:pk>/', views.project_detail, name='project_detail'),
     path('<int:pk>/team/add/', views.member_add, name='member_add'),
     path(

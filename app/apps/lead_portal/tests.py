@@ -387,3 +387,122 @@ class LeadResumeTests(TestCase):
         archive_person(self.lead)
         self.lead_user.refresh_from_db()
         self.assertFalse(self.lead_user.is_active)
+
+
+class LeadProjectClosedNotificationTests(TestCase):
+    """Проект завершён или закрыт — тимлиду приходит уведомление в портал."""
+
+    def setUp(self):
+        self.lead_user = Model.objects.create_user(
+            username="+996700000050", password="x", role=User.Role.TEAM_LEAD,
+        )
+        self.lead = Intern.objects.create(full_name="Уведомлёнов Тимлид", user=self.lead_user)
+        self.intern = Intern.objects.create(full_name="Просто Стажёр")
+        self.old_lead = Intern.objects.create(full_name="Ушедший Тимлид")
+        self.project = Project.objects.create(name="Омур")
+        TeamMember.objects.create(
+            project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.intern, role=TeamRole.OTHER,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.old_lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.LEFT,
+        )
+        self.client.force_login(self.lead_user)
+
+    def _close(self, status):
+        from apps.projects.services import update_project
+
+        self.project.status = status
+        update_project(self.project, {"status": "active"})
+
+    def test_completed_project_notifies_lead(self):
+        from apps.notifications.models import Notification
+
+        self._close("completed")
+        note = Notification.objects.get(intern=self.lead)
+        self.assertEqual(note.title, "Проект «Омур» завершён")
+        self.assertEqual(note.level, "success")
+
+    def test_cancelled_and_refused_projects_notify_lead(self):
+        from apps.notifications.models import Notification
+
+        self._close("cancelled")
+        self.assertEqual(
+            Notification.objects.get(intern=self.lead).title,
+            "Проект «Омур» закрыт: отменён",
+        )
+
+    def test_only_active_leads_are_notified(self):
+        from apps.notifications.models import Notification
+
+        self._close("completed")
+        self.assertFalse(Notification.objects.filter(intern=self.intern).exists())
+        self.assertFalse(Notification.objects.filter(intern=self.old_lead).exists())
+
+    def test_pause_does_not_notify(self):
+        from apps.notifications.models import Notification
+
+        self._close("paused")
+        self.assertFalse(Notification.objects.filter(intern=self.lead).exists())
+
+    def test_force_complete_notifies_lead(self):
+        from apps.notifications.models import Notification
+        from apps.projects.delivery import complete_project
+
+        complete_project(self.project, force=True, reason="сдали вручную")
+        self.assertTrue(
+            Notification.objects.filter(intern=self.lead, title__endswith="завершён").exists()
+        )
+
+    def test_personal_notification_stays_out_of_head_feed(self):
+        from apps.notifications import services
+
+        self._close("completed")
+        self.assertEqual(services.unread_count(), 0)
+        self.assertFalse(services.feed().exists())
+
+    def test_dashboard_shows_marks_read_and_close_hides(self):
+        from apps.notifications.models import Notification
+
+        self._close("completed")
+        response = self.client.get(reverse("lead_portal:dashboard"))
+        self.assertContains(response, "Проект «Омур» завершён")
+        note = Notification.objects.get(intern=self.lead)
+        self.assertTrue(note.is_read)
+        self.client.post(reverse("lead_portal:notification_close", args=[note.pk]))
+        response = self.client.get(reverse("lead_portal:dashboard"))
+        self.assertNotContains(response, "Проект «Омур» завершён")
+
+    def test_cannot_close_someone_elses_notification(self):
+        from apps.notifications.services import notify
+
+        note = notify("Чужое", intern=self.intern)
+        self.client.post(reverse("lead_portal:notification_close", args=[note.pk]))
+        note.refresh_from_db()
+        self.assertFalse(note.is_closed)
+
+    def test_notification_waits_for_login(self):
+        """Логин выдали позже — уведомление уже ждёт в портале."""
+        from apps.notifications.models import Notification
+
+        late = Intern.objects.create(full_name="Без Логина")
+        TeamMember.objects.create(
+            project=self.project, intern=late, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self._close("completed")
+        self.assertTrue(Notification.objects.filter(intern=late).exists())
+        user = Model.objects.create_user(
+            username="+996700000051", password="x", role=User.Role.TEAM_LEAD,
+        )
+        late.user = user
+        late.save()
+        self.client.force_login(user)
+        self.assertContains(
+            self.client.get(reverse("lead_portal:dashboard")), "Проект «Омур» завершён",
+        )

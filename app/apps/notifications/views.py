@@ -2,12 +2,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
 
+from apps.notifications import services
 from apps.notifications.models import Notification
 
 
 @login_required
 def notification_list(request):
-    qs = Notification.objects.filter(is_closed=False)
+    qs = services.feed().filter(is_closed=False)
     level = request.GET.get('level')
     if level:
         qs = qs.filter(level=level)
@@ -26,14 +27,14 @@ def notification_list(request):
 @login_required
 def notification_close(request, pk):
     if request.method == 'POST':
-        Notification.objects.filter(pk=pk).update(is_closed=True, is_read=True)
+        services.feed().filter(pk=pk).update(is_closed=True, is_read=True)
     return redirect('notifications:list')
 
 
 @login_required
 def notification_close_all(request):
     if request.method == 'POST':
-        Notification.objects.filter(is_closed=False).update(
+        services.feed().filter(is_closed=False).update(
             is_closed=True, is_read=True,
         )
     return redirect('notifications:list')
