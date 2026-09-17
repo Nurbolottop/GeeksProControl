@@ -49,9 +49,6 @@
     <a href="?tab=access" class="{% if tab == 'access' %}is-active{% endif %}">Доступы</a>
     <a href="?tab=report" class="{% if tab == 'report' %}is-active{% endif %}">Отчёт</a>
     <a href="?tab=graphics" class="{% if tab == 'graphics' %}is-active{% endif %}">Графика</a>
-    <a href="?tab=daily" class="{% if tab == 'daily' %}is-active{% endif %}">
-        Ежедневно{% if daily_left %}<span class="tab-count">{{ daily_left }}</span>{% endif %}
-    </a>
     <a href="?tab=history" class="{% if tab == 'history' %}is-active{% endif %}">История</a>
     {% if project.group %}
         <a href="{% url 'attendance:group_meetings' project.group.pk %}" class="tabs__link">Табель →</a>
@@ -356,8 +353,6 @@
     {% include 'projects/partials/tab_report.html' %}
 {% elif tab == 'graphics' %}
     {% include 'projects/partials/tab_graphics.html' %}
-{% elif tab == 'daily' %}
-    {% include 'projects/partials/tab_daily.html' %}
 {% elif tab == 'history' %}
     <div class="panel">
         <h2>История изменений</h2>
