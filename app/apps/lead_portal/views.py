@@ -90,6 +90,11 @@ def project_detail(request, pk):
     tab = request.GET.get('tab', 'overview')
     context = {'project': project, 'tab': tab}
     if tab == 'team':
+        from apps.interns.services import active_profile_form_link
+        from apps.interns.views import PROFILE_LINK_TTL_CHOICES
+
+        context['profile_link'] = active_profile_form_link(project)
+        context['profile_link_ttls'] = PROFILE_LINK_TTL_CHOICES
         members = project.team_members.select_related('intern__specialization', 'user')
         is_mobile = bool(project.project_type and project.project_type.is_mobile)
         context['team_sections'] = group_by_role(members, is_mobile)
@@ -344,3 +349,43 @@ def intern_detail(request, pk, intern_pk):
         'scores': scores,
         'average_score': round(sum(values) / len(values), 1) if values else None,
     })
+
+
+def _team_url(project):
+    return f"{reverse('lead_portal:project_detail', args=[project.pk])}?tab=team"
+
+
+@login_required
+def profile_link_create(request, pk):
+    """Ссылка на анкету для новых стажёров этого проекта.
+
+    Тимлид отправляет её тем, с кем договорился: кто заполнит анкету,
+    сразу окажется в команде проекта. Новая ссылка гасит прежнюю
+    ссылку этого же проекта, ссылки других проектов не трогает.
+    """
+    from apps.interns.services import issue_profile_form_link
+
+    project = services.lead_project_or_404(request.user, pk)
+    if request.method == 'POST':
+        raw_ttl = request.POST.get('ttl_days', '')
+        ttl_days = int(raw_ttl) if raw_ttl.isdigit() else None
+        issue_profile_form_link(request.user, ttl_days, project=project)
+        messages.success(
+            request,
+            'Ссылка на анкету готова — отправьте её новому стажёру. '
+            'Прежняя ссылка этого проекта больше не открывается.',
+        )
+    return redirect(_team_url(project))
+
+
+@login_required
+def profile_link_disable(request, pk):
+    from apps.interns.services import active_profile_form_link
+
+    project = services.lead_project_or_404(request.user, pk)
+    if request.method == 'POST':
+        link = active_profile_form_link(project)
+        if link is not None:
+            link.deactivate()
+            messages.success(request, 'Ссылка на анкету отключена.')
+    return redirect(_team_url(project))

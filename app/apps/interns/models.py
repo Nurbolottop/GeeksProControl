@@ -209,9 +209,13 @@ def generate_form_token() -> str:
 class ProfileFormLink(TimeStampedModel):
     """Сменяемая ссылка на публичную анкету стажёра.
 
-    Постоянного адреса у анкеты нет: ПМ выпускает новую ссылку, и все
-    прежние сразу перестают работать — чтобы форма не гуляла по чатам
-    вечно и её не заполняли посторонние.
+    Постоянного адреса у анкеты нет: новая ссылка гасит прежние — чтобы
+    форма не гуляла по чатам вечно и её не заполняли посторонние.
+
+    Ссылка проекта (``project``) — её выпускает тимлид для новых
+    стажёров своей команды: кто заполнил анкету, сразу попадает в
+    команду этого проекта. У каждого проекта своя действующая ссылка.
+    Ссылка без проекта — общая, из списка «Все стажёры».
     """
 
     token = models.CharField(
@@ -229,6 +233,11 @@ class ProfileFormLink(TimeStampedModel):
     submissions = models.PositiveIntegerField('Заполнений', default=0)
     deactivated_at = models.DateTimeField(
         'Отключена', null=True, blank=True,
+    )
+    project = models.ForeignKey(
+        'projects.Project', on_delete=models.CASCADE, related_name='profile_links',
+        verbose_name='Проект', null=True, blank=True,
+        help_text='Кто заполнит анкету по этой ссылке — сразу в команду проекта.',
     )
 
     class Meta:

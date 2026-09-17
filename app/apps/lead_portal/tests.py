@@ -506,3 +506,133 @@ class LeadProjectClosedNotificationTests(TestCase):
         self.assertContains(
             self.client.get(reverse("lead_portal:dashboard")), "Проект «Омур» завершён",
         )
+
+
+
+class LeadProfileLinkTests(LeadProjectOwnershipTests):
+    """Тимлид сам выпускает ссылку на анкету для новых стажёров проекта."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.training.models import Specialization
+
+        self.spec = Specialization.objects.create(name="Backend")
+        self.team_url = (
+            reverse("lead_portal:project_detail", args=[self.project_a.pk]) + "?tab=team"
+        )
+
+    def _payload(self, **overrides):
+        data = {
+            "full_name": "Новый Бэкендер", "phone": "0700777888",
+            "email": "new@example.com", "telegram": "@newbe",
+            "city": "Бишкек", "branch": "Бишкек", "specialization": self.spec.pk,
+            "education_end_date": "2026-06-01", "internship_start_date": "2026-07-01",
+            "internship_attempt": "1",
+        }
+        data.update(overrides)
+        return data
+
+    def _create_link(self, project=None):
+        project = project or self.project_a
+        return self.client.post(
+            reverse("lead_portal:profile_link_create", args=[project.pk]), {"ttl_days": "7"},
+        )
+
+    def test_lead_creates_link_bound_to_project(self):
+        from apps.interns.models import ProfileFormLink
+
+        response = self._create_link()
+        self.assertRedirects(response, self.team_url, fetch_redirect_response=False)
+        link = ProfileFormLink.objects.get(is_active=True, project=self.project_a)
+        self.assertEqual(link.created_by, self.lead_user)
+        self.assertIsNotNone(link.expires_at)
+        page = self.client.get(self.team_url)
+        self.assertContains(page, link.get_absolute_url())
+
+    def test_cannot_create_link_for_foreign_project(self):
+        from apps.interns.models import ProfileFormLink
+
+        self.assertEqual(self._create_link(self.project_b).status_code, 404)
+        self.assertFalse(ProfileFormLink.objects.filter(project=self.project_b).exists())
+
+    def test_new_link_replaces_only_this_projects_link(self):
+        from apps.interns import services as intern_services
+        from apps.interns.models import ProfileFormLink
+
+        general = intern_services.issue_profile_form_link()
+        other = intern_services.issue_profile_form_link(project=self.project_b)
+        self._create_link()
+        first = ProfileFormLink.objects.get(is_active=True, project=self.project_a)
+        self._create_link()
+        first.refresh_from_db()
+        general.refresh_from_db()
+        other.refresh_from_db()
+        self.assertFalse(first.is_active)
+        self.assertTrue(general.is_active)
+        self.assertTrue(other.is_active)
+
+    def test_head_general_link_does_not_kill_project_links(self):
+        from apps.interns import services as intern_services
+        from apps.interns.models import ProfileFormLink
+
+        self._create_link()
+        intern_services.issue_profile_form_link()
+        self.assertTrue(
+            ProfileFormLink.objects.filter(is_active=True, project=self.project_a).exists()
+        )
+
+    def test_disable_link(self):
+        from apps.interns.models import ProfileFormLink
+
+        self._create_link()
+        self.client.post(reverse("lead_portal:profile_link_disable", args=[self.project_a.pk]))
+        self.assertFalse(
+            ProfileFormLink.objects.filter(is_active=True, project=self.project_a).exists()
+        )
+
+    def test_filled_form_puts_person_into_project_team(self):
+        from apps.interns.models import Intern as InternModel, ProfileFormLink
+        from apps.notifications.models import Notification
+
+        self._create_link()
+        link = ProfileFormLink.objects.get(is_active=True, project=self.project_a)
+        self.client.logout()
+        response = self.client.post(
+            reverse("intern_profile_apply", args=[link.token]), self._payload(),
+        )
+        self.assertEqual(response.status_code, 200)
+        person = InternModel.objects.get(phone="0700777888")
+        member = TeamMember.objects.get(project=self.project_a, intern=person)
+        self.assertEqual(member.status, TeamMember.Status.ACTIVE)
+        self.assertEqual(member.role, TeamRole.BACKEND)
+        self.assertIsNotNone(member.joined_at)
+        self.assertEqual(person.status, "active")
+        note = Notification.objects.get(intern=self.lead_intern)
+        self.assertIn("Новый Бэкендер", note.title)
+        self.assertIn("Проект A", note.title)
+
+    def test_refilled_form_does_not_duplicate_membership(self):
+        from apps.interns.models import Intern as InternModel, ProfileFormLink
+
+        self._create_link()
+        link = ProfileFormLink.objects.get(is_active=True, project=self.project_a)
+        self.client.logout()
+        url = reverse("intern_profile_apply", args=[link.token])
+        self.client.post(url, self._payload())
+        self.client.session.flush()
+        other = self.client_class()
+        other.post(url, self._payload())
+        person = InternModel.objects.get(phone="0700777888")
+        self.assertEqual(
+            TeamMember.objects.filter(project=self.project_a, intern=person).count(), 1,
+        )
+
+    def test_general_link_does_not_add_to_any_team(self):
+        from apps.interns import services as intern_services
+        from apps.interns.models import Intern as InternModel
+
+        link = intern_services.issue_profile_form_link()
+        self.client.logout()
+        self.client.post(reverse("intern_profile_apply", args=[link.token]), self._payload())
+        person = InternModel.objects.get(phone="0700777888")
+        self.assertFalse(person.team_memberships.exists())

@@ -75,37 +75,41 @@ def decline_graduate(intern: Intern) -> None:
     intern.save(update_fields=['graduate_status', 'updated_at'])
 
 
-def issue_profile_form_link(user=None, ttl_days: int | None = None) -> ProfileFormLink:
-    """Выпускает новую ссылку на анкету, гася все прежние.
+def issue_profile_form_link(
+    user=None, ttl_days: int | None = None, project=None,
+) -> ProfileFormLink:
+    """Выпускает новую ссылку на анкету, гася прежние того же вида.
 
-    Активной может быть только одна ссылка: как только выпустили новую,
-    старая перестаёт открываться — в этом и смысл «непостоянной» ссылки.
-    `ttl_days` — через сколько дней ссылка закроется сама; None — бессрочно,
-    до замены или ручного отключения.
+    Активной может быть одна ссылка на проект (и одна общая, без
+    проекта): как только выпустили новую, старая перестаёт открываться —
+    в этом и смысл «непостоянной» ссылки. Ссылки других проектов не
+    трогаем. `ttl_days` — через сколько дней ссылка закроется сама;
+    None — бессрочно, до замены или ручного отключения.
     """
     from datetime import timedelta
 
     from django.utils import timezone
 
     now = timezone.now()
-    ProfileFormLink.objects.filter(is_active=True).update(
+    ProfileFormLink.objects.filter(is_active=True, project=project).update(
         is_active=False, deactivated_at=now,
     )
     return ProfileFormLink.objects.create(
         created_by=user if user and user.is_authenticated else None,
         expires_at=now + timedelta(days=ttl_days) if ttl_days else None,
+        project=project,
     )
 
 
-def active_profile_form_link() -> ProfileFormLink | None:
-    """Действующая ссылка на анкету или None.
+def active_profile_form_link(project=None) -> ProfileFormLink | None:
+    """Действующая ссылка на анкету (общая или проекта) или None.
 
     Истёкшую по сроку гасим на месте, чтобы список и анкета одинаково
     считали её мёртвой и в панели не висела ссылка-призрак.
     """
     from django.utils import timezone
 
-    link = ProfileFormLink.objects.filter(is_active=True).first()
+    link = ProfileFormLink.objects.filter(is_active=True, project=project).first()
     if link is not None and link.is_expired:
         link.is_active = False
         link.deactivated_at = link.deactivated_at or timezone.now()
@@ -259,3 +263,59 @@ def unarchive_person(intern: Intern, user=None) -> None:
             intern.user.is_active = True
             intern.user.save(update_fields=['is_active'])
         audit_log(intern, 'Из архива', user=user)
+
+
+
+def join_project_from_form(intern: Intern, link: ProfileFormLink):
+    """Анкета заполнена по ссылке проекта — человек сразу в команде.
+
+    Роль — по направлению из анкеты, как при ручном добавлении. Если он
+    уже в этой команде, второй раз не добавляем. Тимлиду, выпустившему
+    ссылку, — уведомление в портал: пришёл новый человек.
+    """
+    from django.utils import timezone
+
+    from apps.interns.models import InternStatus
+    from apps.notifications.models import NotificationLevel
+    from apps.notifications.services import notify
+    from apps.teams.forms import ROLE_BY_SPECIALIZATION
+    from apps.teams.models import TeamMember, TeamRole
+
+    project = link.project
+    if project is None or intern.is_archived:
+        return None
+    member = TeamMember.objects.filter(
+        project=project, intern=intern, status=TeamMember.Status.ACTIVE,
+    ).first()
+    joined = member is None
+    if joined:
+        spec = intern.specialization
+        member = TeamMember.objects.create(
+            project=project, intern=intern,
+            group=getattr(project, 'group', None),
+            role=ROLE_BY_SPECIALIZATION.get(spec.name if spec else '', TeamRole.OTHER),
+            status=TeamMember.Status.ACTIVE,
+            joined_at=timezone.localdate(),
+        )
+    update_fields = []
+    if intern.status in (InternStatus.WAITING, InternStatus.READY):
+        intern.status = InternStatus.ACTIVE
+        update_fields.append('status')
+    if intern.graduate_status:
+        intern.graduate_status = ''
+        update_fields.append('graduate_status')
+    if update_fields:
+        intern.save(update_fields=[*update_fields, 'updated_at'])
+
+    lead = getattr(link.created_by, 'intern_profile', None) if link.created_by_id else None
+    if lead is not None:
+        notify(
+            f'{intern.full_name} заполнил(а) анкету — в команде «{project.name}»'
+            if joined else
+            f'{intern.full_name} обновил(а) анкету — уже в команде «{project.name}»',
+            level=NotificationLevel.INFO, intern=lead,
+            description=' · '.join(filter(None, [
+                str(intern.specialization or ''), intern.phone, intern.telegram,
+            ])),
+        )
+    return member

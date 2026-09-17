@@ -18,7 +18,7 @@
         <option value="">Ссылка: все</option>
         {% for link in links %}
             <option value="{{ link.token }}" {% if token == link.token %}selected{% endif %}>
-                /{{ link.token }}/ — {{ link.created_at|date:'d.m.Y H:i' }}{% if link.is_open %} (активна){% endif %}
+                {% if link.project %}{{ link.project.name }}{% else %}Общая{% endif %} · /{{ link.token }}/ — {{ link.created_at|date:'d.m.Y H:i' }}{% if link.is_open %} (активна){% endif %}
             </option>
         {% endfor %}
     </select>
@@ -56,7 +56,7 @@
                             <span class="badge badge--gray">Обновил(а) профиль</span>
                         {% endif %}
                     </td>
-                    <td class="sub">/{{ item.link.token }}/</td>
+                    <td class="sub">{% if item.link.project %}<a href="{{ item.link.project.get_absolute_url }}?tab=team">{{ item.link.project.name }}</a>{% if item.link.created_by %} · {{ item.link.created_by.display_name }}{% endif %}<br>{% else %}Общая ссылка<br>{% endif %}/{{ item.link.token }}/</td>
                 </tr>
             {% empty %}
                 <tr><td colspan="5" class="sub" style="padding: 18px;">Пока никто не заполнил анкету.</td></tr>

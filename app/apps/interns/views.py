@@ -146,7 +146,7 @@ def profile_link_answers(request):
     """Журнал заполнений анкеты — кто и по какой ссылке её прошёл."""
     submissions = (
         ProfileFormSubmission.objects
-        .select_related('intern', 'link')
+        .select_related('intern', 'link__project', 'link__created_by__intern_profile')
         .order_by('-created_at')
     )
     token = request.GET.get('link', '')
@@ -155,7 +155,7 @@ def profile_link_answers(request):
     paginator = Paginator(submissions, 50)
     return render(request, 'interns/profile_link_answers.html', {
         'page': paginator.get_page(request.GET.get('page')),
-        'links': ProfileFormLink.objects.all()[:50],
+        'links': ProfileFormLink.objects.select_related('project')[:50],
         'token': token,
         'total': paginator.count,
     })
@@ -735,7 +735,8 @@ def profile_apply(request, token):
     """Публичная анкета: стажёр сам заполняет/обновляет свой профиль.
 
     Открывается только по действующей ссылке (`token`): постоянного
-    адреса у анкеты нет, ПМ выпускает новую ссылку и старые умирают.
+    адреса у анкеты нет, новая ссылка гасит прежние. Если ссылка выпущена
+    тимлидом для проекта — человек сразу попадает в его команду.
 
     Сначала ищем по телефону. У многих текущих записей телефон ещё не
     заполнен (карточку когда-то завели по одному ФИО) — тогда, чтобы не
@@ -773,6 +774,8 @@ def profile_apply(request, token):
             link=link, intern=intern, full_name=intern.full_name,
             phone=intern.phone, is_new=is_new,
         )
+        if link.project_id:
+            services.join_project_from_form(intern, link)
         request.session[session_key] = True
         return render(request, 'interns/profile_apply_done.html')
     return render(request, 'interns/profile_apply.html', {'form': form})

@@ -14,6 +14,14 @@ urlpatterns = [
     path('<int:pk>/', views.project_detail, name='project_detail'),
     path('<int:pk>/team/add/', views.member_add, name='member_add'),
     path(
+        '<int:pk>/team/form-link/', views.profile_link_create,
+        name='profile_link_create',
+    ),
+    path(
+        '<int:pk>/team/form-link/disable/', views.profile_link_disable,
+        name='profile_link_disable',
+    ),
+    path(
         '<int:pk>/team/<int:member_pk>/edit/', views.member_edit,
         name='member_edit',
     ),
