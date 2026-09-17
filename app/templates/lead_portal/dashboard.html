@@ -3,11 +3,16 @@
 {% block title %}Мои проекты — Портал тимлида{% endblock %}
 
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>Мои проекты</h1>
-        <div class="sub">Проектов в работе: {{ projects|length }}</div>
-    </div>
+<div class="portal-hero">
+    <div class="portal-hero__eyebrow">Портал тимлида</div>
+    <h1>Привет, {{ request.user.display_name }} 👋</h1>
+    <p>
+        {% if projects %}
+            Команд под вашим руководством: {{ projects|length }} — выберите проект.
+        {% else %}
+            Пока ни одной команды не назначено — как только появится, она покажется здесь.
+        {% endif %}
+    </p>
 </div>
 <div class="lead-grid">
     {% for project in projects %}

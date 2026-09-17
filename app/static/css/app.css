@@ -94,66 +94,24 @@ h2 {
     max-width: 1520px;
 }
 
-/* ---- Портал ПМ / тимлида: отдельный лёгкий каркас, без сайдбара ----
-   Цвет топбара берётся из --accent/--accent-dark раздела (см.
-   body.page-pm-portal / body.page-lead-portal), поэтому оба портала
-   выглядят как единый продукт, но узнаются с одного взгляда. */
+/* ---- Портал ПМ / тимлида: базовый каркас ----
+   Визуальный язык портала (топбар, карточки, вкладки) полностью в
+   отдельном файле static/css/portal.css — сознательно другой стиль,
+   не вариация цвета поверх обычных .panel/.badge/.btn. Тут только
+   структурный минимум на случай, если portal.css почему-то не
+   загрузится. */
 .pm-shell { min-height: 100vh; background: var(--bg); }
 .pm-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 16px 28px;
-    background: linear-gradient(120deg, var(--accent), var(--accent-dark));
-    box-shadow: 0 2px 14px rgba(20, 24, 40, .16);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
 }
-.pm-topbar__brand {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    font-weight: 800;
-    font-size: 15.5px;
-    letter-spacing: -0.01em;
-    color: #fff;
-    text-decoration: none;
-}
-.pm-topbar__brand::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 0 0 4px rgba(255, 255, 255, .28);
-    flex-shrink: 0;
-}
-.pm-topbar__brand span { color: rgba(255, 255, 255, .78); font-weight: 650; }
-.pm-topbar__user {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, .92);
-}
-.pm-topbar__avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, .22);
-    color: #fff;
-    font-size: 12.5px;
-    font-weight: 700;
-}
-.pm-topbar .btn--ghost {
-    color: #fff;
-    border-color: rgba(255, 255, 255, .38);
-}
-.pm-topbar .btn--ghost:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+.pm-topbar__brand { font-weight: 800; color: var(--text); text-decoration: none; }
+.pm-topbar__user { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-muted); }
 .pm-main { padding: 28px 24px 40px; max-width: 1100px; margin: 0 auto; }
-.pm-main > h1:first-child, .pm-main > p:first-child + h1 { margin-top: 0; }
 
 /* ---- Sidebar ---- */
 .sidebar {

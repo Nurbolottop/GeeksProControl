@@ -3,11 +3,16 @@
 {% block title %}Мои проекты — Портал ПМ{% endblock %}
 
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>Мои проекты</h1>
-        <div class="sub">Проектов в работе: {{ projects|length }}</div>
-    </div>
+<div class="portal-hero">
+    <div class="portal-hero__eyebrow">Портал ПМ</div>
+    <h1>Привет, {{ request.user.display_name }} 👋</h1>
+    <p>
+        {% if projects %}
+            Проектов в работе: {{ projects|length }} — выберите, с каким сейчас работаем.
+        {% else %}
+            Пока ни одного проекта не назначено — как только появится, он покажется здесь.
+        {% endif %}
+    </p>
 </div>
 <div class="lead-grid">
     {% for project in projects %}
