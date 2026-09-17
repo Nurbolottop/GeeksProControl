@@ -13,7 +13,7 @@ from django.utils import timezone
 from apps.training.models import BRANCHES, GroupStatus, Specialization, TrainingGroup
 
 # Порядок и значки — как в сообщении академии
-DIRECTION_ORDER = ['UX/UI', 'Frontend', 'Backend', 'Mobile']
+DIRECTION_ORDER = ['UX/UI', 'Frontend', 'Backend', 'Testing/QA', 'Mobile']
 DIRECTION_ICONS = {
     'UX/UI': '🎨', 'Frontend': '💻', 'Backend': '⚙️', 'Mobile': '📱',
     'Testing/QA': '🧪', 'DevOps': '🛠', 'PM': '📋',

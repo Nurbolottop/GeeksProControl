@@ -37,11 +37,57 @@ ACADEMY_MESSAGE = """🎨 Design
 * 6 группа — старт: 15.09.2026 · конец: 05.03.2027 — 9 студентов
 """
 
+# Бишкек присылает в другом виде: «группа 62-2», «финиш», численность
+# бывает перенесена на следующую строку, в конце — свободный текст
+BISHKEK_MESSAGE = """UX - UI
+* группа 62 старт: 11.06.2026 · финиш: 01.10.2026 - 11 студентов
+* группа 63 старт: 16.07.2026 · финиш: 02.11.2026 - 5-7 студентов
+* группа 64 старт: 14.08.2026 · финиш: 08.12.2026 - 8 студентов
+
+FRONTEND
+* группа 62-2 старт: 30.03.2026 · финиш: 10.09.2026 - 8 студентов
+* группа 63-1 старт: 07.05.2026 · финиш: 29.10.2026 - 7-9 студентов
+* группа 64 старт: 08.06.2026 · финиш: 26.11.2026 - 10-12 студентов
+
+BACKEND
+* группа 67-1 старт: 28.04.2026 · финиш: 13.10.2026 - 8 студентов
+* группа 67-2 старт: 28.04.2026 · финиш: 13.10.2026 - 11-12 студентов
+* группа 68 старт: 05.06.2026 · финиш: 20.11.2026 - 
+15 студентов
+* группа 69-1 старт: 03.07.2026 · финиш: 18.12.2026 - 
+10 студентов
+* группа 69-2 старт: 03.07.2026 · финиш: 18.12.2026 - 
+12 студентов
+
+
+TESTING
+* группа 33  старт: 15.06.2026 · финиш: 03.09.2026 - 
+7 студентов 
+* группа 34  старт: 30.07.2026 · финиш: 24.10.2026 - 
+8-10 студентов 
+* группа 35  старт: 03.09.2026 · финиш: 26.11.2026 - 
+9-11 студентов 
+
+FLUTTER
+* группа 06  старт: 04.04.2026 · финиш: 03.10.2026 - 
+6 студентов
+* группа 07  старт: 30.05.2026 · финиш: 18.11.2026 - 
+6-8 студентов  
+* группа 08  старт: 11.07.2026 · финиш: 30.12.2026 - 
+5-7 студентов 
+
+PM
+по необходимости, сами следим за ними
+
+
+Это план график бишкек филиала
+"""
+
 
 def make_specializations():
     return {
         name: Specialization.objects.create(name=name)
-        for name in ('Backend', 'Frontend', 'UX/UI', 'Mobile')
+        for name in ('Backend', 'Frontend', 'UX/UI', 'Mobile', 'Testing/QA')
     }
 
 
@@ -120,6 +166,74 @@ class AcademyImportTests(TestCase):
     def test_broken_line_is_reported(self):
         rows = importer.parse('💻 Frontend\n* 49 группа — старт скоро', 'Бишкек')
         self.assertEqual(rows[0].action, 'error')
+
+
+class BishkekFormatTests(TestCase):
+    """Формат сообщения Бишкека."""
+
+    def setUp(self):
+        self.specs = make_specializations()
+        self.rows = importer.parse(BISHKEK_MESSAGE, 'Бишкек')
+        self.by_key = {(r.specialization.name, r.number): r for r in self.rows}
+
+    def test_whole_message_is_understood(self):
+        self.assertEqual(len(self.rows), 17)
+        self.assertEqual([r.line for r in self.rows if r.errors], [])
+
+    def test_headers(self):
+        names = {r.direction_name: r.specialization.name for r in self.rows}
+        self.assertEqual(names['UX - UI'], 'UX/UI')
+        self.assertEqual(names['TESTING'], 'Testing/QA')
+        self.assertEqual(names['FLUTTER'], 'Mobile')
+        self.assertEqual(names['BACKEND'], 'Backend')
+
+    def test_number_after_the_word_and_compound_numbers(self):
+        row = self.by_key[('Frontend', '62-2')]
+        self.assertEqual(row.start_date, datetime.date(2026, 3, 30))
+        self.assertEqual(row.end_date, datetime.date(2026, 9, 10))
+        self.assertIn(('Backend', '67-1'), self.by_key)
+        self.assertIn(('Backend', '67-2'), self.by_key)
+
+    def test_leading_zeros_dropped(self):
+        self.assertEqual(
+            sorted(n for (spec, n) in self.by_key if spec == 'Mobile'), ['6', '7', '8'],
+        )
+
+    def test_count_wrapped_to_the_next_line(self):
+        row = self.by_key[('Backend', '68')]
+        self.assertEqual(row.students_count, 15)
+        self.assertEqual(row.students_note, '')
+        ranged = self.by_key[('Testing/QA', '34')]
+        self.assertEqual(ranged.students_count, 8)
+        self.assertEqual(ranged.students_note, '8-10 студентов')
+
+    def test_free_text_does_not_become_an_error(self):
+        # «PM / по необходимости…» и «Это план график…» — не группы
+        self.assertFalse(any('необходимости' in r.line for r in self.rows))
+
+    def test_both_formats_side_by_side(self):
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Ош'))
+        importer.apply(self.rows)
+        self.assertEqual(TrainingGroup.objects.filter(branch='Ош').count(), 18)
+        self.assertEqual(TrainingGroup.objects.filter(branch='Бишкек').count(), 17)
+        again = importer.parse(BISHKEK_MESSAGE, 'Бишкек')
+        self.assertTrue(all(r.action == 'same' for r in again))
+
+    def test_same_number_written_differently_is_the_same_group(self):
+        importer.apply(self.rows)
+        row = importer.parse('FLUTTER\n* группа 6 старт: 04.04.2026 · финиш: 03.10.2026 - 6 студентов', 'Бишкек')[0]
+        self.assertEqual(row.action, 'same')
+
+    def test_testing_listed_before_mobile(self):
+        importer.apply(self.rows)
+        names = [d['specialization'].name for d in selectors.academy_list('Бишкек', today=TODAY)]
+        self.assertEqual(names, ['UX/UI', 'Frontend', 'Backend', 'Testing/QA', 'Mobile'])
+
+    def test_graduated_bishkek_groups_are_not_listed(self):
+        importer.apply(self.rows)
+        dirs = {d['specialization'].name: d for d in selectors.academy_list('Бишкек', today=TODAY)}
+        self.assertNotIn('62-2', [l['group'].number for l in dirs['Frontend']['lines']])
+        self.assertNotIn('33', [l['group'].number for l in dirs['Testing/QA']['lines']])
 
 
 class AcademyBranchTests(TestCase):

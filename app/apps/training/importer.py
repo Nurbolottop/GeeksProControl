@@ -1,11 +1,19 @@
 """Разбор сообщения от IT-академии со списком групп.
 
-Академия присылает текст такого вида — его и понимаем:
+Филиалы присылают текст по-разному — понимаем оба вида:
 
-    🎨 Design
+    🎨 Design                                          (Ош)
     * 39 группа — старт: 09.06.2026 · конец: 06.10.2026 — 4 студента
-    * 43 группа — старт: 19.08.2026 · конец: 03.02.2027 — 5–7 студентов
     * 48 группа — старт: 28.09.2026 · конец: 11.03.2027 — количество пока неизвестно
+
+    UX - UI                                            (Бишкек)
+    * группа 62-2 старт: 30.03.2026 · финиш: 10.09.2026 - 5-7 студентов
+    * группа 68 старт: 05.06.2026 · финиш: 20.11.2026 -
+    15 студентов
+
+Номер группы может стоять до или после слова «группа» и быть составным
+(«62-2»), дата выпуска — «конец» или «финиш», численность — перенесена на
+следующую строку.
 
 Строка без «группа» — заголовок направления, строки ниже относятся к нему.
 Строка «Бишкек» или «Ош» — заголовок филиала: всё ниже уходит в него.
@@ -21,21 +29,28 @@ from dataclasses import dataclass, field
 
 from apps.training.models import BRANCHES, Specialization, TrainingGroup
 
-# Как академия называет направления → как они называются у нас
+# Как академия называет направления → как они называются у нас.
+# Ключи — без пробелов и знаков: «UX - UI», «ux/ui» и «UXUI» — одно и то же.
 ALIASES = {
-    'design': 'UX/UI', 'дизайн': 'UX/UI', 'ui/ux': 'UX/UI', 'ux/ui': 'UX/UI',
-    'uxui': 'UX/UI', 'ux': 'UX/UI',
-    'flutter': 'Mobile', 'mobile': 'Mobile', 'мобильная разработка': 'Mobile',
+    'design': 'UX/UI', 'дизайн': 'UX/UI', 'uiux': 'UX/UI', 'uxui': 'UX/UI', 'ux': 'UX/UI',
+    'flutter': 'Mobile', 'mobile': 'Mobile', 'мобильнаяразработка': 'Mobile',
     'frontend': 'Frontend', 'фронтенд': 'Frontend',
     'backend': 'Backend', 'бэкенд': 'Backend', 'python': 'Backend',
-    'qa': 'Testing/QA', 'тестирование': 'Testing/QA',
+    'qa': 'Testing/QA', 'testing': 'Testing/QA', 'testingqa': 'Testing/QA',
+    'тестирование': 'Testing/QA',
     'devops': 'DevOps', 'pm': 'PM',
 }
 
+
+def _key(text: str) -> str:
+    return re.sub(r'[\W_]+', '', text.lower())
+
+
+NUMBER = r'\d+(?:\s*[-–]\s*\d+)?'
 GROUP_RE = re.compile(
-    r'(?P<number>\d+)\s*групп\w*'
+    rf'(?:(?P<before>{NUMBER})\s*групп\w*|групп\w*\s*№?\s*(?P<after>{NUMBER}))'
     r'.*?старт\w*\s*:?\s*(?P<start>\d{1,2}\.\d{1,2}\.\d{4})'
-    r'.*?конец\w*\s*:?\s*(?P<end>\d{1,2}\.\d{1,2}\.\d{4})'
+    r'.*?(?:конец|финиш|окончание|выпуск)\w*\s*:?\s*(?P<end>\d{1,2}\.\d{1,2}\.\d{4})'
     r'\s*(?:[—–-]\s*(?P<students>.*))?$',
     re.IGNORECASE,
 )
@@ -78,14 +93,35 @@ def find_branch(text: str) -> str:
 
 
 def find_specialization(name: str) -> Specialization | None:
-    cleaned = name.strip().lower()
-    by_name = {spec.name.lower(): spec for spec in Specialization.objects.all()}
+    cleaned = _key(name)
+    by_name = {_key(spec.name): spec for spec in Specialization.objects.all()}
     if cleaned in by_name:
         return by_name[cleaned]
     alias = ALIASES.get(cleaned)
     if alias:
-        return by_name.get(alias.lower())
+        return by_name.get(_key(alias))
     return None
+
+
+def _number(raw: str) -> str:
+    """«06» → «6», «62 - 2» → «62-2»: один и тот же номер записан одинаково."""
+    parts = re.split(r'\s*[-–]\s*', raw.strip())
+    return '-'.join(str(int(part)) for part in parts)
+
+
+def _join_wrapped(text: str) -> list[str]:
+    """Склеиваем строку группы с численностью, перенесённой на следующую:
+    «… финиш: 20.11.2026 -» + «15 студентов»."""
+    lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if lines and re.search(r'[—–-]$', lines[-1]) and 'групп' not in line.lower():
+            lines[-1] = f'{lines[-1]} {line}'
+        else:
+            lines.append(line)
+    return lines
 
 
 def _date(raw: str) -> datetime.date:
@@ -119,10 +155,7 @@ def parse(text: str, branch: str = '') -> list[ParsedGroup]:
     rows = []
     direction_name, specialization = '', None
     current_branch = branch
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
+    for line in _join_wrapped(text):
         body = line.lstrip('*•-–— \t')
         match = GROUP_RE.search(body)
         if match is None:
@@ -130,7 +163,7 @@ def parse(text: str, branch: str = '') -> list[ParsedGroup]:
                 rows.append(ParsedGroup(
                     line=line, direction_name=direction_name,
                     specialization=specialization, branch=current_branch,
-                    errors=['Не разобрал строку: нужны номер группы, «старт» и «конец».'],
+                    errors=['Не разобрал строку: нужны номер группы, «старт» и «конец» (или «финиш»).'],
                 ))
                 continue
             named_branch = find_branch(body)
@@ -146,7 +179,7 @@ def parse(text: str, branch: str = '') -> list[ParsedGroup]:
         row = ParsedGroup(
             line=line, direction_name=direction_name,
             specialization=specialization, branch=current_branch,
-            number=match.group('number'),
+            number=_number(match.group('before') or match.group('after')),
         )
         if not current_branch:
             row.errors.append('Не указан филиал: выберите Бишкек или Ош.')
