@@ -131,3 +131,28 @@ class RoleAwareLoginTests(TestCase):
     def test_login_form_labels_field_as_phone(self):
         response = self.client.get(reverse("login"))
         self.assertContains(response, "Телефон")
+
+
+class DisplayNameTests(TestCase):
+    """У ПМ/тимлида логин — номер телефона, а не имя, поэтому шапка
+    портала должна показывать ФИО из карточки стажёра, не username."""
+
+    def test_shows_linked_intern_full_name(self):
+        from apps.interns.models import Intern
+
+        user = Model.objects.create_user(
+            username="+996700000050", password="x", role=User.Role.TEAM_LEAD,
+        )
+        Intern.objects.create(full_name="Эркинбаев Нурболот", user=user)
+        self.assertEqual(user.display_name, "Эркинбаев Нурболот")
+
+    def test_falls_back_to_username_without_linked_intern(self):
+        user = Model.objects.create_user(username="head3", password="x")
+        self.assertEqual(user.display_name, "head3")
+
+    def test_falls_back_to_full_name_field_without_linked_intern(self):
+        user = Model.objects.create_user(
+            username="head4", password="x",
+            first_name="Тест", last_name="Тестов",
+        )
+        self.assertEqual(user.display_name, "Тест Тестов")

@@ -28,4 +28,10 @@ class User(AbstractUser):
 
     @property
     def display_name(self) -> str:
+        """Имя для шапки/подписей — у ПМ и тимлидов логин это телефон,
+        а не имя, поэтому сперва смотрим ФИО в привязанной карточке
+        стажёра (Intern.full_name), и только потом на обычные поля."""
+        intern = getattr(self, 'intern_profile', None)
+        if intern and intern.full_name:
+            return intern.full_name
         return self.get_full_name() or self.username
