@@ -18,6 +18,15 @@ urlpatterns = [
         '<int:pk>/report/<int:report_pk>/delete/', views.report_delete,
         name='report_delete',
     ),
+    path('<int:pk>/team/add/', views.member_add, name='member_add'),
+    path(
+        '<int:pk>/team/<int:member_pk>/edit/', views.member_edit,
+        name='member_edit',
+    ),
+    path(
+        '<int:pk>/team/<int:member_pk>/delete/', views.member_delete,
+        name='member_delete',
+    ),
     path('<int:pk>/attendance/create/', views.meeting_create, name='meeting_create'),
     path(
         '<int:pk>/attendance/<int:meeting_pk>/', views.meeting_detail,
