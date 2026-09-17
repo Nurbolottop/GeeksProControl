@@ -1,59 +1,58 @@
 {# Ссылка на анкету для новых стажёров: заполнил — сразу в этой команде #}
-<div class="panel" style="margin-bottom: 14px;">
-    <div style="display:flex; justify-content: space-between; align-items:flex-start; gap: 14px; flex-wrap: wrap;">
-        <div style="min-width: 0; flex: 1;">
-            <h2 style="margin: 0 0 4px;">Анкета для новых стажёров</h2>
-            {% if profile_link %}
-                <a id="profile-link-url" href="{{ profile_link.get_absolute_url }}" target="_blank" rel="noopener"
-                   style="word-break: break-all; font-weight: 600;">{{ request.scheme }}://{{ request.get_host }}{{ profile_link.get_absolute_url }}</a>
-                <div class="sub" style="margin-top: 4px;">
-                    Кто заполнит анкету по этой ссылке, сразу окажется в команде «{{ project.name }}».
-                    Создана {{ profile_link.created_at|date:'d.m.Y' }}
-                    · {% if profile_link.expires_at %}действует до {{ profile_link.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
-                    · заполнений: {{ profile_link.submissions }}
-                </div>
-            {% else %}
-                <div class="sub">
-                    Договорились с новым стажёром — создайте ссылку и отправьте ему.
-                    Кто заполнит анкету, сразу окажется в команде «{{ project.name }}».
-                </div>
-            {% endif %}
-        </div>
-        <div style="display:flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            {% if profile_link %}
-                <button type="button" class="btn btn--secondary btn--sm" data-copy-profile-link>Копировать</button>
-            {% endif %}
-            <form method="post" action="{% url 'lead_portal:profile_link_create' project.pk %}" style="margin:0; display:flex; gap:6px;"
-                  {% if profile_link %}data-confirm="Создать новую ссылку? Прежняя ссылка этого проекта перестанет открываться." data-confirm-ok="Создать"{% endif %}>
-                {% csrf_token %}
-                <select name="ttl_days" title="Срок действия ссылки">
-                    {% for value, label in profile_link_ttls %}
-                        <option value="{{ value }}" {% if value == '7' %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <button type="submit" class="btn btn--sm">{% if profile_link %}Новая ссылка{% else %}Создать ссылку{% endif %}</button>
-            </form>
-            {% if profile_link %}
-                <form method="post" action="{% url 'lead_portal:profile_link_disable' project.pk %}" style="margin:0"
-                      data-confirm="Отключить ссылку? По ней больше нельзя будет заполнить анкету." data-confirm-ok="Отключить">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
-                </form>
-            {% endif %}
-        </div>
+<div class="page-head" style="margin-bottom: 12px;">
+    <div>
+        <h2 style="margin:0">Анкета для новых стажёров</h2>
+        <div class="sub">Кто заполнит анкету по ссылке ниже, сразу окажется в команде «{{ project.name }}».</div>
     </div>
-    {% if profile_link %}
-        <script>
-            document.querySelector('[data-copy-profile-link]').addEventListener('click', function () {
-                var button = this;
-                navigator.clipboard.writeText(document.getElementById('profile-link-url').href).then(function () {
-                    button.textContent = 'Скопировано';
-                    setTimeout(function () { button.textContent = 'Копировать'; }, 1500);
-                });
-            });
-        </script>
-    {% endif %}
 </div>
+
+<div class="form-link {% if not profile_link %}form-link--off{% endif %}">
+    <div class="form-link__body">
+        {% if profile_link %}
+            <a class="form-link__url" id="profile-link-url" href="{{ profile_link.get_absolute_url }}" target="_blank" rel="noopener">{{ request.scheme }}://{{ request.get_host }}{{ profile_link.get_absolute_url }}</a>
+            <div class="form-link__meta">
+                Создана {{ profile_link.created_at|date:'d.m.Y' }}
+                · {% if profile_link.expires_at %}действует до {{ profile_link.expires_at|date:'d.m.Y H:i' }}{% else %}без срока{% endif %}
+                · заполнений: {{ profile_link.submissions }}
+            </div>
+        {% else %}
+            <div class="form-link__meta">Активной ссылки нет — создайте кнопкой справа и отправьте стажёру.</div>
+        {% endif %}
+    </div>
+    <div class="form-link__actions">
+        {% if profile_link %}
+            <button type="button" class="btn btn--secondary btn--sm" data-copy-profile-link>Копировать</button>
+        {% endif %}
+        <form method="post" action="{% url 'lead_portal:profile_link_create' project.pk %}" style="margin:0; display:flex; gap:8px;"
+              {% if profile_link %}data-confirm="Создать новую ссылку? Прежняя ссылка этого проекта перестанет открываться." data-confirm-ok="Создать"{% endif %}>
+            {% csrf_token %}
+            <select name="ttl_days" class="form-link__ttl" title="Срок действия ссылки">
+                {% for value, label in profile_link_ttls %}
+                    <option value="{{ value }}" {% if value == '7' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn--secondary btn--sm">{% if profile_link %}Новая ссылка{% else %}Создать ссылку{% endif %}</button>
+        </form>
+        {% if profile_link %}
+            <form method="post" action="{% url 'lead_portal:profile_link_disable' project.pk %}" style="margin:0"
+                  data-confirm="Отключить ссылку? По ней больше нельзя будет заполнить анкету." data-confirm-ok="Отключить">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--secondary btn--sm">Отключить</button>
+            </form>
+        {% endif %}
+    </div>
+</div>
+{% if profile_link %}
+    <script>
+        document.querySelector('[data-copy-profile-link]').addEventListener('click', function () {
+            var button = this;
+            navigator.clipboard.writeText(document.getElementById('profile-link-url').href).then(function () {
+                button.textContent = 'Скопировано';
+                setTimeout(function () { button.textContent = 'Копировать'; }, 1500);
+            });
+        });
+    </script>
+{% endif %}
 
 <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom: 14px;">
     <h2 style="margin:0">Команда ({{ team_members|length }})</h2>
