@@ -290,11 +290,14 @@ class LeadResumeTests(TestCase):
             project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD,
             status=TeamMember.Status.ACTIVE,
         )
-        self.card = ReserveCandidate.objects.create(
-            full_name="Резюмеев Тимлид", phone="0700111222", intern=self.lead,
+        # тимлид попадает в резерв сам — берём его карточку и наполняем
+        self.card = ReserveCandidate.objects.get(intern=self.lead)
+        ReserveCandidate.objects.filter(pk=self.card.pk).update(
+            full_name="Резюмеев Тимлид", phone="0700111222",
             skills="Python", status=CandidateStatus.RESERVE, rating=7,
             comment_pm="внутренний комментарий", consent_given=True,
         )
+        self.card.refresh_from_db()
         self.url = reverse("lead_portal:resume")
         self.client.force_login(self.lead_user)
 
@@ -338,16 +341,28 @@ class LeadResumeTests(TestCase):
         response = self.client.get(reverse("lead_portal:dashboard"))
         self.assertContains(response, "Моё резюме в резерве кадров")
 
-    def test_without_reserve_card_shows_empty_state(self):
+    def test_lead_without_card_gets_one_on_the_spot(self):
+        """Карточку отвязали — открыв резюме, тимлид сразу получает новую."""
+        from apps.reserve.models import ReserveCandidate
+
         self.card.intern = None
+        self.card.phone = ""
         self.card.save()
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
+        fresh = ReserveCandidate.objects.get(intern=self.lead)
+        self.assertEqual(response.context["candidate"], fresh)
+        self.assertNotEqual(fresh.pk, self.card.pk)
+
+    def test_non_lead_without_card_sees_empty_state(self):
+        other_user = Model.objects.create_user(
+            username="+996700000043", password="x", role=User.Role.TEAM_LEAD,
+        )
+        Intern.objects.create(full_name="Не Тимлид", user=other_user)
+        self.client.force_login(other_user)
+        response = self.client.get(self.url)
         self.assertIsNone(response.context["candidate"])
         self.assertContains(response, "Вас пока нет в резерве кадров")
-        self.client.post(self.url, self._payload(skills="взлом"))
-        self.card.refresh_from_db()
-        self.assertEqual(self.card.skills, "Python")
 
     def test_cannot_edit_someone_elses_resume(self):
         other_user = Model.objects.create_user(
@@ -380,13 +395,80 @@ class LeadResumeTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_archived_lead_without_reserve_loses_login(self):
+    def test_archived_person_without_reserve_loses_login(self):
+        """Без карточки в резерве вход при архивации закрывается (у тимлида
+        карточка есть всегда, так что это про остальных людей)."""
         from apps.interns.services import archive_person
 
         self.card.delete()
+        self.lead.refresh_from_db()
         archive_person(self.lead)
         self.lead_user.refresh_from_db()
         self.assertFalse(self.lead_user.is_active)
+
+    def test_new_lead_goes_to_reserve_automatically(self):
+        from apps.reserve.models import ReserveCandidate
+
+        person = Intern.objects.create(
+            full_name="Свежий Тимлид", phone="0700555666", telegram="@fresh",
+        )
+        self.assertFalse(ReserveCandidate.objects.filter(intern=person).exists())
+        TeamMember.objects.create(
+            project=self.project, intern=person, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        card = ReserveCandidate.objects.get(intern=person)
+        self.assertEqual(card.full_name, "Свежий Тимлид")
+        self.assertEqual(card.phone, "0700555666")
+        self.assertEqual(card.status, "review")
+        self.assertTrue(card.events.filter(title__contains="автоматически").exists())
+
+    def test_promotion_to_lead_adds_to_reserve(self):
+        from apps.reserve.models import ReserveCandidate
+
+        person = Intern.objects.create(full_name="Бывший Бэкендер")
+        member = TeamMember.objects.create(
+            project=self.project, intern=person, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.assertFalse(ReserveCandidate.objects.filter(intern=person).exists())
+        member.role = TeamRole.TEAM_LEAD
+        member.save(update_fields=["role"])
+        self.assertTrue(ReserveCandidate.objects.filter(intern=person).exists())
+
+    def test_existing_unlinked_application_is_reused(self):
+        from apps.reserve.models import ReserveCandidate
+
+        application = ReserveCandidate.objects.create(
+            full_name="Анкета Из Ссылки", phone="+996 700 999 000", skills="Go",
+        )
+        person = Intern.objects.create(full_name="Тимлид С Анкетой", phone="0700999000")
+        TeamMember.objects.create(
+            project=self.project, intern=person, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        application.refresh_from_db()
+        self.assertEqual(application.intern, person)
+        self.assertEqual(ReserveCandidate.objects.filter(intern=person).count(), 1)
+
+    def test_backfill_command(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        from apps.reserve.models import ReserveCandidate
+
+        old = Intern.objects.create(full_name="Давний Тимлид")
+        TeamMember.objects.bulk_create([TeamMember(
+            project=self.project, intern=old, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )])  # в обход сигнала — как тимлиды, назначенные до этой логики
+        out = StringIO()
+        call_command("add_leads_to_reserve", stdout=out)
+        self.assertFalse(ReserveCandidate.objects.filter(intern=old).exists())
+        self.assertIn("завести: Давний Тимлид", out.getvalue())
+        call_command("add_leads_to_reserve", apply=True, stdout=StringIO())
+        self.assertTrue(ReserveCandidate.objects.filter(intern=old).exists())
 
 
 class LeadProjectClosedNotificationTests(TestCase):

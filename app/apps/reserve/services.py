@@ -446,3 +446,51 @@ def save_own_resume(candidate: ReserveCandidate, form, user) -> ReserveCandidate
         detail=changed, user=user,
     )
     return candidate
+
+
+# --- Тимлиды автоматически в резерве -----------------------------------------
+# Каждый, кто у нас тимлид, сразу попадает в резерв кадров — руками никто
+# не добавляет. Если в резерве уже лежит его анкета без привязки, берём её,
+# чтобы не плодить дубль; иначе заводим карточку из его данных.
+
+def find_candidate_for(intern):
+    """Непривязанная анкета в резерве с тем же телефоном, почтой или telegram."""
+    phone = _digits(intern.phone)
+    email = (intern.email or '').strip().lower()
+    handle = _handle(intern.telegram)
+    if not (phone or email or handle):
+        return None
+    found = [
+        candidate for candidate in ReserveCandidate.objects.filter(intern__isnull=True)
+        if (phone and len(phone) >= 9 and _digits(candidate.phone) == phone)
+        or (email and (candidate.email or '').strip().lower() == email)
+        or (handle and _handle(candidate.telegram) == handle)
+    ]
+    return found[0] if len(found) == 1 else None
+
+
+def ensure_lead_in_reserve(intern, user=None) -> ReserveCandidate:
+    """Тимлид в резерве: существующая карточка, найденная анкета или новая."""
+    existing = ReserveCandidate.objects.filter(intern=intern).first()
+    if existing is not None:
+        return existing
+    candidate = find_candidate_for(intern)
+    if candidate is not None:
+        candidate.intern = intern
+        candidate.save(update_fields=['intern', 'updated_at'])
+        log_event(
+            candidate, EventKind.UPDATED, 'Тимлид GeeksPro — анкета связана с карточкой',
+            detail=f'{intern.full_name}: проекты у нас подтягиваются в резюме',
+            user=user,
+        )
+        return candidate
+    candidate = candidate_from_intern(intern, user)
+    log_event(
+        candidate, EventKind.UPDATED, 'Тимлид GeeksPro — добавлен в резерв автоматически',
+        detail='Резюме тимлид дополняет сам в своём портале', user=user,
+    )
+    change_status(
+        candidate, CandidateStatus.REVIEW,
+        comment='Тимлид добавлен в резерв автоматически', user=user,
+    )
+    return candidate

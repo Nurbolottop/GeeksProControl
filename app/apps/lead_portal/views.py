@@ -54,8 +54,8 @@ def notification_close(request, pk):
 def resume(request):
     """Моё резюме в резерве кадров: правлю сам, под своим логином, без ссылок.
 
-    Карточку в резерв заводит руководитель — здесь человек только ведёт
-    своё резюме. Оценки, статусы и комментарии сотрудников сюда не
+    Тимлиды попадают в резерв автоматически — здесь человек ведёт своё
+    резюме. Оценки, статусы и комментарии сотрудников сюда не
     попадают: форма та же, что у публичной анкеты.
     """
     import json
@@ -64,6 +64,14 @@ def resume(request):
     from apps.reserve.forms import ReserveApplyForm
 
     candidate = reserve_services.reserve_card_of(request.user)
+    person = getattr(request.user, 'intern_profile', None)
+    if candidate is None and person is not None:
+        from apps.teams.models import TeamMember, TeamRole
+
+        # тимлид всегда в резерве — если карточки почему-то нет, заводим сразу
+        if TeamMember.objects.filter(intern=person, role=TeamRole.TEAM_LEAD).exists():
+            reserve_services.ensure_lead_in_reserve(person)
+            candidate = reserve_services.reserve_card_of(request.user)
     if candidate is None:
         return render(request, 'lead_portal/resume.html', {'candidate': None})
     form = ReserveApplyForm(

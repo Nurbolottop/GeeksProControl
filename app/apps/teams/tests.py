@@ -507,7 +507,8 @@ class LeadArchiveTests(TestCase):
         self.assertIsNotNone(self.lead.archived_at)
         self.assertEqual(self.member.status, TeamMember.Status.LEFT)
         self.assertIsNotNone(self.member.left_at)
-        self.assertFalse(self.login.is_active)
+        # тимлид всегда в резерве кадров — вход остаётся, чтобы вести резюме
+        self.assertTrue(self.login.is_active)
         # ничего не удалено
         self.assertEqual(self.lead.team_memberships.count(), 2)
         self.assertTrue(self.lead.evaluations.filter(pk=self.evaluation.pk).exists())
