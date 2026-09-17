@@ -503,10 +503,21 @@ class LeadResumeTests(TestCase):
             "consent_given": "on", **extra,
         }
 
-    def test_lead_sees_own_resume(self):
+    def test_lead_sees_own_resume_in_view_mode_first(self):
+        """Открывается сначала на просмотр — форма редактирования не
+        отдаётся, пока не нажали «Редактировать»."""
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["candidate"], self.card)
+        self.assertFalse(response.context["editing"])
+        self.assertContains(response, "Редактировать")
+        self.assertNotContains(response, "Сохранить резюме")
+        self.assertNotContains(response, "внутренний комментарий")
+
+    def test_lead_can_switch_to_edit_mode(self):
+        response = self.client.get(self.url, {"edit": "1"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["editing"])
         self.assertContains(response, "Сохранить резюме")
         self.assertNotContains(response, "внутренний комментарий")
 

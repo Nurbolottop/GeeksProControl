@@ -71,6 +71,9 @@ def resume(request):
     Тимлиды попадают в резерв автоматически — здесь человек ведёт своё
     резюме. Оценки, статусы и комментарии сотрудников сюда не
     попадают: форма та же, что у публичной анкеты.
+
+    Открывается сначала в режиме просмотра — редактирование только по
+    кнопке «Редактировать» (или после неудачной отправки формы).
     """
     import json
 
@@ -88,6 +91,13 @@ def resume(request):
             candidate = reserve_services.reserve_card_of(request.user)
     if candidate is None:
         return render(request, 'lead_portal/resume.html', {'candidate': None})
+
+    editing = request.method == 'POST' or request.GET.get('edit') == '1'
+    if not editing:
+        return render(request, 'lead_portal/resume.html', {
+            'candidate': candidate, 'editing': False,
+        })
+
     form = ReserveApplyForm(
         request.POST or None, request.FILES or None, instance=candidate,
     )
@@ -98,6 +108,7 @@ def resume(request):
     return render(request, 'lead_portal/resume.html', {
         'candidate': candidate,
         'form': form,
+        'editing': True,
         'direction_groups': json.dumps(reserve_services.direction_groups_map()),
         'mark_optional': True,
     })
