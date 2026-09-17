@@ -4,6 +4,7 @@ from django.core.paginator import Paginator
 from django.db import models
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.interns import services
@@ -578,12 +579,104 @@ def resume_bank_list(request):
 
 @login_required
 def graduates_list(request):
-    """Стажёры с завершённых проектов — кандидаты в резерв/банк резюме."""
+    """Выпускники: сначала сводка в числах, по клику на число — сами люди.
+
+    Без параметров показываем сводку по направлениям и проектам. Любой
+    фильтр (или `all=1`) открывает список, отфильтрованный по нему.
+    """
     people = services.graduated_interns()
+    params = request.GET
+    filters = {key: params.get(key) for key in GRADUATE_FILTERS if params.get(key)}
+    if not filters and not params.get('all'):
+        return render(request, 'interns/graduates_summary.html', {
+            'total': _graduate_counts(people),
+            'by_direction': _graduates_by(people, _direction_key),
+            'by_project': _graduates_by(people, _project_key),
+        })
+
+    selected = [person for person in people if _graduate_matches(person, filters)]
     return render(request, 'interns/graduates_list.html', {
-        'people': people, 'title': 'Выпускники',
+        'people': selected, 'title': 'Выпускники',
         'GraduateStatus': GraduateStatus,
+        'filter_label': _graduate_filter_label(filters, people),
+        'total_count': len(people),
     })
+
+
+GRADUATE_FILTERS = ('specialization', 'project', 'status', 'bank')
+
+
+def _direction_key(person):
+    spec = person.specialization
+    return (str(spec.pk), spec.name) if spec else ('none', 'Без направления')
+
+
+def _project_key(person):
+    project = person.graduated_project
+    return (str(project.pk), str(project)) if project else ('none', 'Проект не найден')
+
+
+def _graduate_counts(people) -> dict:
+    return {
+        'total': len(people),
+        'pending': sum(1 for p in people if p.graduate_status == GraduateStatus.PENDING),
+        'declined': sum(1 for p in people if p.graduate_status == GraduateStatus.DECLINED),
+        'in_bank': sum(1 for p in people if p.in_resume_bank),
+        'no_bank': sum(1 for p in people if not p.in_resume_bank),
+    }
+
+
+def _graduates_by(people, key) -> list[dict]:
+    """Выпускники, сгруппированные по направлению или проекту, с числами."""
+    groups = {}
+    for person in people:
+        value, label = key(person)
+        groups.setdefault(value, {'value': value, 'label': label, 'people': []})
+        groups[value]['people'].append(person)
+    rows = []
+    for group in groups.values():
+        dates = [p.graduated_at for p in group['people'] if p.graduated_at]
+        rows.append({
+            'value': group['value'], 'label': group['label'],
+            'graduated_at': max(dates) if dates else None,
+            **_graduate_counts(group['people']),
+        })
+    rows.sort(key=lambda row: (-row['total'], row['label']))
+    return rows
+
+
+def _graduate_matches(person, filters) -> bool:
+    if 'specialization' in filters and _direction_key(person)[0] != filters['specialization']:
+        return False
+    if 'project' in filters and _project_key(person)[0] != filters['project']:
+        return False
+    if 'status' in filters and person.graduate_status != filters['status']:
+        return False
+    if filters.get('bank') == 'yes' and not person.in_resume_bank:
+        return False
+    if filters.get('bank') == 'no' and person.in_resume_bank:
+        return False
+    return True
+
+
+def _graduate_filter_label(filters, people) -> str:
+    """Человеческое описание фильтра: «Backend · На проверке»."""
+    parts = []
+    for person in people:
+        if 'specialization' in filters and _direction_key(person)[0] == filters['specialization']:
+            parts.append(_direction_key(person)[1])
+            break
+    for person in people:
+        if 'project' in filters and _project_key(person)[0] == filters['project']:
+            parts.append(_project_key(person)[1])
+            break
+    if filters.get('status') in GraduateStatus.values:
+        parts.append(GraduateStatus(filters['status']).label)
+    if filters.get('bank') == 'yes':
+        parts.append('В банке резюме')
+    elif filters.get('bank') == 'no':
+        parts.append('Не заполнили анкету банка резюме')
+    return ' · '.join(parts)
 
 
 @login_required
@@ -603,7 +696,8 @@ def graduate_decline(request, pk):
             f'{intern.full_name}: отмечен(а) как не продолжающий(ая) '
             'стажировку. Ниже — текст для отправки, чтобы попасть в банк резюме.',
         )
-    return redirect('interns:graduates')
+    # в сводке текста нет — ведём прямо в список, где он раскрывается
+    return redirect(f"{reverse('interns:graduates')}?status={GraduateStatus.DECLINED}")
 
 
 def resume_bank_apply(request):

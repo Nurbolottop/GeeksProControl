@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Выпускники — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Выпускники</h1>
+        <div class="sub">Стажёры с завершённых проектов. Нажмите на число, чтобы увидеть этих людей.</div>
+    </div>
+    <div class="page-actions">
+        <a href="?all=1" class="btn btn--secondary">Все выпускники списком</a>
+    </div>
+</div>
+
+<div class="kpi-grid">
+    <a href="?all=1" class="kpi-card kpi-card--info" style="text-decoration: none;">
+        <div class="kpi-card__value">{{ total.total }}</div>
+        <div class="kpi-card__label">Всего выпускников</div>
+    </a>
+    <a href="?status=pending" class="kpi-card kpi-card--yellow" style="text-decoration: none;">
+        <div class="kpi-card__value">{{ total.pending }}</div>
+        <div class="kpi-card__label">На проверке</div>
+    </a>
+    <a href="?status=declined" class="kpi-card" style="text-decoration: none;">
+        <div class="kpi-card__value">{{ total.declined }}</div>
+        <div class="kpi-card__label">Не хотят продолжать</div>
+    </a>
+    <a href="?bank=yes" class="kpi-card kpi-card--green" style="text-decoration: none;">
+        <div class="kpi-card__value">{{ total.in_bank }}</div>
+        <div class="kpi-card__label">В банке резюме</div>
+    </a>
+    <a href="?bank=no" class="kpi-card" style="text-decoration: none;">
+        <div class="kpi-card__value">{{ total.no_bank }}</div>
+        <div class="kpi-card__label">Не заполнили анкету</div>
+    </a>
+</div>
+
+<div class="panel" style="padding: 0;">
+    <div class="panel-head" style="padding: 16px 20px 4px;"><h2 style="margin: 0;">По направлениям</h2></div>
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>Направление</th>
+                <th>Всего</th>
+                <th>На проверке</th>
+                <th>Не хотят продолжать</th>
+                <th>В банке резюме</th>
+                <th>Не заполнили анкету</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in by_direction %}
+                <tr>
+                    <td><a href="?specialization={{ row.value }}"><strong>{{ row.label }}</strong></a></td>
+                    <td><a href="?specialization={{ row.value }}"><strong style="font-size: 15px;">{{ row.total }}</strong></a></td>
+                    <td>{% if row.pending %}<a href="?specialization={{ row.value }}&status=pending" class="badge badge--yellow">{{ row.pending }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                    <td>{% if row.declined %}<a href="?specialization={{ row.value }}&status=declined" class="badge badge--gray">{{ row.declined }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                    <td>{% if row.in_bank %}<a href="?specialization={{ row.value }}&bank=yes" class="badge badge--green">{{ row.in_bank }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                    <td>{% if row.no_bank %}<a href="?specialization={{ row.value }}&bank=no" class="badge badge--gray">{{ row.no_bank }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Выпускников пока нет.</td></tr>
+            {% endfor %}
+            </tbody>
+            {% if by_direction %}
+                <tfoot>
+                <tr>
+                    <td><strong>Итого</strong></td>
+                    <td><strong>{{ total.total }}</strong></td>
+                    <td>{{ total.pending }}</td>
+                    <td>{{ total.declined }}</td>
+                    <td>{{ total.in_bank }}</td>
+                    <td>{{ total.no_bank }}</td>
+                </tr>
+                </tfoot>
+            {% endif %}
+        </table>
+    </div>
+</div>
+
+{% if by_project %}
+    <div class="panel" style="padding: 0; margin-top: 18px;">
+        <div class="panel-head" style="padding: 16px 20px 4px;"><h2 style="margin: 0;">По проектам</h2></div>
+        <div class="table-wrap">
+            <table class="data">
+                <thead>
+                <tr>
+                    <th>Проект</th>
+                    <th>Дата выпуска</th>
+                    <th>Всего</th>
+                    <th>На проверке</th>
+                    <th>Не хотят продолжать</th>
+                    <th>В банке резюме</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in by_project %}
+                    <tr>
+                        <td><a href="?project={{ row.value }}"><strong>{{ row.label }}</strong></a></td>
+                        <td>{{ row.graduated_at|date:'d.m.Y'|default:'—' }}</td>
+                        <td><a href="?project={{ row.value }}"><strong style="font-size: 15px;">{{ row.total }}</strong></a></td>
+                        <td>{% if row.pending %}<a href="?project={{ row.value }}&status=pending" class="badge badge--yellow">{{ row.pending }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                        <td>{% if row.declined %}<a href="?project={{ row.value }}&status=declined" class="badge badge--gray">{{ row.declined }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                        <td>{% if row.in_bank %}<a href="?project={{ row.value }}&bank=yes" class="badge badge--green">{{ row.in_bank }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

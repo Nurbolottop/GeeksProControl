@@ -5,8 +5,13 @@
 {% block content %}
 <div class="page-head">
     <div>
-        <h1>{{ title }}</h1>
-        <div class="sub">Стажёры с завершённых проектов. Всего: {{ people|length }}</div>
+        <h1>{{ title }}{% if filter_label %}: {{ filter_label }}{% endif %}</h1>
+        <div class="sub">
+            {% if filter_label %}Показано {{ people|length }} из {{ total_count }}{% else %}Стажёры с завершённых проектов. Всего: {{ people|length }}{% endif %}
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'interns:graduates' %}" class="btn btn--secondary">← К сводке</a>
     </div>
 </div>
 

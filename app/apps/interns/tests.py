@@ -720,7 +720,7 @@ class GraduatesListTests(TestCase):
             status=TeamMember.Status.ACTIVE,
         )
 
-        response = self.client.get(reverse("interns:graduates"))
+        response = self.client.get(reverse("interns:graduates"), {"all": "1"})
         names = [p.full_name for p in response.context["people"]]
         self.assertEqual(names, ["Выпускник Один"])
         self.assertContains(response, "Завершённый")
@@ -744,9 +744,103 @@ class GraduatesListTests(TestCase):
             status=TeamMember.Status.LEFT, left_at=datetime.date(2026, 1, 15),
         )
 
-        response = self.client.get(reverse("interns:graduates"))
+        response = self.client.get(reverse("interns:graduates"), {"all": "1"})
         self.assertContains(response, "В банке резюме")
         self.assertNotContains(response, reverse("interns:reserve_create"))
+
+
+class GraduatesSummaryTests(TestCase):
+    """«Выпускники» открываются числами; число ведёт к людям."""
+
+    def setUp(self):
+        import datetime
+
+        from django.contrib.auth import get_user_model
+
+        from apps.projects.models import Project, ProjectStatus
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.user = get_user_model().objects.create_user(username="head6", password="x")
+        self.client.force_login(self.user)
+        self.url = reverse("interns:graduates")
+        self.backend = Specialization.objects.create(name="Backend")
+        self.design = Specialization.objects.create(name="UX/UI")
+        self.balazhan = Project.objects.create(
+            name="Балажан", status=ProjectStatus.COMPLETED,
+            actual_end_date=datetime.date(2026, 9, 17),
+        )
+        self.bilim = Project.objects.create(
+            name="БилимОрдо", status=ProjectStatus.COMPLETED,
+            actual_end_date=datetime.date(2026, 9, 10),
+        )
+
+        def graduate(name, spec, project, status=GraduateStatus.PENDING, bank=False):
+            person = Intern.objects.create(
+                full_name=name, specialization=spec,
+                graduate_status=status, in_resume_bank=bank,
+            )
+            TeamMember.objects.create(
+                project=project, intern=person, role=TeamRole.BACKEND,
+                status=TeamMember.Status.LEFT, left_at=project.actual_end_date,
+            )
+            return person
+
+        graduate("Бэк Один", self.backend, self.balazhan)
+        graduate("Бэк Два", self.backend, self.bilim)
+        graduate("Бэк Три", self.backend, self.bilim, GraduateStatus.DECLINED, bank=True)
+        graduate("Дизайнер", self.design, self.balazhan, GraduateStatus.DECLINED)
+        graduate("Без Направления", None, self.balazhan)
+
+    def test_opens_on_numbers_not_on_the_list(self):
+        response = self.client.get(self.url)
+        self.assertTemplateUsed(response, "interns/graduates_summary.html")
+        self.assertNotContains(response, "Бэк Один")
+        total = response.context["total"]
+        self.assertEqual(
+            (total["total"], total["pending"], total["declined"], total["in_bank"], total["no_bank"]),
+            (5, 3, 2, 1, 4),
+        )
+
+    def test_numbers_by_direction(self):
+        rows = {row["label"]: row for row in self.client.get(self.url).context["by_direction"]}
+        self.assertEqual(rows["Backend"]["total"], 3)
+        self.assertEqual(rows["Backend"]["pending"], 2)
+        self.assertEqual(rows["Backend"]["in_bank"], 1)
+        self.assertEqual(rows["UX/UI"]["declined"], 1)
+        self.assertEqual(rows["Без направления"]["total"], 1)
+
+    def test_numbers_by_project(self):
+        rows = {row["label"].split(" ", 1)[-1]: row for row in self.client.get(self.url).context["by_project"]}
+        self.assertEqual(rows["Балажан"]["total"], 3)
+        self.assertEqual(rows["БилимОрдо"]["total"], 2)
+        self.assertEqual(rows["БилимОрдо"]["declined"], 1)
+
+    def test_direction_number_opens_those_people(self):
+        response = self.client.get(self.url, {"specialization": self.backend.pk, "status": "pending"})
+        self.assertTemplateUsed(response, "interns/graduates_list.html")
+        names = sorted(p.full_name for p in response.context["people"])
+        self.assertEqual(names, ["Бэк Два", "Бэк Один"])
+        self.assertContains(response, "Backend · На проверке")
+
+    def test_project_number_opens_those_people(self):
+        response = self.client.get(self.url, {"project": self.bilim.pk})
+        names = sorted(p.full_name for p in response.context["people"])
+        self.assertEqual(names, ["Бэк Два", "Бэк Три"])
+
+    def test_without_direction_is_reachable(self):
+        response = self.client.get(self.url, {"specialization": "none"})
+        self.assertEqual([p.full_name for p in response.context["people"]], ["Без Направления"])
+
+    def test_bank_filters(self):
+        response = self.client.get(self.url, {"bank": "yes"})
+        self.assertEqual([p.full_name for p in response.context["people"]], ["Бэк Три"])
+        response = self.client.get(self.url, {"bank": "no"})
+        self.assertEqual(len(response.context["people"]), 4)
+
+    def test_all_list(self):
+        response = self.client.get(self.url, {"all": "1"})
+        self.assertEqual(len(response.context["people"]), 5)
 
 
 class GraduateWorkflowTests(TestCase):
@@ -822,7 +916,7 @@ class GraduateWorkflowTests(TestCase):
         response = self.client.post(
             reverse("interns:graduate_decline", args=[graduate.pk]),
         )
-        self.assertRedirects(response, reverse("interns:graduates"))
+        self.assertRedirects(response, reverse("interns:graduates") + "?status=declined")
 
         graduate.refresh_from_db()
         self.assertEqual(graduate.graduate_status, GraduateStatus.DECLINED)
@@ -833,7 +927,7 @@ class GraduateWorkflowTests(TestCase):
             full_name="Копия Инструкции", graduate_status=GraduateStatus.DECLINED,
         )
 
-        response = self.client.get(reverse("interns:graduates"))
+        response = self.client.get(reverse("interns:graduates"), {"status": "declined"})
         self.assertContains(response, reverse("resume_bank_apply"))
 
 
