@@ -143,3 +143,49 @@ class MeetingScoreTests(TestCase):
         )
         self.assertEqual(score_response.status_code, 404)
         self.assertFalse(WorkScore.objects.filter(meeting=self.meeting, intern=pm).exists())
+
+
+class MeetingCompletionTests(TestCase):
+    """meeting_completion: закрыт ли табель собрания для списка людей —
+    основа обязательной отметки/оценки у тимлида."""
+
+    def setUp(self):
+        from apps.attendance import services as attendance_services
+
+        self.services = attendance_services
+        flow = Flow.objects.create(number=1)
+        project = Project.objects.create(name='Джаз')
+        self.group = Group.objects.create(flow=flow, number=1, project=project)
+        self.meeting = GroupMeeting.objects.create(
+            group=self.group, kind=MeetingKind.INTERNAL,
+            date=datetime.date(2026, 8, 19),
+        )
+        self.person = Intern.objects.create(full_name='Отмечаемый')
+        self.member = TeamMember.objects.create(
+            group=self.group, project=project, intern=self.person,
+            role=TeamRole.BACKEND, workload=50,
+        )
+
+    def test_no_members_is_complete(self):
+        result = self.services.meeting_completion(self.meeting, [])
+        self.assertEqual(result, {'total': 0, 'marked': 0, 'scored': 0, 'complete': True})
+
+    def test_nothing_marked_is_incomplete(self):
+        result = self.services.meeting_completion(self.meeting, [self.member])
+        self.assertFalse(result['complete'])
+        self.assertEqual((result['total'], result['marked'], result['scored']), (1, 0, 0))
+
+    def test_only_attendance_marked_is_still_incomplete(self):
+        Attendance.objects.create(
+            meeting=self.meeting, intern=self.person, status=Attendance.Status.PRESENT,
+        )
+        result = self.services.meeting_completion(self.meeting, [self.member])
+        self.assertFalse(result['complete'])
+
+    def test_marked_and_scored_is_complete(self):
+        Attendance.objects.create(
+            meeting=self.meeting, intern=self.person, status=Attendance.Status.PRESENT,
+        )
+        WorkScore.objects.create(meeting=self.meeting, intern=self.person, score=7)
+        result = self.services.meeting_completion(self.meeting, [self.member])
+        self.assertTrue(result['complete'])

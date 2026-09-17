@@ -229,14 +229,19 @@ class PmAttendanceTests(TestCase):
         )
         self.assertContains(response, "ещё не назначена")
 
-    def test_can_create_meeting_for_own_group(self):
-        from apps.attendance.models import GroupMeeting
+    def test_no_meeting_create_route_exists(self):
+        """ПМ больше не создаёт собрания — это делает тимлид."""
+        with self.assertRaises(NoReverseMatch):
+            reverse("pm_portal:meeting_create", args=[self.project_a.pk])
 
-        self.client.post(
-            reverse("pm_portal:meeting_create", args=[self.project_a.pk]),
-            {"date": "2026-09-10"},
-        )
-        self.assertTrue(GroupMeeting.objects.filter(group=self.group).exists())
+    def test_no_mark_or_score_routes_exist(self):
+        """Отмечать посещаемость и ставить оценки ПМ тоже больше не может."""
+        with self.assertRaises(NoReverseMatch):
+            reverse("pm_portal:meeting_mark_toggle", args=[self.project_a.pk, 1])
+        with self.assertRaises(NoReverseMatch):
+            reverse("pm_portal:meeting_mark_all", args=[self.project_a.pk, 1])
+        with self.assertRaises(NoReverseMatch):
+            reverse("pm_portal:meeting_score", args=[self.project_a.pk, 1])
 
     def test_cannot_reach_meeting_from_foreign_group(self):
         from apps.flows.models import Flow, Group
@@ -255,108 +260,42 @@ class PmAttendanceTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
 
-    def test_toggle_mark_creates_attendance(self):
-        from apps.attendance import services as attendance_services
-        from apps.attendance.models import Attendance, MeetingKind
-
-        meeting = attendance_services.create_meeting(
-            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
-        )
-        self.client.post(
-            reverse(
-                "pm_portal:meeting_mark_toggle",
-                args=[self.project_a.pk, meeting.pk],
-            ),
-            {"intern": self.dev_intern.pk},
-        )
-        self.assertTrue(
-            Attendance.objects.filter(meeting=meeting, intern=self.dev_intern).exists(),
-        )
-
-    def test_toggle_mark_is_ajax_returns_partial_not_redirect(self):
-        from apps.attendance import services as attendance_services
-        from apps.attendance.models import MeetingKind
-
-        meeting = attendance_services.create_meeting(
-            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
-        )
-        response = self.client.post(
-            reverse(
-                "pm_portal:meeting_mark_toggle",
-                args=[self.project_a.pk, meeting.pk],
-            ),
-            {"intern": self.dev_intern.pk},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f'id="mark-{self.dev_intern.pk}"')
-        self.assertContains(response, "Был")
-
-    def test_score_person_creates_work_score(self):
-        from apps.attendance import services as attendance_services
-        from apps.attendance.models import MeetingKind, WorkScore
-
-        meeting = attendance_services.create_meeting(
-            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
-        )
-        response = self.client.post(
-            reverse("pm_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
-            {"intern": self.dev_intern.pk, "score": "8"},
-        )
-        self.assertEqual(response.status_code, 200)
-        score = WorkScore.objects.get(meeting=meeting, intern=self.dev_intern)
-        self.assertEqual(score.score, 8)
-
-    def test_pm_cannot_be_marked_or_scored(self):
-        """ПМ/тимлид не отмечаются и не оцениваются — их вообще нет
-        в табеле собрания."""
+    def test_meeting_detail_shows_marks_and_scores_read_only(self):
+        """ПМ видит отметки/оценки, которые проставил тимлид, но не может
+        их менять — ни кнопок отметки, ни поля ввода оценки/комментария нет."""
         from apps.attendance import services as attendance_services
         from apps.attendance.models import Attendance, MeetingKind, WorkScore
 
         meeting = attendance_services.create_meeting(
             self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
         )
-        mark_response = self.client.post(
-            reverse(
-                "pm_portal:meeting_mark_toggle",
-                args=[self.project_a.pk, meeting.pk],
-            ),
-            {"intern": self.pm_intern.pk},
+        Attendance.objects.create(
+            meeting=meeting, intern=self.dev_intern, status=Attendance.Status.PRESENT,
         )
-        self.assertEqual(mark_response.status_code, 404)
-        self.assertFalse(
-            Attendance.objects.filter(meeting=meeting, intern=self.pm_intern).exists(),
-        )
+        WorkScore.objects.create(meeting=meeting, intern=self.dev_intern, score=8)
 
-        score_response = self.client.post(
-            reverse("pm_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
-            {"intern": self.pm_intern.pk, "score": "8"},
+        response = self.client.get(
+            reverse("pm_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
         )
-        self.assertEqual(score_response.status_code, 404)
-        self.assertFalse(WorkScore.objects.filter(meeting=meeting, intern=self.pm_intern).exists())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Был")
+        self.assertContains(response, "8")
+        self.assertNotContains(response, "hx-post")
+        self.assertNotContains(response, "score-note")
 
+    def test_pm_does_not_see_pm_or_lead_in_meeting_table(self):
+        """ПМ/тимлид не отмечаются и не оцениваются — их вообще нет
+        в табеле собрания."""
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import MeetingKind
+
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
         detail_response = self.client.get(
             reverse("pm_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
         )
         self.assertNotContains(detail_response, "Project Manager")
-
-    def test_cannot_score_on_foreign_project(self):
-        from apps.flows.models import Flow, Group
-        from apps.attendance import services as attendance_services
-        from apps.attendance.models import MeetingKind, WorkScore
-
-        other_flow = Flow.objects.create(number=3, status=Flow.Status.ACTIVE)
-        other_group = Group.objects.create(
-            flow=other_flow, number=1, project=self.project_b,
-        )
-        meeting = attendance_services.create_meeting(
-            other_group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
-        )
-        response = self.client.post(
-            reverse("pm_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
-            {"intern": self.pm_intern.pk, "score": "8"},
-        )
-        self.assertEqual(response.status_code, 404)
-        self.assertFalse(WorkScore.objects.filter(meeting=meeting).exists())
 
     def test_meeting_detail_shows_grouped_scores_tab(self):
         from apps.attendance import services as attendance_services

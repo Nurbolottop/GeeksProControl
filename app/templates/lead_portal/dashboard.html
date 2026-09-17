@@ -49,7 +49,10 @@
             <tbody>
             {% for project in projects %}
                 <tr>
-                    <td><a href="{% url 'lead_portal:project_detail' project.pk %}"><strong>{{ project.name }}</strong></a></td>
+                    <td>
+                        <a href="{% url 'lead_portal:project_detail' project.pk %}"><strong>{{ project.name }}</strong></a>
+                        {% if project.pending_meeting %}<span class="pm-dot" title="Не закрыт табель собрания"></span>{% endif %}
+                    </td>
                     <td>{% include 'projects/partials/status_badge.html' with status=project.status %}</td>
                 </tr>
             {% empty %}

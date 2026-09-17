@@ -36,9 +36,13 @@ def dashboard(request):
     else:
         category = 'all'
 
+    projects = list(projects)
+    for project in projects:
+        project.pending_meeting = services.pending_meeting(project, request.user)
+
     notifications = list(personal(getattr(request.user, 'intern_profile', None)))
     response = render(request, 'lead_portal/dashboard.html', {
-        'projects': list(projects),
+        'projects': projects,
         'resume': reserve_card_of(request.user),
         'notifications': notifications,
         'category': category,
@@ -121,7 +125,10 @@ def project_detail(request, pk):
     project = services.lead_project_or_404(request.user, pk)
     project.deadline_status = calculate_deadline_status(project)
     tab = request.GET.get('tab', 'overview')
-    context = {'project': project, 'tab': tab}
+    context = {
+        'project': project, 'tab': tab,
+        'pending_meeting': services.pending_meeting(project, request.user),
+    }
     if tab == 'team':
         from apps.interns.services import active_profile_form_link
         from apps.interns.views import PROFILE_LINK_TTL_CHOICES
@@ -257,9 +264,23 @@ def _group_or_404(project):
 
 @login_required
 def meeting_create(request, pk):
+    """Новое собрание нельзя создать, пока не закрыто предыдущее —
+    отмечать посещаемость и ставить оценки своему направлению
+    обязательно (в отличие от ПМ, у которого это только просмотр)."""
     project = services.lead_project_or_404(request.user, pk)
     group = _group_or_404(project)
     if request.method == 'POST':
+        pending = services.pending_meeting(project, request.user)
+        if pending is not None:
+            messages.error(
+                request,
+                f'Сначала закройте табель за {pending.date:%d.%m.%Y} — отметьте '
+                'посещаемость и оценки всем стажёрам своего направления, '
+                'только потом можно создать новое собрание.',
+            )
+            return redirect(
+                f"{reverse('lead_portal:project_detail', args=[project.pk])}?tab=attendance",
+            )
         raw = request.POST.get('date', '').strip()
         try:
             date = datetime.date.fromisoformat(raw)

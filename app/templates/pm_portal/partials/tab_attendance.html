@@ -7,14 +7,7 @@
         <div class="panel-head">
             <h2>Собрания ({{ meetings|length }})</h2>
         </div>
-        <form method="post" action="{% url 'pm_portal:meeting_create' project.pk %}" style="display:flex; gap:10px; align-items:flex-end;">
-            {% csrf_token %}
-            <div class="form-field">
-                <label>Дата собрания</label>
-                <input type="date" name="date" required>
-            </div>
-            <button type="submit" class="btn">+ Собрание</button>
-        </form>
+        <div class="sub">Посещаемость и оценки ведёт тимлид — здесь только просмотр.</div>
     </div>
 
     {% for meeting in meetings %}
@@ -29,7 +22,7 @@
         </a>
     {% empty %}
         <div class="panel empty" style="text-align:center; padding: 26px 20px;">
-            Собраний пока нет — добавьте первое выше.
+            Собраний пока нет — их создаёт тимлид.
         </div>
     {% endfor %}
 {% endif %}

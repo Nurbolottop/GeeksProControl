@@ -37,3 +37,30 @@ def lead_own_role(user):
     intern = getattr(user, 'intern_profile', None)
     spec = getattr(intern, 'specialization', None) if intern else None
     return ROLE_BY_SPECIALIZATION.get(spec.name) if spec else None
+
+
+def pending_meeting(project, user):
+    """Последнее собрание проекта, которое тимлид ещё не закрыл — не
+    всем его стажёрам своего направления отмечена посещаемость и
+    выставлена оценка. None, если группы/собраний нет или всё закрыто.
+
+    Отмечать и оценивать обязательно: новое собрание нельзя создать,
+    пока не закрыто предыдущее (см. meeting_create).
+    """
+    from apps.attendance import services as attendance_services
+    from apps.attendance.models import MeetingKind
+
+    group = getattr(project, 'group', None)
+    if group is None:
+        return None
+    meeting = group.meetings.filter(kind=MeetingKind.INTERNAL).order_by('-date').first()
+    if meeting is None:
+        return None
+    own_role = lead_own_role(user)
+    members = attendance_services.attendance_eligible_members(group).filter(
+        status=TeamMember.Status.ACTIVE, intern__isnull=False,
+    )
+    if own_role:
+        members = members.filter(role=own_role)
+    completion = attendance_services.meeting_completion(meeting, members)
+    return None if completion['complete'] else meeting

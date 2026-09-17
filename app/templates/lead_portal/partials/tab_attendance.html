@@ -3,6 +3,21 @@
         Команда потока ещё не назначена — обратитесь к руководителю.
     </div>
 {% else %}
+    {% if pending_meeting %}
+        <div class="stage-alert" role="alert">
+            <span class="stage-alert__beacon" aria-hidden="true"></span>
+            <div class="stage-alert__text">
+                <b>Не закрыт табель за {{ pending_meeting.date|date:'d.m.Y' }}.</b>
+                <span>
+                    Отметьте посещаемость и оценки всем стажёрам своего направления —
+                    новое собрание нельзя создать, пока это не сделано.
+                </span>
+            </div>
+            <div class="stage-alert__actions">
+                <a href="{% url 'lead_portal:meeting_detail' project.pk pending_meeting.pk %}" class="stage-alert__btn">Открыть табель</a>
+            </div>
+        </div>
+    {% endif %}
     <div class="panel">
         <div class="panel-head">
             <h2>Собрания ({{ meetings|length }})</h2>

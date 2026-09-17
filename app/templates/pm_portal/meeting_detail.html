@@ -21,12 +21,6 @@
             {% endif %}
         </div>
     </div>
-    <div class="page-actions">
-        <form method="post" action="{% url 'pm_portal:meeting_mark_all' project.pk meeting.pk %}" style="margin:0">
-            {% csrf_token %}
-            <button type="submit" class="btn">✓ Отметить всех</button>
-        </form>
-    </div>
 </div>
 
 <div x-data="{ tab: '{{ tab }}' }">
@@ -59,9 +53,8 @@
 
     <div x-show="tab === 'scores'" x-cloak>
         <div class="score-hint">
-            Кликните по шкале — балл выставится сразу.
+            Оценки ставит тимлид — здесь только просмотр.
             <strong>0–4</strong> — не тянет, <strong>5–7</strong> — норма, <strong>8–10</strong> — сильно.
-            Неоценённые идут первыми; ✕ снимает балл.
             {% if period_start %}
                 За период с {{ period_start|date:'d.m.Y' }} по {{ meeting.date|date:'d.m.Y' }} ({{ period_days }} дн.).
             {% endif %}

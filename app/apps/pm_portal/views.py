@@ -1,5 +1,3 @@
-import datetime
-
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404
@@ -9,7 +7,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.attendance import services as attendance_services
-from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
+from apps.attendance.models import GroupMeeting, WorkScore
 from apps.documents import services as document_services
 from apps.documents.models import Document, DocumentStatus
 from apps.pm_portal import services, stages as stage_reminders
@@ -152,28 +150,9 @@ def _group_or_404(project):
 
 
 @login_required
-def meeting_create(request, pk):
-    project = services.pm_project_or_404(request.user, pk)
-    group = _group_or_404(project)
-    if request.method == 'POST':
-        raw = request.POST.get('date', '').strip()
-        try:
-            date = datetime.date.fromisoformat(raw)
-        except ValueError:
-            messages.error(request, 'Укажите корректную дату.')
-        else:
-            meeting = attendance_services.create_meeting(
-                group, kind=MeetingKind.INTERNAL, date=date,
-            )
-            if meeting:
-                messages.success(request, f'Собрание {date:%d.%m.%Y} добавлено.')
-            else:
-                messages.info(request, 'Такое собрание уже есть.')
-    return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=attendance")
-
-
-@login_required
 def meeting_detail(request, pk, meeting_pk):
+    """Табель собрания у ПМ — только просмотр: отмечает и оценивает
+    теперь тимлид, ПМ видит результат."""
     project = services.pm_project_or_404(request.user, pk)
     group = _group_or_404(project)
     meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
@@ -212,89 +191,6 @@ def meeting_detail(request, pk, meeting_pk):
         'period_start': meeting.period_start, 'period_days': meeting.period_days,
         'tab': 'scores' if request.GET.get('tab') == 'scores' else 'marks',
     })
-
-
-@login_required
-def meeting_score(request, pk, meeting_pk):
-    """Клик по шкале «Активность» — балл (0–10) или комментарий за период."""
-    project = services.pm_project_or_404(request.user, pk)
-    group = _group_or_404(project)
-    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
-    if request.method != 'POST':
-        raise Http404
-    member = get_object_or_404(
-        attendance_services.attendance_eligible_members(group)
-        .select_related('intern__specialization').filter(intern__isnull=False),
-        intern_id=request.POST.get('intern'),
-    )
-    intern = member.intern
-    entry = WorkScore.objects.filter(meeting=meeting, intern=intern).first()
-
-    if 'comment' in request.POST:
-        comment = request.POST.get('comment', '').strip()[:255]
-        if entry:
-            entry.comment = comment
-            entry.save(update_fields=['comment', 'marked_by', 'updated_at'])
-        elif comment:
-            entry = WorkScore.objects.create(
-                meeting=meeting, intern=intern,
-                score=0, comment=comment, marked_by=request.user,
-            )
-    else:
-        raw = request.POST.get('score', '')
-        if raw.isdigit() and 0 <= int(raw) <= WorkScore.MAX:
-            value = int(raw)
-            if entry:
-                entry.score = value
-                entry.marked_by = request.user
-                entry.save(update_fields=['score', 'marked_by', 'updated_at'])
-            else:
-                entry = WorkScore.objects.create(
-                    meeting=meeting, intern=intern, score=value,
-                    marked_by=request.user,
-                )
-        elif entry:
-            entry.delete()
-            entry = None
-
-    member.score = attendance_services.score_row(
-        meeting, intern,
-        score=entry.score if entry else None,
-        comment=entry.comment if entry else '',
-        previous=attendance_services.previous_scores(meeting).get(intern.pk),
-    )
-    return render(request, 'pm_portal/partials/score_row.html', {
-        'project': project, 'meeting': meeting, 'member': member,
-    })
-
-
-@login_required
-def meeting_mark_toggle(request, pk, meeting_pk):
-    """AJAX: клик по бейджу переключает отметку — Был → Не был → ... → пусто."""
-    project = services.pm_project_or_404(request.user, pk)
-    group = _group_or_404(project)
-    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
-    if request.method != 'POST':
-        raise Http404
-    member = get_object_or_404(
-        attendance_services.attendance_eligible_members(group)
-        .filter(intern__isnull=False), intern_id=request.POST.get('intern'),
-    )
-    member.mark = attendance_services.toggle_mark(meeting, member.intern, user=request.user)
-    return render(request, 'pm_portal/partials/mark_row.html', {
-        'project': project, 'meeting': meeting, 'member': member,
-    })
-
-
-@login_required
-def meeting_mark_all(request, pk, meeting_pk):
-    project = services.pm_project_or_404(request.user, pk)
-    group = _group_or_404(project)
-    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
-    if request.method == 'POST':
-        created = attendance_services.mark_all_present(meeting, user=request.user)
-        messages.success(request, f'Отмечено присутствующих: {created}.')
-    return redirect('pm_portal:meeting_detail', pk=project.pk, meeting_pk=meeting.pk)
 
 
 @login_required

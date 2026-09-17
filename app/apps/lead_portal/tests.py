@@ -357,6 +357,91 @@ class LeadAttendanceTests(TestCase):
             Attendance.objects.filter(meeting=meeting, intern=frontend_intern).exists(),
         )
 
+    def test_cannot_create_new_meeting_while_previous_incomplete(self):
+        """Табель обязателен: нельзя создать новое собрание, пока не
+        отмечены посещаемость и оценки всем стажёрам своего направления
+        на предыдущем."""
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import GroupMeeting, MeetingKind
+
+        member_intern = Intern.objects.create(full_name="Недооценённый")
+        TeamMember.objects.create(
+            project=self.project_a, group=self.group, intern=member_intern,
+            role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
+        )
+        attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL,
+            date=__import__("datetime").date(2026, 9, 10),
+        )
+        self.client.post(
+            reverse("lead_portal:meeting_create", args=[self.project_a.pk]),
+            {"date": "2026-09-17"},
+        )
+        self.assertEqual(GroupMeeting.objects.filter(group=self.group).count(), 1)
+
+    def test_can_create_new_meeting_after_previous_fully_closed(self):
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import (
+            Attendance, GroupMeeting, MeetingKind, WorkScore,
+        )
+
+        member_intern = Intern.objects.create(full_name="Закрытый")
+        TeamMember.objects.create(
+            project=self.project_a, group=self.group, intern=member_intern,
+            role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
+        )
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL,
+            date=__import__("datetime").date(2026, 9, 10),
+        )
+        Attendance.objects.create(
+            meeting=meeting, intern=member_intern, status=Attendance.Status.PRESENT,
+        )
+        WorkScore.objects.create(meeting=meeting, intern=member_intern, score=7)
+
+        self.client.post(
+            reverse("lead_portal:meeting_create", args=[self.project_a.pk]),
+            {"date": "2026-09-17"},
+        )
+        self.assertEqual(GroupMeeting.objects.filter(group=self.group).count(), 2)
+
+    def test_can_create_new_meeting_when_no_own_direction_members_yet(self):
+        """Некого отмечать — блокировка не мешает, если в направлении
+        тимлида пока вообще никого нет."""
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import GroupMeeting, MeetingKind
+
+        attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL,
+            date=__import__("datetime").date(2026, 9, 10),
+        )
+        self.client.post(
+            reverse("lead_portal:meeting_create", args=[self.project_a.pk]),
+            {"date": "2026-09-17"},
+        )
+        self.assertEqual(GroupMeeting.objects.filter(group=self.group).count(), 2)
+
+    def test_dashboard_and_tab_show_pending_meeting_indicator(self):
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import MeetingKind
+
+        member_intern = Intern.objects.create(full_name="Неотмеченный")
+        TeamMember.objects.create(
+            project=self.project_a, group=self.group, intern=member_intern,
+            role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
+        )
+        attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL,
+            date=__import__("datetime").date(2026, 9, 10),
+        )
+        dashboard_response = self.client.get(reverse("lead_portal:dashboard"))
+        self.assertContains(dashboard_response, "pm-dot")
+
+        project_response = self.client.get(
+            reverse("lead_portal:project_detail", args=[self.project_a.pk]),
+        )
+        self.assertContains(project_response, "pm-dot")
+
     def test_lead_cannot_be_marked_or_scored(self):
         """Тимлид не отмечается и не оценивается — его нет в табеле
         собственного собрания."""

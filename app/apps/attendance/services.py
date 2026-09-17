@@ -224,6 +224,28 @@ def mark_all_present(meeting, user=None, only_role=None) -> int:
     return created
 
 
+def meeting_completion(meeting, members) -> dict:
+    """Насколько собрание закрыто для списка участников: у всех ли
+    проставлена отметка посещения и оценка активности.
+
+    Используется как валидация у тимлида — новое собрание нельзя
+    создать, пока не закрыто предыдущее (посещаемость и оценки
+    обязательны; у ПМ марки/оценок больше нет — только просмотр).
+    """
+    intern_ids = [member.intern_id for member in members if member.intern_id]
+    total = len(intern_ids)
+    marked = Attendance.objects.filter(
+        meeting=meeting, intern_id__in=intern_ids,
+    ).values('intern_id').distinct().count()
+    scored = WorkScore.objects.filter(
+        meeting=meeting, intern_id__in=intern_ids,
+    ).values('intern_id').distinct().count()
+    return {
+        'total': total, 'marked': marked, 'scored': scored,
+        'complete': total == 0 or (marked >= total and scored >= total),
+    }
+
+
 def upcoming_meetings(group, limit: int = 5):
     today = timezone.localdate()
     return group.meetings.filter(date__gte=today).order_by('date')[:limit]
