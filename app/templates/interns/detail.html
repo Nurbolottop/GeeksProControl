@@ -9,7 +9,11 @@
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
             <span class="badge badge--{{ kind_tone }}">{{ kind }}</span>
             <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
-            <span class="badge badge--green">{{ intern.get_status_display }}</span>
+            {% if intern.is_archived %}
+                <span class="badge badge--red">В архиве</span>
+            {% else %}
+                <span class="badge badge--green">{{ intern.get_status_display }}</span>
+            {% endif %}
             {% if intern.rating %}<span class="badge badge--yellow">★ {{ intern.rating }}</span>{% endif %}
             {% if intern.in_resume_bank %}<span class="badge badge--blue">Банк резюме</span>{% endif %}
         </div>
@@ -21,6 +25,21 @@
             </a>
         {% endif %}
         <a href="{% url 'interns:update' intern.pk %}" class="btn btn--secondary">Редактировать</a>
+        {% if intern.is_archived %}
+            <form method="post" action="{% url 'interns:unarchive' intern.pk %}" style="margin:0"
+                  data-confirm="Вернуть {{ intern.full_name|escapejs }} из архива? Вход в систему откроется, на проекты нужно будет назначить заново."
+                  data-confirm-ok="Вернуть">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--secondary">Вернуть из архива</button>
+            </form>
+        {% elif is_lead or was_lead %}
+            <form method="post" action="{% url 'interns:archive' intern.pk %}" style="margin:0"
+                  data-confirm="Отправить {{ intern.full_name|escapejs }} в архив? Человек будет снят со всех текущих проектов{% if intern.user %}, вход в систему закроется{% endif %}. Оценки и история проектов сохранятся."
+                  data-confirm-ok="В архив">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--secondary">В архив</button>
+            </form>
+        {% endif %}
         <form method="post" action="{% url 'interns:delete' intern.pk %}" style="margin:0"
               data-confirm="Удалить {{ intern.full_name|escapejs }} из базы? Человек пропадёт из всех команд и табелей.">
             {% csrf_token %}
@@ -28,6 +47,16 @@
         </form>
     </div>
 </div>
+
+{% if intern.is_archived %}
+    <div class="panel" style="border-left: 4px solid var(--red, #dc2626); padding-block: 14px;">
+        <strong>В архиве с {{ intern.archived_at|date:'d.m.Y' }}.</strong>
+        <span class="sub">
+            У нас больше не работает: снят(а) с текущих проектов{% if intern.user %}, вход в систему закрыт{% endif %}.
+            Оценки и история проектов сохранены.
+        </span>
+    </div>
+{% endif %}
 
 <div class="panel">
     <h2>Карточка</h2>
@@ -70,7 +99,9 @@
 <div class="panel">
     <div class="panel-head">
         <h2>Текущие проекты ({{ active_memberships|length }})</h2>
-        <a href="{% url 'interns:project_add' intern.pk %}" class="btn btn--secondary btn--sm">+ Добавить в проект</a>
+        {% if not intern.is_archived %}
+            <a href="{% url 'interns:project_add' intern.pk %}" class="btn btn--secondary btn--sm">+ Добавить в проект</a>
+        {% endif %}
     </div>
     {% for member in active_memberships %}
         <div style="padding: 6px 0; border-bottom: 1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">

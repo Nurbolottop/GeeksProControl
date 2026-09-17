@@ -204,3 +204,51 @@ def branch_summary(interns) -> dict:
         'rows': rows,
         'totals': totals,
     }
+
+
+# --- Архив сотрудников -------------------------------------------------------
+# Тимлид (или любой человек из базы), который у нас больше не работает, не
+# удаляется: его оценки, табели и история проектов остаются. Он пропадает из
+# рабочих списков, снимается со всех текущих проектов и теряет вход в систему.
+
+def archive_person(intern: Intern, user=None, reason: str = '') -> int:
+    """Отправить человека в архив. Возвращает, со скольких проектов снят."""
+    from django.db import transaction
+    from django.utils import timezone
+
+    from apps.audit.services import log as audit_log
+    from apps.teams.models import TeamMember
+
+    with transaction.atomic():
+        active = intern.team_memberships.filter(status=TeamMember.Status.ACTIVE)
+        projects = ', '.join(
+            member.project.name for member in active.select_related('project')
+            if member.project_id
+        )
+        closed = active.update(
+            status=TeamMember.Status.LEFT, left_at=timezone.localdate(),
+        )
+        intern.archive()
+        if intern.user_id and intern.user.is_active:
+            intern.user.is_active = False
+            intern.user.save(update_fields=['is_active'])
+        audit_log(
+            intern, 'В архив',
+            old_value=f'снят с проектов: {projects}' if projects else 'проектов не было',
+            reason=reason, user=user,
+        )
+    return closed
+
+
+def unarchive_person(intern: Intern, user=None) -> None:
+    """Вернуть из архива. На проекты не возвращаем — назначают заново."""
+    from django.db import transaction
+
+    from apps.audit.services import log as audit_log
+
+    with transaction.atomic():
+        intern.unarchive()
+        if intern.user_id and not intern.user.is_active:
+            intern.user.is_active = True
+            intern.user.save(update_fields=['is_active'])
+        audit_log(intern, 'Из архива', user=user)

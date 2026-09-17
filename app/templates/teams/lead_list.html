@@ -74,6 +74,34 @@
     </div>
 {% endfor %}
 
+{% if archived_leads %}
+    <div class="panel" x-data="{ open: false }">
+        <div class="panel-head">
+            <h2>Архив</h2>
+            <button type="button" class="btn btn--secondary btn--sm" @click="open = !open"
+                    x-text="open ? 'Скрыть' : 'Показать ({{ archived_leads|length }})'"></button>
+        </div>
+        <div x-show="open" x-cloak>
+            {% for person in archived_leads %}
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding: 8px 0; border-top: 1px solid var(--border);">
+                    <div>
+                        <a href="{{ person.get_absolute_url }}"><strong>{{ person.full_name }}</strong></a>
+                        <div class="sub">{{ person.specialization|default:'Без направления' }} · в архиве с {{ person.archived_at|date:'d.m.Y' }}</div>
+                    </div>
+                    <form method="post" action="{% url 'interns:unarchive' person.pk %}" style="margin:0"
+                          data-confirm="Вернуть {{ person.full_name|escapejs }} из архива?" data-confirm-ok="Вернуть">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn--secondary btn--sm">Вернуть</button>
+                    </form>
+                </div>
+            {% endfor %}
+        </div>
+        <div x-show="!open" class="sub" style="font-size: 12.5px">
+            Тимлиды, которые у нас больше не работают. История их проектов и оценки сохранены.
+        </div>
+    </div>
+{% endif %}
+
 <div class="panel" id="assign" x-data="{ open: {% if not total %}true{% else %}false{% endif %} }">
     <div class="panel-head">
         <h2>Назначить тимлида</h2>

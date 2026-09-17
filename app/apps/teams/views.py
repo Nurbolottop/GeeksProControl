@@ -197,6 +197,12 @@ def lead_list(request):
         .select_related('intern__specialization', 'project')
         .order_by('intern__full_name')
     )
+    # кто у нас больше не работает — в отдельном блоке «Архив», не в рабочих
+    archived = {}
+    for member in leads:
+        if member.intern_id and member.intern.is_archived:
+            archived.setdefault(member.intern_id, member.intern)
+    leads = [member for member in leads if member.intern_id not in archived]
     by_person = {}
     for member in leads:
         entry = by_person.setdefault(member.intern_id, {
@@ -226,6 +232,9 @@ def lead_list(request):
     ]
 
     return render(request, 'teams/lead_list.html', {
+        'archived_leads': sorted(
+            archived.values(), key=lambda person: person.archived_at, reverse=True,
+        ),
         'sections': sections,
         'missing': missing,
         'rows': list(by_person.values()),
@@ -259,6 +268,9 @@ def lead_add(request):
     intern = Intern.objects.filter(pk=data.get('intern')).first()
     if intern is None:
         messages.error(request, 'Выберите человека.')
+        return redirect('teams:lead_list')
+    if intern.is_archived:
+        messages.error(request, f'{intern.full_name} в архиве — сначала верните из архива.')
         return redirect('teams:lead_list')
 
     member, made = TeamMember.objects.get_or_create(

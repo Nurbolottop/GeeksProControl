@@ -283,8 +283,11 @@ def intern_detail(request, pk):
     roles = {m.role for m in active_memberships}
     is_lead = TeamRole.TEAM_LEAD in roles
     is_pm = TeamRole.PROJECT_MANAGER in roles
+    was_lead = any(m.role == TeamRole.TEAM_LEAD for m in memberships)
     if is_lead:
         kind, kind_tone = 'Тимлид направления', 'orange'
+    elif intern.is_archived and was_lead:
+        kind, kind_tone = 'Бывший тимлид', 'gray'
     else:
         # ПМ — тоже стажёр, а не отдельная категория: его роль и так
         # видна по проектам ниже и по направлению «PM» в шапке.
@@ -293,6 +296,7 @@ def intern_detail(request, pk):
     context = {
         'intern': intern,
         'is_lead': is_lead,
+        'was_lead': was_lead,
         'kind': kind,
         'kind_tone': kind_tone,
         'lead_projects': [
@@ -312,6 +316,9 @@ def intern_detail(request, pk):
 def intern_project_add(request, pk):
     """Добавить стажёра на проект прямо с его карточки."""
     intern = get_object_or_404(Intern, pk=pk)
+    if intern.is_archived:
+        messages.error(request, f'{intern.full_name} в архиве — сначала верните из архива.')
+        return redirect(intern.get_absolute_url())
     form = InternProjectAddForm(
         request.POST or None, instance=TeamMember(intern=intern),
     )
@@ -398,6 +405,31 @@ def evaluation_add(request, pk):
         request, 'interns/evaluation_form.html',
         {'form': form, 'intern': intern, 'title': f'Оценка: {intern.full_name}'},
     )
+
+
+@login_required
+def intern_archive(request, pk):
+    """В архив: человек у нас больше не работает, но история остаётся."""
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST' and not intern.is_archived:
+        closed = services.archive_person(
+            intern, user=request.user, reason=request.POST.get('reason', '').strip(),
+        )
+        note = f' и снят(а) с проектов: {closed}' if closed else ''
+        messages.success(request, f'{intern.full_name} в архиве{note}.')
+    return redirect(intern.get_absolute_url())
+
+
+@login_required
+def intern_unarchive(request, pk):
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST' and intern.is_archived:
+        services.unarchive_person(intern, user=request.user)
+        messages.success(
+            request,
+            f'{intern.full_name} возвращён(а) из архива. На проекты назначьте заново.',
+        )
+    return redirect(intern.get_absolute_url())
 
 
 @login_required

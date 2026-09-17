@@ -39,6 +39,8 @@ urlpatterns = [
     path('<int:pk>/edit/', views.intern_update, name='update'),
     path('<int:pk>/evaluate/', views.evaluation_add, name='evaluate'),
     path('<int:pk>/delete/', views.intern_delete, name='delete'),
+    path('<int:pk>/archive/', views.intern_archive, name='archive'),
+    path('<int:pk>/unarchive/', views.intern_unarchive, name='unarchive'),
     path('<int:pk>/grant-access/', views.grant_pm_access, name='grant_access'),
     path('<int:pk>/project/add/', views.intern_project_add, name='project_add'),
     path(

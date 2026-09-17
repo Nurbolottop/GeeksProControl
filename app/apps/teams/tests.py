@@ -458,3 +458,107 @@ class MemberDeleteTests(TestCase):
         self.assertEqual(self.project.team_members.count(), 2)
         call_command("dedupe_members", verbosity=0)
         self.assertEqual(self.project.team_members.count(), 1)
+
+
+class LeadArchiveTests(TestCase):
+    """Тимлид, который у нас больше не работает, уходит в архив, а не удаляется."""
+
+    def setUp(self):
+        from apps.accounts.models import User
+        from apps.interns.models import Intern, InternEvaluation
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        self.head = User.objects.create_user(username="head-arch", password="x")
+        self.client.force_login(self.head)
+        self.login = User.objects.create_user(username="lead-login", password="x")
+        self.lead = Intern.objects.create(full_name="Бексултан", user=self.login)
+        self.project = Project.objects.create(name="Омур")
+        self.old_project = Project.objects.create(name="Старый")
+        self.member = TeamMember.objects.create(
+            project=self.project, intern=self.lead,
+            role=TeamRole.TEAM_LEAD, status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.old_project, intern=self.lead,
+            role=TeamRole.TEAM_LEAD, status=TeamMember.Status.LEFT,
+        )
+        self.evaluation = InternEvaluation.objects.create(
+            intern=self.lead, project=self.project, evaluator=self.head,
+            hard_skills=1, quality=1, speed=1, responsibility=1,
+            communication=1, teamwork=1, independence=1,
+        )
+
+    def _archive(self):
+        return self.client.post(reverse("interns:archive", args=[self.lead.pk]))
+
+    def test_archive_keeps_history_and_ends_projects(self):
+        from apps.audit.models import AuditLog
+        from apps.teams.models import TeamMember
+
+        response = self._archive()
+        self.assertRedirects(
+            response, self.lead.get_absolute_url(), fetch_redirect_response=False,
+        )
+        self.lead.refresh_from_db()
+        self.member.refresh_from_db()
+        self.login.refresh_from_db()
+        self.assertTrue(self.lead.is_archived)
+        self.assertIsNotNone(self.lead.archived_at)
+        self.assertEqual(self.member.status, TeamMember.Status.LEFT)
+        self.assertIsNotNone(self.member.left_at)
+        self.assertFalse(self.login.is_active)
+        # ничего не удалено
+        self.assertEqual(self.lead.team_memberships.count(), 2)
+        self.assertTrue(self.lead.evaluations.filter(pk=self.evaluation.pk).exists())
+        self.assertTrue(
+            AuditLog.objects.filter(object_id=str(self.lead.pk), action="В архив").exists()
+        )
+
+    def test_archived_lead_leaves_working_list(self):
+        self._archive()
+        response = self.client.get(reverse("teams:lead_list"))
+        self.assertEqual(response.context["total"], 0)
+        self.assertEqual(
+            [p.pk for p in response.context["archived_leads"]], [self.lead.pk],
+        )
+
+    def test_detail_shows_archive_state(self):
+        response = self.client.get(self.lead.get_absolute_url())
+        self.assertContains(response, reverse("interns:archive", args=[self.lead.pk]))
+        self._archive()
+        response = self.client.get(self.lead.get_absolute_url())
+        self.assertContains(response, "В архиве с")
+        self.assertContains(response, "Бывший тимлид")
+        self.assertContains(response, reverse("interns:unarchive", args=[self.lead.pk]))
+
+    def test_unarchive_restores_login_but_not_projects(self):
+        from apps.teams.models import TeamMember
+
+        self._archive()
+        self.client.post(reverse("interns:unarchive", args=[self.lead.pk]))
+        self.lead.refresh_from_db()
+        self.login.refresh_from_db()
+        self.member.refresh_from_db()
+        self.assertFalse(self.lead.is_archived)
+        self.assertTrue(self.login.is_active)
+        self.assertEqual(self.member.status, TeamMember.Status.LEFT)
+
+    def test_get_does_not_archive(self):
+        self.client.get(reverse("interns:archive", args=[self.lead.pk]))
+        self.lead.refresh_from_db()
+        self.assertFalse(self.lead.is_archived)
+
+    def test_archived_cannot_be_assigned_again(self):
+        self._archive()
+        from apps.projects.models import Project
+
+        new_project = Project.objects.create(name="Новый")
+        self.client.post(
+            reverse("teams:lead_add"), {"project": new_project.pk, "intern": self.lead.pk},
+        )
+        self.assertFalse(new_project.team_members.filter(intern=self.lead).exists())
+        self.client.post(
+            reverse("interns:project_add", args=[self.lead.pk]), {"project": new_project.pk},
+        )
+        self.assertFalse(new_project.team_members.filter(intern=self.lead).exists())
