@@ -26,3 +26,14 @@ def lead_projects(user):
         team_members__role=TeamRole.TEAM_LEAD,
         team_members__status=TeamMember.Status.ACTIVE,
     ).distinct()
+
+
+def lead_own_role(user):
+    """Направление тимлида по его собственной специализации (Backend,
+    Frontend...) — именно этих стажёров команды он видит и добавляет,
+    остальные направления и ПМ в его портале не показываются."""
+    from apps.teams.forms import ROLE_BY_SPECIALIZATION
+
+    intern = getattr(user, 'intern_profile', None)
+    spec = getattr(intern, 'specialization', None) if intern else None
+    return ROLE_BY_SPECIALIZATION.get(spec.name) if spec else None

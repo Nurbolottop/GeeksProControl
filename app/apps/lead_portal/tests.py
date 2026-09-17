@@ -15,11 +15,15 @@ class LeadProjectOwnershipTests(TestCase):
     TeamMember(role='team_lead')."""
 
     def setUp(self):
+        from apps.training.models import Specialization
+
+        self.backend_spec = Specialization.objects.create(name="Backend")
         self.lead_user = Model.objects.create_user(
             username="+996700000030", password="x", role=User.Role.TEAM_LEAD,
         )
         self.lead_intern = Intern.objects.create(
             full_name="Тестов Тимлид", user=self.lead_user,
+            specialization=self.backend_spec,
         )
         self.project_a = Project.objects.create(name="Проект A")
         self.project_b = Project.objects.create(name="Проект B")
@@ -98,7 +102,9 @@ class LeadTeamManagementTests(LeadProjectOwnershipTests):
     проекта, ничего на чужом."""
 
     def test_can_add_member_to_own_project(self):
-        other = Intern.objects.create(full_name="Новый Бэкендер")
+        other = Intern.objects.create(
+            full_name="Новый Бэкендер", specialization=self.backend_spec,
+        )
         self.client.post(
             reverse("lead_portal:member_add", args=[self.project_a.pk]),
             {"intern": other.pk},
@@ -152,6 +158,82 @@ class LeadTeamManagementTests(LeadProjectOwnershipTests):
             reverse("lead_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
         )
         self.assertContains(response, "Участник А")
+
+    def test_team_tab_shows_only_own_direction(self):
+        """Тимлид по бэкенду видит только бэкенд-стажёров — ни ПМ, ни
+        других направлений, ни других тимлидов."""
+        backend_intern = Intern.objects.create(full_name="Бэкендер")
+        frontend_intern = Intern.objects.create(full_name="Фронтендер")
+        pm_intern = Intern.objects.create(full_name="Менеджер Проекта")
+        TeamMember.objects.create(
+            project=self.project_a, intern=backend_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project_a, intern=frontend_intern, role=TeamRole.FRONTEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project_a, intern=pm_intern, role=TeamRole.PROJECT_MANAGER,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("lead_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
+        )
+        self.assertContains(response, "Бэкендер")
+        self.assertNotContains(response, "Фронтендер")
+        self.assertNotContains(response, "Менеджер Проекта")
+        self.assertNotContains(response, "Project Manager")
+        self.assertNotContains(response, "Frontend")
+
+    def test_cannot_add_member_of_other_direction(self):
+        """Роль в ссылке игнорируется — форма показывает только людей
+        направления самого тимлида (Backend), Frontend-человека выбрать
+        нельзя, даже подставив его id в ссылку."""
+        from apps.training.models import Specialization
+
+        frontend_spec = Specialization.objects.create(name="Frontend")
+        other = Intern.objects.create(
+            full_name="Новый Фронтендер", specialization=frontend_spec,
+        )
+        self.client.post(
+            reverse("lead_portal:member_add", args=[self.project_a.pk]) + "?role=frontend",
+            {"intern": other.pk},
+        )
+        self.assertFalse(
+            TeamMember.objects.filter(project=self.project_a, intern=other).exists(),
+        )
+
+    def test_can_add_member_of_own_direction_regardless_of_role_param(self):
+        backend_intern = Intern.objects.create(
+            full_name="Новый Бэкендер", specialization=self.backend_spec,
+        )
+        self.client.post(
+            reverse("lead_portal:member_add", args=[self.project_a.pk]) + "?role=frontend",
+            {"intern": backend_intern.pk},
+        )
+        member = TeamMember.objects.get(project=self.project_a, intern=backend_intern)
+        self.assertEqual(member.role, TeamRole.BACKEND)
+
+    def test_cannot_edit_or_remove_member_of_other_direction(self):
+        intern = Intern.objects.create(full_name="Чужое Направление")
+        member = TeamMember.objects.create(
+            project=self.project_a, intern=intern, role=TeamRole.FRONTEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.post(
+            reverse("lead_portal:member_edit", args=[self.project_a.pk, member.pk]),
+            {"intern": intern.pk, "status": "active", "comment": "ой"},
+        )
+        self.assertEqual(response.status_code, 404)
+        member.refresh_from_db()
+        self.assertEqual(member.comment, "")
+
+        response = self.client.post(
+            reverse("lead_portal:member_delete", args=[self.project_a.pk, member.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(TeamMember.objects.filter(pk=member.pk).exists())
 
 
 class LeadAttendanceTests(TestCase):
@@ -302,6 +384,17 @@ class LeadInternDetailTests(LeadProjectOwnershipTests):
         intern = Intern.objects.create(full_name="Чужой Стажёр")
         TeamMember.objects.create(
             project=self.project_b, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("lead_portal:intern_detail", args=[self.project_a.pk, intern.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_cannot_view_intern_of_other_direction(self):
+        intern = Intern.objects.create(full_name="Фронтендер")
+        TeamMember.objects.create(
+            project=self.project_a, intern=intern, role=TeamRole.FRONTEND,
             status=TeamMember.Status.ACTIVE,
         )
         response = self.client.get(
@@ -646,9 +739,8 @@ class LeadProfileLinkTests(LeadProjectOwnershipTests):
 
     def setUp(self):
         super().setUp()
-        from apps.training.models import Specialization
 
-        self.spec = Specialization.objects.create(name="Backend")
+        self.spec = self.backend_spec
         self.team_url = (
             reverse("lead_portal:project_detail", args=[self.project_a.pk]) + "?tab=team"
         )

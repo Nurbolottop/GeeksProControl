@@ -12,8 +12,8 @@ from apps.lead_portal import services
 from apps.projects.services import calculate_deadline_status
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
-from apps.teams.selectors import group_by_role
-from apps.teams.views import _role_from, _title_for, _with_new_person, people_options
+from apps.teams.selectors import ROLE_LABELS, ROLE_TONE, group_by_role
+from apps.teams.views import _title_for, _with_new_person, people_options
 from apps.training.models import Specialization
 
 
@@ -116,10 +116,25 @@ def project_detail(request, pk):
 
         context['profile_link'] = active_profile_form_link(project)
         context['profile_link_ttls'] = PROFILE_LINK_TTL_CHOICES
+        own_role = services.lead_own_role(request.user)
         members = project.team_members.select_related('intern__specialization', 'user')
+        if own_role:
+            members = members.filter(role=own_role)
         is_mobile = bool(project.project_type and project.project_type.is_mobile)
-        context['team_sections'] = group_by_role(members, is_mobile)
+        sections = group_by_role(members, is_mobile)
+        if own_role:
+            # group_by_role всегда показывает пустые секции ПМ/тимлида/etc
+            # (ALWAYS_SHOWN) — тимлиду нужна только его собственная, и
+            # даже если в ней пока никого нет (иначе некуда добавлять).
+            sections = [s for s in sections if s['role'] == own_role] or [{
+                'role': own_role,
+                'label': ROLE_LABELS.get(own_role, own_role),
+                'tone': ROLE_TONE.get(own_role, 'gray'),
+                'members': [], 'count': 0, 'active': 0,
+            }]
+        context['team_sections'] = sections
         context['team_members'] = list(members)
+        context['own_role'] = own_role
     elif tab == 'attendance':
         group = getattr(project, 'group', None)
         context['group'] = group
@@ -134,8 +149,17 @@ def _team_url(project):
 
 @login_required
 def member_add(request, pk):
+    """Тимлид добавляет только в своё направление — роль из ссылки
+    игнорируется, берём всегда его собственную специализацию."""
     project = services.lead_project_or_404(request.user, pk)
-    role = _role_from(request)
+    role = services.lead_own_role(request.user)
+    if role is None:
+        messages.error(
+            request,
+            'У вас не заполнено направление (специализация) — обратитесь '
+            'к руководителю, чтобы добавлять участников команды.',
+        )
+        return redirect(_team_url(project))
     form = TeamMemberForm(request.POST or None, role=role)
     created_person = None
     if request.method == 'POST':
@@ -163,10 +187,18 @@ def member_add(request, pk):
     )
 
 
+def _own_direction_member_or_404(request, project, member_pk):
+    """Тимлид правит/убирает только участников своего направления."""
+    own_role = services.lead_own_role(request.user)
+    return get_object_or_404(
+        TeamMember, pk=member_pk, project=project, role=own_role,
+    )
+
+
 @login_required
 def member_edit(request, pk, member_pk):
     project = services.lead_project_or_404(request.user, pk)
-    member = get_object_or_404(TeamMember, pk=member_pk, project=project)
+    member = _own_direction_member_or_404(request, project, member_pk)
     form = TeamMemberEditForm(request.POST or None, instance=member)
     if request.method == 'POST' and form.is_valid():
         form.save()
@@ -191,7 +223,7 @@ def member_edit(request, pk, member_pk):
 @login_required
 def member_delete(request, pk, member_pk):
     project = services.lead_project_or_404(request.user, pk)
-    member = get_object_or_404(TeamMember, pk=member_pk, project=project)
+    member = _own_direction_member_or_404(request, project, member_pk)
     if request.method == 'POST':
         name = member.person_name
         member.delete()
@@ -354,11 +386,14 @@ def meeting_score(request, pk, meeting_pk):
 
 @login_required
 def intern_detail(request, pk, intern_pk):
-    """Детальная карточка стажёра — только по своей команде, только чтение."""
+    """Детальная карточка стажёра — только по своей команде и своему
+    направлению, только чтение."""
     project = services.lead_project_or_404(request.user, pk)
+    own_role = services.lead_own_role(request.user)
     member = get_object_or_404(
         TeamMember.objects.select_related('intern__specialization'),
         project=project, intern_id=intern_pk, status=TeamMember.Status.ACTIVE,
+        role=own_role,
     )
     intern = member.intern
     group = getattr(project, 'group', None)
