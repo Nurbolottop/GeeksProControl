@@ -259,6 +259,16 @@ def meeting_create(request, pk):
     return redirect(f"{reverse('lead_portal:project_detail', args=[project.pk])}?tab=attendance")
 
 
+def _own_direction_eligible_members(request, group):
+    """Кого тимлид может отмечать/оценивать на собрании — только своё
+    направление (ПМ и другие тимлиды и так исключены отдельно)."""
+    members = attendance_services.attendance_eligible_members(group)
+    own_role = services.lead_own_role(request.user)
+    if own_role:
+        members = members.filter(role=own_role)
+    return members
+
+
 @login_required
 def meeting_detail(request, pk, meeting_pk):
     project = services.lead_project_or_404(request.user, pk)
@@ -268,7 +278,7 @@ def meeting_detail(request, pk, meeting_pk):
     scores = {score.intern_id: score for score in meeting.scores.all()}
     previous = attendance_services.previous_scores(meeting)
     members = list(
-        attendance_services.attendance_eligible_members(group)
+        _own_direction_eligible_members(request, group)
         .select_related('intern__specialization')
         .filter(intern__isnull=False).order_by('role', 'intern__full_name'),
     )
@@ -310,7 +320,7 @@ def meeting_mark_toggle(request, pk, meeting_pk):
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(
-        attendance_services.attendance_eligible_members(group)
+        _own_direction_eligible_members(request, group)
         .filter(intern__isnull=False), intern_id=request.POST.get('intern'),
     )
     member.mark = attendance_services.toggle_mark(meeting, member.intern, user=request.user)
@@ -325,7 +335,9 @@ def meeting_mark_all(request, pk, meeting_pk):
     group = _group_or_404(project)
     meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
     if request.method == 'POST':
-        created = attendance_services.mark_all_present(meeting, user=request.user)
+        created = attendance_services.mark_all_present(
+            meeting, user=request.user, only_role=services.lead_own_role(request.user),
+        )
         messages.success(request, f'Отмечено присутствующих: {created}.')
     return redirect('lead_portal:meeting_detail', pk=project.pk, meeting_pk=meeting.pk)
 
@@ -339,7 +351,7 @@ def meeting_score(request, pk, meeting_pk):
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(
-        attendance_services.attendance_eligible_members(group)
+        _own_direction_eligible_members(request, group)
         .select_related('intern__specialization').filter(intern__isnull=False),
         intern_id=request.POST.get('intern'),
     )

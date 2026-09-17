@@ -241,12 +241,15 @@ class LeadAttendanceTests(TestCase):
 
     def setUp(self):
         from apps.flows.models import Flow, Group
+        from apps.training.models import Specialization
 
+        self.backend_spec = Specialization.objects.create(name="Backend")
         self.lead_user = Model.objects.create_user(
             username="+996700000040", password="x", role=User.Role.TEAM_LEAD,
         )
         self.lead_intern = Intern.objects.create(
             full_name="Тимлид Табельный", user=self.lead_user,
+            specialization=self.backend_spec,
         )
         self.project_a = Project.objects.create(name="Проект С группой")
         self.project_b = Project.objects.create(name="Проект без доступа")
@@ -303,6 +306,55 @@ class LeadAttendanceTests(TestCase):
         )
         self.assertTrue(
             WorkScore.objects.filter(meeting=meeting, intern=member_intern, score=8).exists(),
+        )
+
+    def test_other_direction_member_not_visible_or_markable_on_meeting(self):
+        """Бекенд-тимлид не видит и не может отмечать/оценивать фронтендера
+        на собрании — только своё направление (как и в «Команде»)."""
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import Attendance, MeetingKind, WorkScore
+
+        frontend_intern = Intern.objects.create(full_name="Фронтендер")
+        TeamMember.objects.create(
+            project=self.project_a, group=self.group, intern=frontend_intern,
+            role=TeamRole.FRONTEND, status=TeamMember.Status.ACTIVE,
+        )
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL,
+            date=__import__("datetime").date(2026, 9, 10),
+        )
+
+        detail_response = self.client.get(
+            reverse("lead_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
+        )
+        self.assertNotContains(detail_response, "Фронтендер")
+
+        mark_response = self.client.post(
+            reverse(
+                "lead_portal:meeting_mark_toggle",
+                args=[self.project_a.pk, meeting.pk],
+            ),
+            {"intern": frontend_intern.pk},
+        )
+        self.assertEqual(mark_response.status_code, 404)
+        self.assertFalse(
+            Attendance.objects.filter(meeting=meeting, intern=frontend_intern).exists(),
+        )
+
+        score_response = self.client.post(
+            reverse("lead_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
+            {"intern": frontend_intern.pk, "score": "8"},
+        )
+        self.assertEqual(score_response.status_code, 404)
+        self.assertFalse(
+            WorkScore.objects.filter(meeting=meeting, intern=frontend_intern).exists(),
+        )
+
+        self.client.post(
+            reverse("lead_portal:meeting_mark_all", args=[self.project_a.pk, meeting.pk]),
+        )
+        self.assertFalse(
+            Attendance.objects.filter(meeting=meeting, intern=frontend_intern).exists(),
         )
 
     def test_lead_cannot_be_marked_or_scored(self):

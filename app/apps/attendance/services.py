@@ -200,12 +200,19 @@ def toggle_mark(meeting, intern, user=None) -> Attendance | None:
 
 
 @transaction.atomic
-def mark_all_present(meeting, user=None) -> int:
-    """Отметить всю активную команду присутствующей на собрании."""
+def mark_all_present(meeting, user=None, only_role=None) -> int:
+    """Отметить всю активную команду присутствующей на собрании.
+
+    ``only_role`` — сузить до одного направления (например, тимлид
+    в своём портале отмечает только свою часть команды).
+    """
     created = 0
-    for member in attendance_eligible_members(meeting.group).filter(
+    members = attendance_eligible_members(meeting.group).filter(
         status='active',
-    ).exclude(intern__isnull=True):
+    ).exclude(intern__isnull=True)
+    if only_role:
+        members = members.filter(role=only_role)
+    for member in members:
         _, is_new = Attendance.objects.get_or_create(
             meeting=meeting, intern=member.intern,
             defaults={'status': Attendance.Status.PRESENT, 'marked_by': user},
