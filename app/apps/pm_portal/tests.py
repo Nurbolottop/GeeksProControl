@@ -35,6 +35,24 @@ class PmProjectOwnershipTests(TestCase):
         names = [p.name for p in response.context["projects"]]
         self.assertEqual(names, ["Проект A"])
 
+    def test_dashboard_status_filter(self):
+        from apps.projects.models import ProjectStatus
+
+        self.project_a.status = ProjectStatus.COMPLETED
+        self.project_a.save(update_fields=["status"])
+
+        response = self.client.get(reverse("pm_portal:dashboard"), {"status": "completed"})
+        names = [p.name for p in response.context["projects"]]
+        self.assertEqual(names, ["Проект A"])
+
+        response = self.client.get(reverse("pm_portal:dashboard"), {"status": "in_progress"})
+        names = [p.name for p in response.context["projects"]]
+        self.assertEqual(names, [])
+
+        response = self.client.get(reverse("pm_portal:dashboard"), {"status": "all"})
+        names = [p.name for p in response.context["projects"]]
+        self.assertEqual(names, ["Проект A"])
+
     def test_can_open_own_project(self):
         response = self.client.get(
             reverse("pm_portal:project_detail", args=[self.project_a.pk]),
@@ -159,6 +177,13 @@ class PmAttendanceTests(TestCase):
             project=self.project_a, group=self.group, intern=self.pm_intern,
             role=TeamRole.PROJECT_MANAGER, status=TeamMember.Status.ACTIVE,
         )
+        # ПМ/тимлид не отмечают посещаемость и не получают «Активность» —
+        # для этого нужен обычный стажёр команды.
+        self.dev_intern = Intern.objects.create(full_name="Стажёров Бэкендер")
+        TeamMember.objects.create(
+            project=self.project_a, group=self.group, intern=self.dev_intern,
+            role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
+        )
         self.client.force_login(self.pm_user)
 
     def test_no_group_shows_empty_state(self):
@@ -209,10 +234,10 @@ class PmAttendanceTests(TestCase):
                 "pm_portal:meeting_mark_toggle",
                 args=[self.project_a.pk, meeting.pk],
             ),
-            {"intern": self.pm_intern.pk},
+            {"intern": self.dev_intern.pk},
         )
         self.assertTrue(
-            Attendance.objects.filter(meeting=meeting, intern=self.pm_intern).exists(),
+            Attendance.objects.filter(meeting=meeting, intern=self.dev_intern).exists(),
         )
 
     def test_toggle_mark_is_ajax_returns_partial_not_redirect(self):
@@ -227,10 +252,10 @@ class PmAttendanceTests(TestCase):
                 "pm_portal:meeting_mark_toggle",
                 args=[self.project_a.pk, meeting.pk],
             ),
-            {"intern": self.pm_intern.pk},
+            {"intern": self.dev_intern.pk},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f'id="mark-{self.pm_intern.pk}"')
+        self.assertContains(response, f'id="mark-{self.dev_intern.pk}"')
         self.assertContains(response, "Был")
 
     def test_score_person_creates_work_score(self):
@@ -242,11 +267,44 @@ class PmAttendanceTests(TestCase):
         )
         response = self.client.post(
             reverse("pm_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
-            {"intern": self.pm_intern.pk, "score": "8"},
+            {"intern": self.dev_intern.pk, "score": "8"},
         )
         self.assertEqual(response.status_code, 200)
-        score = WorkScore.objects.get(meeting=meeting, intern=self.pm_intern)
+        score = WorkScore.objects.get(meeting=meeting, intern=self.dev_intern)
         self.assertEqual(score.score, 8)
+
+    def test_pm_cannot_be_marked_or_scored(self):
+        """ПМ/тимлид не отмечаются и не оцениваются — их вообще нет
+        в табеле собрания."""
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import Attendance, MeetingKind, WorkScore
+
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL, date=datetime.date(2026, 9, 10),
+        )
+        mark_response = self.client.post(
+            reverse(
+                "pm_portal:meeting_mark_toggle",
+                args=[self.project_a.pk, meeting.pk],
+            ),
+            {"intern": self.pm_intern.pk},
+        )
+        self.assertEqual(mark_response.status_code, 404)
+        self.assertFalse(
+            Attendance.objects.filter(meeting=meeting, intern=self.pm_intern).exists(),
+        )
+
+        score_response = self.client.post(
+            reverse("pm_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
+            {"intern": self.pm_intern.pk, "score": "8"},
+        )
+        self.assertEqual(score_response.status_code, 404)
+        self.assertFalse(WorkScore.objects.filter(meeting=meeting, intern=self.pm_intern).exists())
+
+        detail_response = self.client.get(
+            reverse("pm_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
+        )
+        self.assertNotContains(detail_response, "Project Manager")
 
     def test_cannot_score_on_foreign_project(self):
         from apps.flows.models import Flow, Group
@@ -278,7 +336,8 @@ class PmAttendanceTests(TestCase):
             reverse("pm_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
         )
         self.assertContains(response, "Активность")
-        self.assertContains(response, "Project Manager")
+        self.assertContains(response, "Backend")
+        self.assertNotContains(response, "Project Manager")
 
 
 class PmEvaluationTests(PmProjectOwnershipTests):

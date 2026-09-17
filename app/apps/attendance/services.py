@@ -8,6 +8,17 @@ from django.utils import timezone
 from apps.attendance.models import (
     Attendance, GroupMeeting, MeetingKind, WorkScore,
 )
+from apps.teams.models import TeamRole
+
+# Посещаемость и «Активность» ставят только стажёрам команды — ПМ и
+# тимлид не студенты, их в табеле быть не должно (ТЗ, реплика
+# пользователя: «пусть в табеле... не будут выходить ПМ и тимлиды»).
+ATTENDANCE_EXCLUDED_ROLES = (TeamRole.PROJECT_MANAGER, TeamRole.TEAM_LEAD)
+
+
+def attendance_eligible_members(group):
+    """Участники группы, которых можно отмечать/оценивать — без ПМ и тимлида."""
+    return group.members.exclude(role__in=ATTENDANCE_EXCLUDED_ROLES)
 
 
 def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -47,7 +58,7 @@ def build_sheet(group, year: int, month: int) -> dict:
         .order_by('date', 'kind'),
     )
     members = [
-        member for member in group.members.select_related(
+        member for member in attendance_eligible_members(group).select_related(
             'intern__specialization',
         ).order_by('role', 'intern__full_name')
         if member.intern_id
@@ -192,7 +203,7 @@ def toggle_mark(meeting, intern, user=None) -> Attendance | None:
 def mark_all_present(meeting, user=None) -> int:
     """Отметить всю активную команду присутствующей на собрании."""
     created = 0
-    for member in meeting.group.members.filter(
+    for member in attendance_eligible_members(meeting.group).filter(
         status='active',
     ).exclude(intern__isnull=True):
         _, is_new = Attendance.objects.get_or_create(

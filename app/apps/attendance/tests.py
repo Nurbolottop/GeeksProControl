@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
+from apps.attendance.models import Attendance, GroupMeeting, MeetingKind, WorkScore
 from apps.flows.models import Flow, Group
 from apps.interns.models import Intern
 from apps.projects.models import Project
@@ -97,7 +97,7 @@ class MeetingScoreTests(TestCase):
         other = Intern.objects.create(full_name='Алтынай')
         TeamMember.objects.create(
             group=self.group, project=self.group.project, intern=other,
-            role=TeamRole.PROJECT_MANAGER, workload=50,
+            role=TeamRole.FRONTEND, workload=50,
         )
         WorkScore.objects.create(
             meeting=self.meeting, intern=self.person, score=9,
@@ -115,3 +115,31 @@ class MeetingScoreTests(TestCase):
         self.assertContains(response, 'Кто был на собрании')
         self.assertContains(response, 'Как работал за период')
         self.assertContains(response, '12.08.2026')
+
+    def test_pm_and_lead_excluded_from_marking_and_scoring(self):
+        """ПМ и тимлид не студенты — их не отмечают и не оценивают,
+        даже прямым POST мимо интерфейса."""
+        pm = Intern.objects.create(full_name='Тестов ПМ')
+        TeamMember.objects.create(
+            group=self.group, project=self.group.project, intern=pm,
+            role=TeamRole.PROJECT_MANAGER, workload=50,
+        )
+
+        detail = self.client.get(
+            reverse('attendance:meeting_detail', args=[self.meeting.pk]),
+        )
+        self.assertNotContains(detail, pm.full_name)
+
+        mark_response = self.client.post(
+            reverse('attendance:mark_person', args=[self.meeting.pk]),
+            {'intern': pm.pk, 'status': 'present'},
+        )
+        self.assertEqual(mark_response.status_code, 404)
+        self.assertFalse(Attendance.objects.filter(meeting=self.meeting, intern=pm).exists())
+
+        score_response = self.client.post(
+            reverse('attendance:score_person', args=[self.meeting.pk]),
+            {'intern': pm.pk, 'score': '9'},
+        )
+        self.assertEqual(score_response.status_code, 404)
+        self.assertFalse(WorkScore.objects.filter(meeting=self.meeting, intern=pm).exists())

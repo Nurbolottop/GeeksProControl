@@ -34,6 +34,20 @@ class LeadProjectOwnershipTests(TestCase):
         names = [p.name for p in response.context["projects"]]
         self.assertEqual(names, ["Проект A"])
 
+    def test_dashboard_status_filter(self):
+        from apps.projects.models import ProjectStatus
+
+        self.project_a.status = ProjectStatus.COMPLETED
+        self.project_a.save(update_fields=["status"])
+
+        response = self.client.get(reverse("lead_portal:dashboard"), {"status": "completed"})
+        names = [p.name for p in response.context["projects"]]
+        self.assertEqual(names, ["Проект A"])
+
+        response = self.client.get(reverse("lead_portal:dashboard"), {"status": "in_progress"})
+        names = [p.name for p in response.context["projects"]]
+        self.assertEqual(names, [])
+
     def test_can_open_own_project(self):
         response = self.client.get(
             reverse("lead_portal:project_detail", args=[self.project_a.pk]),
@@ -208,6 +222,42 @@ class LeadAttendanceTests(TestCase):
         self.assertTrue(
             WorkScore.objects.filter(meeting=meeting, intern=member_intern, score=8).exists(),
         )
+
+    def test_lead_cannot_be_marked_or_scored(self):
+        """Тимлид не отмечается и не оценивается — его нет в табеле
+        собственного собрания."""
+        from apps.attendance import services as attendance_services
+        from apps.attendance.models import Attendance, MeetingKind, WorkScore
+
+        meeting = attendance_services.create_meeting(
+            self.group, kind=MeetingKind.INTERNAL,
+            date=__import__("datetime").date(2026, 9, 10),
+        )
+        mark_response = self.client.post(
+            reverse(
+                "lead_portal:meeting_mark_toggle",
+                args=[self.project_a.pk, meeting.pk],
+            ),
+            {"intern": self.lead_intern.pk},
+        )
+        self.assertEqual(mark_response.status_code, 404)
+        self.assertFalse(
+            Attendance.objects.filter(meeting=meeting, intern=self.lead_intern).exists(),
+        )
+
+        score_response = self.client.post(
+            reverse("lead_portal:meeting_score", args=[self.project_a.pk, meeting.pk]),
+            {"intern": self.lead_intern.pk, "score": "8"},
+        )
+        self.assertEqual(score_response.status_code, 404)
+        self.assertFalse(
+            WorkScore.objects.filter(meeting=meeting, intern=self.lead_intern).exists(),
+        )
+
+        detail_response = self.client.get(
+            reverse("lead_portal:meeting_detail", args=[self.project_a.pk, meeting.pk]),
+        )
+        self.assertNotContains(detail_response, "Team Lead")
 
     def test_cannot_reach_meeting_from_foreign_group(self):
         from apps.flows.models import Flow, Group

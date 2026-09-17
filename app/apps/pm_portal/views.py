@@ -23,10 +23,24 @@ from apps.teams.selectors import group_by_role
 @login_required
 def dashboard(request):
     """Список проектов, где текущий пользователь — активный ПМ."""
-    projects = list(services.pm_projects(request.user))
+    from apps.projects.models import ProjectStatus
+
+    category = request.GET.get('status', 'all')
+    projects = services.pm_projects(request.user)
+    if category == 'in_progress':
+        projects = projects.filter(status__in=[ProjectStatus.ACTIVE, ProjectStatus.PAUSED])
+    elif category == 'completed':
+        projects = projects.filter(status=ProjectStatus.COMPLETED)
+    elif category == 'cancelled':
+        projects = projects.filter(status__in=[ProjectStatus.CANCELLED, ProjectStatus.REFUSED])
+    else:
+        category = 'all'
+    projects = list(projects)
     for project in projects:
         project.stage_check_needed = stage_reminders.needs_stage_check(project)
-    return render(request, 'pm_portal/dashboard.html', {'projects': projects})
+    return render(request, 'pm_portal/dashboard.html', {
+        'projects': projects, 'category': category,
+    })
 
 
 @login_required
@@ -158,7 +172,8 @@ def meeting_detail(request, pk, meeting_pk):
     scores = {score.intern_id: score for score in meeting.scores.all()}
     previous = attendance_services.previous_scores(meeting)
     members = list(
-        group.members.select_related('intern__specialization')
+        attendance_services.attendance_eligible_members(group)
+        .select_related('intern__specialization')
         .filter(intern__isnull=False).order_by('role', 'intern__full_name'),
     )
     for member in members:
@@ -199,7 +214,8 @@ def meeting_score(request, pk, meeting_pk):
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(
-        group.members.select_related('intern__specialization').filter(intern__isnull=False),
+        attendance_services.attendance_eligible_members(group)
+        .select_related('intern__specialization').filter(intern__isnull=False),
         intern_id=request.POST.get('intern'),
     )
     intern = member.intern
@@ -252,7 +268,8 @@ def meeting_mark_toggle(request, pk, meeting_pk):
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(
-        group.members.filter(intern__isnull=False), intern_id=request.POST.get('intern'),
+        attendance_services.attendance_eligible_members(group)
+        .filter(intern__isnull=False), intern_id=request.POST.get('intern'),
     )
     member.mark = attendance_services.toggle_mark(meeting, member.intern, user=request.user)
     return render(request, 'pm_portal/partials/mark_row.html', {

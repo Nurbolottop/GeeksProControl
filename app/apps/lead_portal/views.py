@@ -21,13 +21,26 @@ from apps.training.models import Specialization
 def dashboard(request):
     """Список проектов, где текущий пользователь — активный тимлид."""
     from apps.notifications.services import personal
+    from apps.projects.models import ProjectStatus
     from apps.reserve.services import reserve_card_of
+
+    category = request.GET.get('status', 'all')
+    projects = services.lead_projects(request.user)
+    if category == 'in_progress':
+        projects = projects.filter(status__in=[ProjectStatus.ACTIVE, ProjectStatus.PAUSED])
+    elif category == 'completed':
+        projects = projects.filter(status=ProjectStatus.COMPLETED)
+    elif category == 'cancelled':
+        projects = projects.filter(status__in=[ProjectStatus.CANCELLED, ProjectStatus.REFUSED])
+    else:
+        category = 'all'
 
     notifications = list(personal(getattr(request.user, 'intern_profile', None)))
     response = render(request, 'lead_portal/dashboard.html', {
-        'projects': list(services.lead_projects(request.user)),
+        'projects': list(projects),
         'resume': reserve_card_of(request.user),
         'notifications': notifications,
+        'category': category,
     })
     # показали на главной — значит прочитано; висит, пока не нажмут «Понятно»
     unread = [note.pk for note in notifications if not note.is_read]
@@ -223,7 +236,8 @@ def meeting_detail(request, pk, meeting_pk):
     scores = {score.intern_id: score for score in meeting.scores.all()}
     previous = attendance_services.previous_scores(meeting)
     members = list(
-        group.members.select_related('intern__specialization')
+        attendance_services.attendance_eligible_members(group)
+        .select_related('intern__specialization')
         .filter(intern__isnull=False).order_by('role', 'intern__full_name'),
     )
     for member in members:
@@ -264,7 +278,8 @@ def meeting_mark_toggle(request, pk, meeting_pk):
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(
-        group.members.filter(intern__isnull=False), intern_id=request.POST.get('intern'),
+        attendance_services.attendance_eligible_members(group)
+        .filter(intern__isnull=False), intern_id=request.POST.get('intern'),
     )
     member.mark = attendance_services.toggle_mark(meeting, member.intern, user=request.user)
     return render(request, 'lead_portal/partials/mark_row.html', {
@@ -292,7 +307,8 @@ def meeting_score(request, pk, meeting_pk):
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(
-        group.members.select_related('intern__specialization').filter(intern__isnull=False),
+        attendance_services.attendance_eligible_members(group)
+        .select_related('intern__specialization').filter(intern__isnull=False),
         intern_id=request.POST.get('intern'),
     )
     intern = member.intern

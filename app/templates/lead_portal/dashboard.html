@@ -31,6 +31,12 @@
         </a>
     </div>
 {% endif %}
+<div class="tabs">
+    <a href="?status=all" class="{% if category == 'all' %}is-active{% endif %}">Все</a>
+    <a href="?status=in_progress" class="{% if category == 'in_progress' %}is-active{% endif %}">В процессе</a>
+    <a href="?status=completed" class="{% if category == 'completed' %}is-active{% endif %}">Завершён</a>
+    <a href="?status=cancelled" class="{% if category == 'cancelled' %}is-active{% endif %}">Отменён</a>
+</div>
 <div class="panel" style="padding: 0;">
     <div class="table-wrap">
         <table class="data">
@@ -47,7 +53,7 @@
                     <td>{% include 'projects/partials/status_badge.html' with status=project.status %}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="2" class="empty" style="text-align:center; padding: 24px;">Вы пока не назначены тимлидом ни на один проект.</td></tr>
+                <tr><td colspan="2" class="empty" style="text-align:center; padding: 24px;">Проектов с таким статусом нет.</td></tr>
             {% endfor %}
             </tbody>
         </table>

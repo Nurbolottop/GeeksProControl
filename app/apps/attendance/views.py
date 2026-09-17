@@ -151,6 +151,10 @@ def toggle(request, pk):
     if request.method != 'POST':
         raise Http404
     intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
+    if meeting.group.members.filter(
+        intern=intern, role__in=services.ATTENDANCE_EXCLUDED_ROLES,
+    ).exists():
+        raise Http404
     mark = services.toggle_mark(meeting, intern, user=request.user)
     score = WorkScore.objects.filter(meeting=meeting, intern=intern).first()
     return render(request, 'attendance/partials/cell.html', {
@@ -227,7 +231,7 @@ def group_meetings(request, pk):
         .prefetch_related('attendance', 'scores')
         .order_by('-date'),
     )
-    people = group.members.filter(
+    people = services.attendance_eligible_members(group).filter(
         status='active', intern__isnull=False,
     ).count()
     for meeting in meetings:
@@ -255,7 +259,8 @@ def meeting_detail(request, pk):
         pk=pk,
     )
     members = list(
-        meeting.group.members.select_related('intern__specialization')
+        services.attendance_eligible_members(meeting.group)
+        .select_related('intern__specialization')
         .filter(intern__isnull=False)
         .order_by('role', 'intern__full_name'),
     )
@@ -316,6 +321,10 @@ def mark_person(request, pk):
     if request.method != 'POST':
         raise Http404
     intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
+    if meeting.group.members.filter(
+        intern=intern, role__in=services.ATTENDANCE_EXCLUDED_ROLES,
+    ).exists():
+        raise Http404
     status = request.POST.get('status', '')
 
     mark = Attendance.objects.filter(meeting=meeting, intern=intern).first()
@@ -350,6 +359,10 @@ def score_person(request, pk):
     if request.method != 'POST':
         raise Http404
     intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
+    if meeting.group.members.filter(
+        intern=intern, role__in=services.ATTENDANCE_EXCLUDED_ROLES,
+    ).exists():
+        raise Http404
     entry = WorkScore.objects.filter(meeting=meeting, intern=intern).first()
 
     if 'comment' in request.POST:
