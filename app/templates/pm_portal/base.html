@@ -16,6 +16,7 @@
     <header class="pm-topbar">
         <a href="{% url 'pm_portal:dashboard' %}" class="pm-topbar__brand">Geeks<span>Pro</span> · Портал ПМ</a>
         <div class="pm-topbar__user">
+            <span class="pm-topbar__avatar">{{ request.user.display_name|first|upper }}</span>
             {{ request.user.display_name }}
             <form method="post" action="{% url 'logout' %}" style="display:inline; margin:0">
                 {% csrf_token %}

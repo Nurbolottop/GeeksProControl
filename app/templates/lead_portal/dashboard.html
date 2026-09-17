@@ -3,12 +3,24 @@
 {% block title %}Мои проекты — Портал тимлида{% endblock %}
 
 {% block content %}
-<h1>Мои проекты</h1>
-<div class="lead-grid" style="margin-top: 16px">
+<div class="page-head">
+    <div>
+        <h1>Мои проекты</h1>
+        <div class="sub">Проектов в работе: {{ projects|length }}</div>
+    </div>
+</div>
+<div class="lead-grid">
     {% for project in projects %}
         <a href="{% url 'lead_portal:project_detail' project.pk %}" class="lead-card" style="text-decoration: none; display: block;">
-            <div class="lead-card__name">{{ project.name }}</div>
-            <div class="lead-card__count">{{ project.get_status_display }}</div>
+            <div class="lead-card__head">
+                <div class="lead-card__avatar">{{ project.name|first|upper }}</div>
+                <div class="lead-card__info">
+                    <span class="lead-card__name">{{ project.name }}</span>
+                    <span class="lead-card__count">
+                        {% include 'projects/partials/status_badge.html' with status=project.status %}
+                    </span>
+                </div>
+            </div>
         </a>
     {% empty %}
         <div class="empty">Вы пока не назначены тимлидом ни на один проект.</div>

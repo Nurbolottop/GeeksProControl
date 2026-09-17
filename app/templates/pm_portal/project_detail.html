@@ -4,9 +4,21 @@
 
 {% block content %}
 <p><a href="{% url 'pm_portal:dashboard' %}">← Мои проекты</a></p>
-<h1>{{ project.name }}</h1>
+<div class="page-head">
+    <div>
+        <h1>{{ project.name }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            {% include 'projects/partials/status_badge.html' with status=project.status %}
+            {% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}
+        </div>
+    </div>
+    <div class="progress" style="min-width: 160px;">
+        <div class="progress__bar"><div class="progress__fill" style="width: {{ project.progress }}%"></div></div>
+        <span class="progress__label">{{ project.progress }}%</span>
+    </div>
+</div>
 
-<div class="tabs" style="margin-top: 16px">
+<div class="tabs">
     <a href="?tab=overview" class="{% if tab == 'overview' %}is-active{% endif %}">Обзор</a>
     <a href="?tab=stages" class="{% if tab == 'stages' %}is-active{% endif %}">Этапы{% if stage_check_needed %}<span class="pm-dot" title="Сверьте этапы"></span>{% endif %}</a>
     <a href="?tab=report" class="{% if tab == 'report' %}is-active{% endif %}">Отчёт</a>
@@ -31,10 +43,7 @@
 {% else %}
     <div class="panel">
         <dl class="def-grid">
-            <div class="def"><dt>Статус</dt><dd>{{ project.get_status_display }}</dd></div>
-            <div class="def"><dt>Этап</dt><dd>{% include 'projects/partials/stage_badge.html' with stage_key=project.current_stage stage_display=project.get_current_stage_display %}</dd></div>
             <div class="def"><dt>Срок</dt><dd>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</dd></div>
-            <div class="def"><dt>Прогресс</dt><dd>{{ project.progress }}%</dd></div>
             <div class="def"><dt>Клиент</dt><dd>{{ project.client|default:'—' }}</dd></div>
             <div class="def"><dt>Плановая дата завершения</dt><dd>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
         </dl>
