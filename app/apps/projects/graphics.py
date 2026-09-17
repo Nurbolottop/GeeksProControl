@@ -173,3 +173,29 @@ def stage_timeline(roadmap: dict) -> list[dict]:
             'overdue': overdue,
         })
     return rows
+
+
+def road_data(roadmap: dict) -> dict:
+    """То, что скрипт дороги этапов берёт из json_script на странице."""
+    return {
+        'stages': [
+            {'title': s['title'], 'state': s['state'], 'index': s['index']}
+            for s in roadmap['segments']
+        ],
+        'marker': roadmap['marker'],
+    }
+
+
+def graphics_context(project) -> dict:
+    """Всё для вкладки «Графика»: путь, плитки, хронология, данные дороги.
+
+    Одна сборка на все места, где графика показывается, — основное
+    приложение и портал ПМ, чтобы картинка нигде не разъезжалась.
+    """
+    roadmap = stage_roadmap(project)
+    return {
+        'roadmap': roadmap,
+        'pulse': project_pulse(project, roadmap),
+        'timeline': stage_timeline(roadmap),
+        'road_data': road_data(roadmap),
+    }

@@ -33,13 +33,7 @@ def lead_overview(project, own_role) -> dict:
     since = today - datetime.timedelta(days=WINDOW_DAYS)
 
     roadmap = graphics.stage_roadmap(project)
-    road_data = {
-        'stages': [
-            {'title': s['title'], 'state': s['state'], 'index': s['index']}
-            for s in roadmap['segments']
-        ],
-        'marker': roadmap['marker'],
-    }
+    road_data = graphics.road_data(roadmap)
 
     members = (
         project.team_members.filter(status=TeamMember.Status.ACTIVE, intern__isnull=False)

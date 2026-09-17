@@ -200,17 +200,7 @@ def project_detail(request, pk):
     }
     if tab == 'graphics':
         from apps.projects import graphics
-        roadmap = graphics.stage_roadmap(project)
-        context['roadmap'] = roadmap
-        context['pulse'] = graphics.project_pulse(project, roadmap)
-        context['timeline'] = graphics.stage_timeline(roadmap)
-        context['road_data'] = {
-            'stages': [
-                {'title': s['title'], 'state': s['state'], 'index': s['index']}
-                for s in roadmap['segments']
-            ],
-            'marker': roadmap['marker'],
-        }
+        context.update(graphics.graphics_context(project))
     elif tab == 'tasks':
         from apps.tasks.models import TaskStatus
         context['tasks'] = (

@@ -853,3 +853,51 @@ class PmStageTests(PmProjectOwnershipTests):
             {"next": "https://evil.example.com/"},
         )
         self.assertEqual(response["Location"], self.stages_url)
+
+
+class PmOverviewGraphicsTests(PmProjectOwnershipTests):
+    """«Обзор» ПМ показывает графику проекта — как вкладка «Графика»."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.projects.services import create_project
+
+        create_project(self.project_a)
+        self.url = reverse("pm_portal:project_detail", args=[self.project_a.pk])
+
+    def test_overview_has_road_tiles_and_timeline(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Путь проекта")
+        self.assertContains(response, 'id="gx-road-data"')
+        labels = [tile["label"] for tile in response.context["pulse"]]
+        self.assertIn("в работе", labels)
+        self.assertIn("последний отчёт", labels)
+        self.assertNotContains(response, "Кладётся внутрь")
+
+    def test_same_data_as_main_app_graphics(self):
+        from apps.projects.graphics import graphics_context
+
+        response = self.client.get(self.url)
+        expected = graphics_context(self.project_a)
+        self.assertEqual(response.context["road_data"], expected["road_data"])
+        self.assertEqual(response.context["roadmap"]["percent"], expected["roadmap"]["percent"])
+
+    def test_other_tabs_do_not_build_graphics(self):
+        response = self.client.get(self.url + "?tab=team")
+        self.assertNotIn("roadmap", response.context)
+
+    def test_foreign_project_overview_is_closed(self):
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project_b.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_timeline_line_has_no_leading_separator(self):
+        from apps.pm_portal.stages import set_stage_status
+
+        stage = self.project_a.stages.get(key="new")
+        set_stage_status(self.project_a, stage, "done")
+        html = self.client.get(self.url).content.decode()
+        self.assertIn("закрыт", html)
+        self.assertNotRegex(html, r"<span>\s*·\s*закрыт")

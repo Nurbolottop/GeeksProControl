@@ -31,8 +31,8 @@
                             <b>{{ row.segment.title }}</b>
                             <span>
                                 {% if row.start %}начат {{ row.start|date:'d.m.Y' }}{% endif %}
-                                {% if row.end %} · закрыт {{ row.end|date:'d.m.Y' }}
-                                {% elif row.deadline %} · срок {{ row.deadline|date:'d.m.Y' }}{% endif %}
+                                {% if row.end %}{% if row.start %} · {% endif %}закрыт {{ row.end|date:'d.m.Y' }}
+                                {% elif row.deadline %}{% if row.start %} · {% endif %}срок {{ row.deadline|date:'d.m.Y' }}{% endif %}
                             </span>
                         </div>
                         <span class="gx-timeline__tag">

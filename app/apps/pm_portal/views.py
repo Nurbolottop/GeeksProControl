@@ -92,6 +92,12 @@ def project_detail(request, pk):
         context['project_brief'] = getattr(project, 'brief', None)
     elif tab == 'client':
         context['client'] = project.client
+    else:
+        # «Обзор»: путь проекта, живые цифры и хронология — как «Графика»
+        # в основном приложении
+        from apps.projects.graphics import graphics_context
+
+        context.update(graphics_context(project))
     return render(request, 'pm_portal/project_detail.html', context)
 
 

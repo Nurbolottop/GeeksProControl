@@ -41,7 +41,8 @@
 {% elif tab == 'client' %}
     {% include 'pm_portal/partials/tab_client.html' %}
 {% else %}
-    <div class="panel">
+    {% include 'projects/partials/tab_graphics.html' %}
+    <div class="panel" style="margin-top: 18px;">
         <dl class="def-grid">
             <div class="def"><dt>Срок</dt><dd>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</dd></div>
             <div class="def"><dt>Клиент</dt><dd>{{ project.client|default:'—' }}</dd></div>
