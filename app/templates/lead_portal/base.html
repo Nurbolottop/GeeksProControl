@@ -17,7 +17,9 @@
         <a href="{% url 'lead_portal:dashboard' %}" class="pm-topbar__brand">Geeks<span>Pro</span> · Портал тимлида</a>
         <div class="pm-topbar__user">
             <a href="{% url 'lead_portal:resume' %}" style="color: inherit; font-weight: 600; text-decoration: none; margin-right: 14px;">Моё резюме</a>
-            <span class="pm-topbar__avatar">{{ request.user.display_name|first|upper }}</span>
+            <span class="pm-topbar__avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+            </span>
             {{ request.user.display_name }}
             <form method="post" action="{% url 'logout' %}" style="display:inline; margin:0">
                 {% csrf_token %}

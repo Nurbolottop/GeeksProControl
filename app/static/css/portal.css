@@ -56,7 +56,12 @@ body.page-lead-portal { --accent-2: #34d399; --ink: #12312c; --ink-muted: #5a746
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     color: #fff;
     box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
+.pm-shell .pm-topbar__avatar svg { width: 17px; height: 17px; }
 .pm-shell .pm-topbar .btn--ghost {
     color: var(--ink-muted);
     border-color: rgba(20, 20, 40, .14);
