@@ -407,6 +407,64 @@ class GrantPMAccessTests(TestCase):
         self.assertTrue(self.pm.user.check_password("secondpass123"))
 
 
+class GrantLeadAccessTests(TestCase):
+    """Выдача логина тимлиду со страницы стажёра — тот же принцип, что
+    и у ПМ, но своя роль/портал."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        self.user = get_user_model().objects.create_user(
+            username="head3", password="x",
+        )
+        self.client.force_login(self.user)
+        self.project = Project.objects.create(name="Кундолук")
+        self.lead = Intern.objects.create(full_name="Тестов Тимлид")
+        self.dev = Intern.objects.create(full_name="Тестов Фронтендер")
+        TeamMember.objects.create(
+            project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.dev, role=TeamRole.FRONTEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+    def test_button_shown_only_for_lead(self):
+        lead_page = self.client.get(self.lead.get_absolute_url())
+        self.assertContains(lead_page, "Выдать доступ тимлида")
+        dev_page = self.client.get(self.dev.get_absolute_url())
+        self.assertNotContains(dev_page, "Выдать доступ тимлида")
+
+    def test_granting_access_creates_linked_user_with_lead_role(self):
+        from apps.accounts.models import User
+
+        self.client.post(reverse("interns:grant_lead_access", args=[self.lead.pk]), {
+            "username": "+996700000098", "password": "somepass123",
+        })
+        self.lead.refresh_from_db()
+        self.assertIsNotNone(self.lead.user)
+        self.assertEqual(self.lead.user.username, "+996700000098")
+        self.assertEqual(self.lead.user.role, User.Role.TEAM_LEAD)
+        self.assertTrue(self.lead.user.check_password("somepass123"))
+
+    def test_resetting_password_keeps_same_user(self):
+        self.client.post(reverse("interns:grant_lead_access", args=[self.lead.pk]), {
+            "username": "+996700000098", "password": "firstpass123",
+        })
+        self.lead.refresh_from_db()
+        first_user_id = self.lead.user_id
+
+        self.client.post(reverse("interns:grant_lead_access", args=[self.lead.pk]), {
+            "username": "+996700000098", "password": "secondpass123",
+        })
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.user_id, first_user_id)
+        self.assertTrue(self.lead.user.check_password("secondpass123"))
+
+
 class ResumeBankListTests(TestCase):
     """«Банк резюме» — включая тимлидов, в отличие от общего списка
     стажёров."""

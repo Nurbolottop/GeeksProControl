@@ -18,6 +18,8 @@ class RoleAwareLoginView(auth_views.LoginView):
     def get_success_url(self):
         if self.request.user.role == User.Role.PROJECT_MANAGER:
             return reverse('pm_portal:dashboard')
+        if self.request.user.role == User.Role.TEAM_LEAD:
+            return reverse('lead_portal:dashboard')
         return super().get_success_url()
 
 

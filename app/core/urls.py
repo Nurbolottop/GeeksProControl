@@ -47,6 +47,7 @@ urlpatterns = [
     path('resources/', include('apps.resources.urls')),
     path('reports/', include('apps.reports.urls')),
     path('pm/', include('apps.pm_portal.urls')),
+    path('lead/', include('apps.lead_portal.urls')),
     path('academy/', include('apps.training.urls')),
     path('scripts/', include('apps.scripts.urls')),
 ]

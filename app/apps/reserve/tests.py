@@ -202,8 +202,11 @@ class ReservePermissionTests(TestCase):
 
     def setUp(self):
         self.candidate = ReserveCandidate.objects.create(full_name='Кандидат')
-        self.lead = User.objects.create_user(
-            username='lead', password='pass12345', role=User.Role.TEAM_LEAD,
+        # Не head/administrator, и не ПМ/тимлид — у тех своя портальная
+        # зона и middleware туда не пускает вовсе; тут нужна роль без
+        # отдельного портала, чтобы дойти до самой проверки прав.
+        self.viewer = User.objects.create_user(
+            username='viewer', password='pass12345', role=User.Role.INTERN,
         )
         self.head = User.objects.create_user(
             username='head', password='pass12345', role=User.Role.HEAD,
@@ -214,8 +217,8 @@ class ReservePermissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login/', response['Location'])
 
-    def test_team_lead_can_view_but_not_change(self):
-        self.client.force_login(self.lead)
+    def test_non_editor_can_view_but_not_change(self):
+        self.client.force_login(self.viewer)
         self.assertEqual(self.client.get(reverse('reserve:list')).status_code, 200)
         self.assertEqual(
             self.client.get(reverse('reserve:detail', args=[self.candidate.pk])).status_code,
@@ -228,6 +231,16 @@ class ReservePermissionTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.candidate.refresh_from_db()
         self.assertEqual(self.candidate.status, CandidateStatus.NEW)
+
+    def test_team_lead_is_walled_off_to_own_portal(self):
+        """Тимлид теперь портальная роль, как ПМ — общий сайт (включая
+        резерв) ему недоступен вообще, его уводит в /lead/."""
+        lead = User.objects.create_user(
+            username='lead', password='pass12345', role=User.Role.TEAM_LEAD,
+        )
+        self.client.force_login(lead)
+        response = self.client.get(reverse('reserve:list'))
+        self.assertRedirects(response, reverse('lead_portal:dashboard'))
 
     def test_head_can_change_status(self):
         self.client.force_login(self.head)
@@ -510,10 +523,14 @@ class ReserveShareLinkTests(TestCase):
         self.assertTrue(self.candidate.events.filter(kind=EventKind.SHARED).exists())
 
     def test_viewer_without_role_cannot_create_link(self):
-        lead = User.objects.create_user(
-            username='lead', password='pass12345', role=User.Role.TEAM_LEAD,
+        # Не head/administrator — ни ПМ, ни тимлид не подходят: у обоих
+        # свой портал и туда их уводит middleware раньше, чем сработает
+        # проверка прав здесь, так что для этой проверки нужна роль без
+        # отдельного портала.
+        viewer = User.objects.create_user(
+            username='viewer', password='pass12345', role=User.Role.INTERN,
         )
-        self.client.force_login(lead)
+        self.client.force_login(viewer)
         response = self.client.post(
             reverse('reserve:share_create', args=[self.candidate.pk]), {},
         )
@@ -603,10 +620,12 @@ class ReserveShareCollectionTests(TestCase):
         self.assertEqual(set(link.candidates.all()), {self.first, self.second})
 
     def test_viewer_without_role_cannot_create_collection(self):
-        lead = User.objects.create_user(
-            username='lead', password='pass12345', role=User.Role.TEAM_LEAD,
+        # См. комментарий в test_viewer_without_role_cannot_create_link —
+        # ПМ/тимлид тут не годятся, у них свой портал и свой middleware.
+        viewer = User.objects.create_user(
+            username='viewer2', password='pass12345', role=User.Role.INTERN,
         )
-        self.client.force_login(lead)
+        self.client.force_login(viewer)
         response = self.client.post(
             reverse('reserve:share_collection_create'), {'ttl_days': '30'},
         )

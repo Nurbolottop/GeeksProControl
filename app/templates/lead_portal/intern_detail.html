@@ -1,0 +1,52 @@
+{% extends 'lead_portal/base.html' %}
+
+{% block title %}{{ intern.full_name }} — Портал тимлида{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'lead_portal:project_detail' project.pk %}?tab=team">← Команда</a></p>
+<div class="page-head">
+    <div>
+        <h1>{{ intern.full_name }}</h1>
+        <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+            <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
+            <span class="badge badge--gray">{{ member.get_role_display }}</span>
+            {% if average_score is not None %}
+                <span class="badge badge--{% if average_score >= 8 %}green{% elif average_score >= 5 %}yellow{% else %}red{% endif %}">
+                    Активность: {{ average_score }}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <h2>Карточка</h2>
+    <dl class="def-grid">
+        <div class="def"><dt>Телефон</dt><dd>{{ intern.phone|default:'—' }}</dd></div>
+        <div class="def"><dt>Email</dt><dd>{{ intern.email|default:'—' }}</dd></div>
+        <div class="def"><dt>Telegram</dt><dd>{{ intern.telegram|default:'—' }}</dd></div>
+        <div class="def"><dt>Город</dt><dd>{{ intern.city|default:'—' }}</dd></div>
+        <div class="def"><dt>Филиал</dt><dd>{{ intern.branch|default:'—' }}</dd></div>
+        <div class="def"><dt>Начало стажировки</dt><dd>{{ intern.internship_start_date|date:'d.m.Y'|default:'—' }}</dd></div>
+        <div class="def"><dt>Стажировка по счёту</dt><dd>{{ intern.internship_attempt }}-й раз</dd></div>
+    </dl>
+</div>
+
+<div class="panel">
+    <div class="panel-head">
+        <h2>Активность по собраниям ({{ scores|length }})</h2>
+        <a href="{% url 'lead_portal:project_detail' project.pk %}?tab=attendance" class="btn btn--secondary btn--sm">Табель</a>
+    </div>
+    {% for item in scores %}
+        <div style="padding: 10px 0; border-bottom: 1px solid var(--border); display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <strong>{{ item.score }}/10</strong>
+            <span class="when" style="color:var(--text-muted); font-size:12px">
+                {{ item.meeting.date|date:'d.m.Y' }} · {{ item.meeting.get_kind_display }}
+            </span>
+            {% if item.comment %}<span>{{ item.comment }}</span>{% endif %}
+        </div>
+    {% empty %}
+        <div class="empty">Оценок активности пока нет — ставятся на собраниях, во вкладке «Табель».</div>
+    {% endfor %}
+</div>
+{% endblock %}

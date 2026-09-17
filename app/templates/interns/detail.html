@@ -24,6 +24,11 @@
                 {% if intern.user %}Сбросить пароль{% else %}Выдать доступ{% endif %}
             </a>
         {% endif %}
+        {% if is_lead %}
+            <a href="{% url 'interns:grant_lead_access' intern.pk %}" class="btn btn--secondary">
+                {% if intern.user %}Сбросить пароль{% else %}Выдать доступ тимлида{% endif %}
+            </a>
+        {% endif %}
         <a href="{% url 'interns:update' intern.pk %}" class="btn btn--secondary">Редактировать</a>
         {% if intern.is_archived %}
             <form method="post" action="{% url 'interns:unarchive' intern.pk %}" style="margin:0"

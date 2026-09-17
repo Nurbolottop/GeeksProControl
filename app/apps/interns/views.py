@@ -447,8 +447,12 @@ def intern_delete(request, pk):
 
 
 @login_required
-def grant_pm_access(request, pk):
-    """Выдать (или сбросить) доступ ПМа в его портал — логин по телефону."""
+def _grant_role_access(request, pk, role, title):
+    """Выдать (или сбросить) доступ в портал своей роли — логин по телефону.
+
+    Общая логика для ПМ и тимлида: отличается только роль учётки и
+    подпись формы, доступ у обоих устроен одинаково (Intern.user).
+    """
     from apps.accounts.models import User
 
     intern = get_object_or_404(Intern, pk=pk)
@@ -461,8 +465,8 @@ def grant_pm_access(request, pk):
             user = intern.user
             user.username = username
         else:
-            user = User(username=username, role=User.Role.PROJECT_MANAGER)
-        user.role = User.Role.PROJECT_MANAGER
+            user = User(username=username)
+        user.role = role
         user.phone = intern.phone
         user.set_password(password)
         user.save()
@@ -472,8 +476,26 @@ def grant_pm_access(request, pk):
         messages.success(request, f'Доступ выдан: логин «{username}».')
         return redirect(intern.get_absolute_url())
     return render(request, 'interns/grant_access_form.html', {
-        'form': form, 'intern': intern,
+        'form': form, 'intern': intern, 'title': title,
     })
+
+
+def grant_pm_access(request, pk):
+    """Выдать (или сбросить) доступ ПМа в его портал — логин по телефону."""
+    from apps.accounts.models import User
+
+    return _grant_role_access(
+        request, pk, User.Role.PROJECT_MANAGER, 'Доступ в портал ПМ',
+    )
+
+
+def grant_lead_access(request, pk):
+    """Выдать (или сбросить) доступ тимлида в его портал — логин по телефону."""
+    from apps.accounts.models import User
+
+    return _grant_role_access(
+        request, pk, User.Role.TEAM_LEAD, 'Доступ в портал тимлида',
+    )
 
 
 def _flagged_list(request, field, title):
