@@ -29,10 +29,6 @@
 {% elif tab == 'attendance' %}
     {% include 'lead_portal/partials/tab_attendance.html' %}
 {% else %}
-    <div class="panel">
-        <dl class="def-grid">
-            <div class="def"><dt>Срок</dt><dd>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</dd></div>
-        </dl>
-    </div>
+    {% include 'lead_portal/partials/tab_overview.html' %}
 {% endif %}
 {% endblock %}

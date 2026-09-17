@@ -5,6 +5,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.attendance import services as attendance_services
 from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
@@ -140,6 +141,11 @@ def project_detail(request, pk):
         context['group'] = group
         if group:
             context['meetings'] = group.meetings.select_related('host').order_by('-date')
+    else:
+        from apps.lead_portal.overview import lead_overview
+
+        context.update(lead_overview(project, services.lead_own_role(request.user)))
+        context['today'] = timezone.localdate()
     return render(request, 'lead_portal/project_detail.html', context)
 
 

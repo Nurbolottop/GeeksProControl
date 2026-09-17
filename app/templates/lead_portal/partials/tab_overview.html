@@ -1,0 +1,93 @@
+<section class="gx">
+    {% include 'projects/partials/graphics_stage.html' %}
+
+    {# ── Моё направление в цифрах ── #}
+    <div class="gx-tiles">
+        {% for tile in lead_tiles %}
+            <div class="gx-tile gx-tile--{{ tile.tone }}" style="--delay: {{ forloop.counter0 }}">
+                <div class="gx-tile__label">{{ tile.label }}</div>
+                <div class="gx-tile__value">
+                    {% if tile.text %}{{ tile.text }}{% else %}<span data-count="{{ tile.value }}">0</span>{% endif %}
+                    {% if tile.unit %}<small>{{ tile.unit }}</small>{% endif %}
+                </div>
+                <div class="gx-tile__hint">{{ tile.hint }}</div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="gx-grid2">
+        {# ── Кому нужно внимание ── #}
+        <div class="gx-card">
+            <h3 class="gx-card__title">Кому нужно внимание</h3>
+            {% for row in attention %}
+                <div class="gx-row">
+                    <span class="gx-row__avatar gx-row__avatar--warn">{{ row.person.full_name|first|upper }}</span>
+                    <div class="gx-row__body">
+                        <a href="{% url 'lead_portal:intern_detail' project.pk row.person.pk %}"><b>{{ row.person.full_name }}</b></a>
+                        <span>{{ row.reasons|join:' · ' }}</span>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="gx-good">
+                    {% if people_count %}
+                        ✓ У всех в порядке: за 4 недели никто не проседает по посещаемости и активности.
+                    {% else %}
+                        В вашем направлении пока никого — добавьте людей на вкладке «Команда»
+                        или отправьте им ссылку на анкету.
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <div class="gx-card__note">Смотрим последние 4 недели: посещаемость ниже 70%, активность ниже 5 из 10 или нет отметок.</div>
+        </div>
+
+        {# ── Собрания ── #}
+        <div class="gx-card">
+            <h3 class="gx-card__title">Собрания</h3>
+            {% if not group %}
+                <div class="gx-card__note">У проекта пока нет группы в потоке — собраний нет.</div>
+            {% else %}
+                {% for meeting in unmarked %}
+                    <a class="gx-row gx-row--link" href="{% url 'lead_portal:meeting_detail' project.pk meeting.pk %}">
+                        <span class="gx-row__date gx-row__date--warn">{{ meeting.date|date:'d.m' }}</span>
+                        <div class="gx-row__body">
+                            <b>{{ meeting.get_kind_display }}</b>
+                            <span class="gx-warn">Прошло, но не отмечено — отметьте посещаемость</span>
+                        </div>
+                    </a>
+                {% endfor %}
+                {% for meeting in upcoming %}
+                    <a class="gx-row gx-row--link" href="{% url 'lead_portal:meeting_detail' project.pk meeting.pk %}">
+                        <span class="gx-row__date">{{ meeting.date|date:'d.m' }}</span>
+                        <div class="gx-row__body">
+                            <b>{{ meeting.get_kind_display }}</b>
+                            <span>
+                                {% if meeting.date == today %}сегодня{% else %}{{ meeting.date|date:'l' }}{% endif %}
+                                {% if meeting.host %} · ведёт {{ meeting.host.full_name }}{% endif %}
+                            </span>
+                        </div>
+                    </a>
+                {% endfor %}
+                {% if not unmarked and not upcoming %}
+                    <div class="gx-card__note">Ближайших собраний не назначено.</div>
+                {% endif %}
+                <a class="gx-card__more" href="?tab=attendance">Весь табель →</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ── С кем связаться ── #}
+    {% if pm %}
+        <div class="gx-card gx-contact">
+            <span class="gx-row__avatar">{{ pm.person_name|first|upper }}</span>
+            <div class="gx-row__body">
+                <span class="gx-card__eyebrow">ПМ проекта</span>
+                <b>{{ pm.person_name }}</b>
+                <span>
+                    {% if pm.intern.phone %}<a href="tel:{{ pm.intern.phone }}">{{ pm.intern.phone }}</a>{% endif %}
+                    {% if pm.intern.telegram %} · <a href="https://t.me/{{ pm.intern.telegram|cut:'@' }}" target="_blank" rel="noopener">{{ pm.intern.telegram }}</a>{% endif %}
+                    {% if not pm.intern.phone and not pm.intern.telegram %}контакты не указаны{% endif %}
+                </span>
+            </div>
+        </div>
+    {% endif %}
+</section>

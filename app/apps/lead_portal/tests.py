@@ -912,3 +912,98 @@ class LeadProfileLinkTests(LeadProjectOwnershipTests):
         self.client.post(reverse("intern_profile_apply", args=[link.token]), self._payload())
         person = InternModel.objects.get(phone="0700777888")
         self.assertFalse(person.team_memberships.exists())
+
+
+class LeadOverviewTests(TestCase):
+    """«Обзор» тимлида: путь проекта, его направление в цифрах, кому нужно
+    внимание, собрания и контакт ПМ."""
+
+    def setUp(self):
+        import datetime
+
+        from django.utils import timezone
+
+        from apps.attendance.models import Attendance, GroupMeeting, WorkScore
+        from apps.flows.models import Flow, Group
+        from apps.projects.services import create_project
+        from apps.training.models import Specialization
+
+        today = timezone.localdate()
+        backend = Specialization.objects.create(name="Backend")
+        frontend = Specialization.objects.create(name="Frontend")
+        self.lead_user = Model.objects.create_user(
+            username="+996700000060", password="x", role=User.Role.TEAM_LEAD,
+        )
+        self.lead = Intern.objects.create(
+            full_name="Обзоров Тимлид", user=self.lead_user, specialization=backend,
+        )
+        self.project = Project.objects.create(
+            name="Омур", planned_end_date=today + datetime.timedelta(days=10),
+        )
+        create_project(self.project)
+        group = Group.objects.filter(project=self.project).first() or Group.objects.create(
+            flow=Flow.objects.create(number=77), number=1, project=self.project,
+        )
+        self.pm = Intern.objects.create(full_name="Проектов ПМ", phone="0700111000", telegram="@pm")
+        TeamMember.objects.create(project=self.project, intern=self.pm, role=TeamRole.PROJECT_MANAGER, status="active")
+        TeamMember.objects.create(project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD, status="active")
+        self.good = Intern.objects.create(full_name="Ходит Всегда", specialization=backend)
+        self.absent = Intern.objects.create(full_name="Пропускает Часто", specialization=backend)
+        self.front = Intern.objects.create(full_name="Фронт Чужой", specialization=frontend)
+        for person, role in ((self.good, TeamRole.BACKEND), (self.absent, TeamRole.BACKEND), (self.front, TeamRole.FRONTEND)):
+            TeamMember.objects.create(project=self.project, intern=person, role=role, status="active")
+        for days in (14, 7):
+            meeting = GroupMeeting.objects.create(
+                group=group, date=today - datetime.timedelta(days=days), status="held",
+            )
+            Attendance.objects.create(meeting=meeting, intern=self.good, status="present")
+            Attendance.objects.create(meeting=meeting, intern=self.absent, status="absent")
+            Attendance.objects.create(meeting=meeting, intern=self.front, status="absent")
+            WorkScore.objects.create(meeting=meeting, intern=self.good, score=9)
+        self.unmarked = GroupMeeting.objects.create(
+            group=group, date=today - datetime.timedelta(days=2), status="planned",
+        )
+        self.upcoming = GroupMeeting.objects.create(
+            group=group, date=today + datetime.timedelta(days=3), status="planned",
+        )
+        self.client.force_login(self.lead_user)
+        self.url = reverse("lead_portal:project_detail", args=[self.project.pk])
+
+    def test_overview_shows_road_tiles_and_pm(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Путь проекта")
+        self.assertContains(response, 'id="gx-road-data"')
+        self.assertContains(response, "Проектов ПМ")
+        self.assertContains(response, "@pm")
+        labels = [tile["label"] for tile in response.context["lead_tiles"]]
+        self.assertEqual(labels, ["моё направление", "посещаемость", "средняя активность", "до дедлайна"])
+        self.assertNotContains(response, "Кладётся внутрь")
+
+    def test_only_own_direction_is_counted(self):
+        tiles = {t["label"]: t for t in self.client.get(self.url).context["lead_tiles"]}
+        self.assertEqual(tiles["моё направление"]["value"], 2)
+        # 2 из 4 отметок бэкенда — «был»; фронтенд в расчёт не идёт
+        self.assertEqual(tiles["посещаемость"]["value"], 50)
+        self.assertEqual(tiles["средняя активность"]["text"], "9,0")
+
+    def test_attention_lists_people_who_slip(self):
+        response = self.client.get(self.url)
+        names = [row["person"].full_name for row in response.context["attention"]]
+        self.assertEqual(names, ["Пропускает Часто"])
+        self.assertContains(response, "посещаемость 0%")
+        self.assertNotContains(response, "Фронт Чужой")
+
+    def test_meetings_block(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["unmarked"], [self.unmarked])
+        self.assertEqual(response.context["upcoming"], [self.upcoming])
+        self.assertContains(response, "Прошло, но не отмечено")
+
+    def test_graphics_tab_in_main_app_has_no_template_leftovers(self):
+        head = Model.objects.create_user(username="head-gx", password="x")
+        self.client.force_login(head)
+        response = self.client.get(f"{self.project.get_absolute_url()}?tab=graphics")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Путь проекта")
+        self.assertNotContains(response, "Кладётся внутрь")
