@@ -3,6 +3,16 @@
 {% block title %}Тимлиды — GeeksPro Control{% endblock %}
 
 {% block content %}
+<style>
+    .lead-card__past { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+    .lead-card__more {
+        background: none; border: none; padding: 0; cursor: pointer;
+        font: inherit; font-size: 12.5px; color: var(--text-muted);
+    }
+    .lead-card__more:hover { color: var(--primary); }
+    .lead-chip--past { opacity: .75; }
+    .lead-chip--past em { font-style: normal; font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+</style>
 <div class="page-head">
     <div>
         <h1>Тимлиды</h1>
@@ -47,7 +57,7 @@
                             <a href="{{ row.intern.get_absolute_url }}" class="lead-card__name">
                                 {{ row.intern.full_name }}
                             </a>
-                            <span class="lead-card__count">{{ row.projects|length }} проектов</span>
+                            <span class="lead-card__count">{{ row.projects|length }} {{ row.count_label }} сейчас</span>
                         </div>
                     </div>
                     <div class="lead-card__projects">
@@ -62,8 +72,26 @@
                                     <button type="submit" class="lead-chip__x" title="Снять роль тимлида">✕</button>
                                 </form>
                             </span>
+                        {% empty %}
+                            <span class="sub">Сейчас не ведёт ни одного активного проекта</span>
                         {% endfor %}
                     </div>
+                    {% if row.past %}
+                        <div class="lead-card__past" x-data="{ open: false }">
+                            <button type="button" class="lead-card__more" @click="open = !open"
+                                    x-text="open ? 'Скрыть прошлые проекты' : 'Прошлые проекты: {{ row.past|length }}'"></button>
+                            <div class="lead-card__projects" x-show="open" x-cloak>
+                                {% for member in row.past %}
+                                    <span class="lead-chip lead-chip--past">
+                                        {% if member.project %}
+                                            <a href="{{ member.project.get_absolute_url }}?tab=team">{{ member.project.name }}</a>
+                                            <em>{{ member.project.get_status_display|lower }}</em>
+                                        {% else %}без проекта{% endif %}
+                                    </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>

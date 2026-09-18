@@ -128,6 +128,23 @@ def academy_list(branch: str | None = None, today: datetime.date | None = None) 
     return result
 
 
+def nav_tree(today: datetime.date | None = None) -> list[dict]:
+    """Дерево для сайдбара: филиал → направления с актуальными группами.
+
+    Только филиалы, где сейчас есть хоть одна учащаяся/набирающаяся
+    группа — иначе разворачивать в меню нечего.
+    """
+    tree = []
+    for value, label in BRANCHES:
+        directions = academy_list(value, today)
+        if directions:
+            tree.append({'value': value, 'label': label, 'directions': directions})
+    unassigned = academy_list(NO_BRANCH, today)
+    if unassigned:
+        tree.append({'value': NO_BRANCH, 'label': 'Филиал не указан', 'directions': unassigned})
+    return tree
+
+
 def academy_totals(branch: str | None = None, today: datetime.date | None = None) -> dict:
     """Итог одной строкой: сколько групп и студентов в филиале."""
     return _count(current_groups(branch, today))

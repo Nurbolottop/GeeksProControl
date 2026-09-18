@@ -10,19 +10,32 @@ from apps.training.models import BRANCHES, GroupStatus, Specialization, Training
 
 @login_required
 def plan(request):
-    """IT-академия: группы филиала по направлениям — как их присылает академия."""
+    """IT-академия: группы филиала по направлениям — как их присылает академия.
+
+    ?specialization=<pk> сужает список до одного направления — сайдбар
+    ведёт сюда из дерева «филиал → направление», чтобы смотреть их
+    по отдельности.
+    """
     tabs = selectors.branch_tabs()
     values = [tab['value'] for tab in tabs]
     branch = request.GET.get('branch')
     if branch not in values:
         # по умолчанию — первый филиал, где есть группы
         branch = next((tab['value'] for tab in tabs if tab['groups']), values[0])
+    directions = selectors.academy_list(branch)
+    specialization = None
+    spec_id = request.GET.get('specialization')
+    if spec_id and spec_id.isdigit():
+        directions = [d for d in directions if d['specialization'].pk == int(spec_id)]
+        if directions:
+            specialization = directions[0]['specialization']
     return render(request, 'training/plan.html', {
         'tabs': tabs,
         'branch': branch,
         'current': next(tab for tab in tabs if tab['value'] == branch),
-        'directions': selectors.academy_list(branch),
+        'directions': directions,
         'no_branch': selectors.NO_BRANCH,
+        'specialization': specialization,
     })
 
 

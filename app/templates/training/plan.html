@@ -29,7 +29,14 @@
 <div class="page-head">
     <div>
         <h1>IT-академия</h1>
-        <div class="sub">Группы академии, из которых к нам приходят стажёры</div>
+        <div class="sub">
+            {% if specialization %}
+                Направление «{{ specialization }}» в филиале {{ current.label }} —
+                <a href="?branch={{ branch }}">показать все направления</a>
+            {% else %}
+                Группы академии, из которых к нам приходят стажёры
+            {% endif %}
+        </div>
     </div>
     <div class="page-actions">
         <a href="{% url 'training:group_list' %}?branch={{ branch }}" class="btn btn--secondary">Все группы</a>
@@ -74,7 +81,11 @@
         </div>
     {% empty %}
         <div class="panel">
-            <div class="sub">В филиале {{ current.label }} групп пока нет. Нажмите «Вставить сообщение академии», выберите {{ current.label }} и вставьте присланный список.</div>
+            {% if specialization is None and request.GET.specialization %}
+                <div class="sub">В филиале {{ current.label }} нет групп этого направления сейчас. <a href="?branch={{ branch }}">Показать все направления</a>.</div>
+            {% else %}
+                <div class="sub">В филиале {{ current.label }} групп пока нет. Нажмите «Вставить сообщение академии», выберите {{ current.label }} и вставьте присланный список.</div>
+            {% endif %}
         </div>
     {% endfor %}
 </div>

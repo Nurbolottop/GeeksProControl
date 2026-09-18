@@ -4,9 +4,10 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from apps.common.text import plural
 from apps.flows.models import Group
 from apps.interns.models import Intern
-from apps.projects.models import Project
+from apps.projects.models import Project, ProjectStatus
 from apps.teams import services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember, TeamRole
@@ -185,6 +186,13 @@ def member_edit(request, pk):
     )
 
 
+def _is_current(member) -> bool:
+    """Проект идёт сейчас, и человек в нём ещё числится."""
+    if member.status != TeamMember.Status.ACTIVE:
+        return False
+    return member.project is None or member.project.status == ProjectStatus.ACTIVE
+
+
 @login_required
 def lead_list(request):
     """Тимлиды направлений: кто где ведёт направление.
@@ -208,8 +216,20 @@ def lead_list(request):
         entry = by_person.setdefault(member.intern_id, {
             'intern': member.intern,
             'projects': [],
+            'past': [],
         })
-        entry['projects'].append(member)
+        # В карточке — только то, что человек ведёт сейчас. Завершённые,
+        # отменённые и приостановленные проекты прячем под раскрывашку:
+        # иначе у тимлида с 11 проектами не видно, чем он занят сегодня.
+        key = 'projects' if _is_current(member) else 'past'
+        entry[key].append(member)
+    for entry in by_person.values():
+        entry['count_label'] = plural(
+            len(entry['projects']), 'проект', 'проекта', 'проектов',
+        )
+        entry['past'].sort(
+            key=lambda member: member.project.name if member.project else '',
+        )
 
     # Раскладываем по направлениям: у каждого направления свой блок
     groups: dict[str, dict] = {}
@@ -222,7 +242,7 @@ def lead_list(request):
         groups.values(), key=lambda g: (-len(g['leads']), g['name']),
     )
     for group in sections:
-        group['leads'].sort(key=lambda e: -len(e['projects']))
+        group['leads'].sort(key=lambda e: (-len(e['projects']), -len(e['past'])))
 
     # Направления, где тимлида нет вообще — это дыра, её видно сразу
     covered = set(groups)

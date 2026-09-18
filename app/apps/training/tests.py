@@ -416,6 +416,17 @@ class AcademyListTests(TestCase):
         self.assertEqual(selectors.plural(11, 'студент', 'студента', 'студентов'), 'студентов')
         self.assertEqual(selectors.plural(22, 'студент', 'студента', 'студентов'), 'студента')
 
+    def test_nav_tree_only_lists_branches_with_groups(self):
+        tree = selectors.nav_tree(today=TODAY)
+        values = [branch['value'] for branch in tree]
+        self.assertEqual(values, ['Бишкек'])
+        names = [d['specialization'].name for d in tree[0]['directions']]
+        self.assertEqual(names, ['UX/UI', 'Frontend', 'Backend', 'Mobile'])
+
+    def test_nav_tree_empty_when_no_groups_at_all(self):
+        TrainingGroup.objects.all().delete()
+        self.assertEqual(selectors.nav_tree(today=TODAY), [])
+
 
 class AcademyViewsTests(TestCase):
     def setUp(self):
@@ -502,3 +513,36 @@ class AcademyViewsTests(TestCase):
     def test_old_graduations_url_leads_to_the_plan(self):
         response = self.client.get(reverse('resources:graduations'))
         self.assertRedirects(response, reverse('training:plan'))
+
+    def test_specialization_filter_narrows_to_one_direction(self):
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        backend = self.specs['Backend']
+        response = self.client.get(
+            reverse('training:plan'), {'branch': 'Бишкек', 'specialization': backend.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['directions']), 1)
+        self.assertEqual(response.context['specialization'], backend)
+        self.assertEqual(response.context['directions'][0]['specialization'], backend)
+
+    def test_specialization_filter_for_other_branch_is_empty(self):
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        backend = self.specs['Backend']
+        response = self.client.get(
+            reverse('training:plan'), {'branch': 'Ош', 'specialization': backend.pk},
+        )
+        self.assertEqual(response.context['directions'], [])
+        self.assertIsNone(response.context['specialization'])
+
+    def test_sidebar_shows_branch_and_direction_tree(self):
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        response = self.client.get(reverse('training:plan'))
+        self.assertContains(response, 'Бишкек')
+        self.assertContains(
+            response,
+            f"?branch=Бишкек&specialization={self.specs['Backend'].pk}",
+        )
+
+    def test_sidebar_tree_empty_when_no_groups(self):
+        response = self.client.get(reverse('training:plan'))
+        self.assertEqual(list(response.context['academy_nav']), [])

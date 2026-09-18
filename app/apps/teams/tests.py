@@ -209,6 +209,74 @@ class RoleSectionAddTests(TestCase):
         self.assertNotIn("frontend", roles)
 
 
+class LeadCurrentProjectsTests(TestCase):
+    """В карточке тимлида — только то, что он ведёт сейчас."""
+
+    def setUp(self):
+        from apps.projects.models import ProjectStatus
+        from apps.projects.services import create_project
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(username="head9", password="x")
+        self.client.force_login(self.user)
+        self.spec = Specialization.objects.create(name="Backend")
+        self.person = Intern.objects.create(full_name="Ведущий Тимлид", specialization=self.spec)
+        self.active = create_project(Project(name="Идёт"))
+        self.done = create_project(Project(name="Завершён"))
+        self.done.status = ProjectStatus.COMPLETED
+        self.done.save(update_fields=["status"])
+        self.paused = create_project(Project(name="Приостановлен"))
+        self.paused.status = ProjectStatus.PAUSED
+        self.paused.save(update_fields=["status"])
+        for project in (self.active, self.done, self.paused):
+            TeamMember.objects.create(
+                project=project, intern=self.person, role=TeamRole.TEAM_LEAD,
+            )
+
+    def _row(self):
+        response = self.client.get(reverse("teams:lead_list"))
+        return response, response.context["rows"][0]
+
+    def test_only_active_projects_in_the_card(self):
+        _, row = self._row()
+        self.assertEqual([m.project.name for m in row["projects"]], ["Идёт"])
+
+    def test_finished_and_paused_go_to_past(self):
+        _, row = self._row()
+        self.assertEqual(
+            sorted(m.project.name for m in row["past"]), ["Завершён", "Приостановлен"],
+        )
+
+    def test_past_projects_are_behind_a_toggle(self):
+        response, _ = self._row()
+        self.assertContains(response, "Прошлые проекты: 2")
+
+    def test_left_membership_counts_as_past(self):
+        member = TeamMember.objects.get(project=self.active, intern=self.person)
+        member.status = TeamMember.Status.LEFT
+        member.save(update_fields=["status"])
+        _, row = self._row()
+        self.assertEqual(row["projects"], [])
+        self.assertEqual(len(row["past"]), 3)
+
+    def test_count_is_worded_by_the_number(self):
+        _, row = self._row()
+        self.assertEqual(row["count_label"], "проект")
+        TeamMember.objects.create(
+            project=Project.objects.create(name="Второй"), intern=self.person,
+            role=TeamRole.TEAM_LEAD,
+        )
+        _, row = self._row()
+        self.assertEqual(row["count_label"], "проекта")
+
+    def test_lead_without_active_projects_is_still_listed(self):
+        TeamMember.objects.filter(project=self.active).delete()
+        response, row = self._row()
+        self.assertEqual(row["projects"], [])
+        self.assertContains(response, "Ведущий Тимлид")
+        self.assertContains(response, "не ведёт ни одного активного проекта")
+
+
 class LeadSectionTests(TestCase):
     """Раздел «Тимлиды»: назначить, снять, посмотреть по проектам."""
 
