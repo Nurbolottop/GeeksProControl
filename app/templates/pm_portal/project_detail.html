@@ -3,15 +3,7 @@
 {% block title %}{{ project.name }} — Портал ПМ{% endblock %}
 
 {% block content %}
-<style>
-    .pm-first-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
-        gap: 14px;
-        margin-bottom: 18px;
-        align-items: start;
-    }
-</style>
+
 <p><a href="{% url 'pm_portal:dashboard' %}">← Мои проекты</a></p>
 <div class="page-head">
     <div>
@@ -50,12 +42,14 @@
 {% elif tab == 'client' %}
     {% include 'pm_portal/partials/tab_client.html' %}
 {% else %}
-    {# Тип и ссылки — первым рядом: ПМ правит их чаще всего #}
-    <div class="pm-first-row">
-    <div class="panel" style="margin: 0;">
+    {# Тип и ссылки — одним блоком первым рядом: ПМ правит их чаще всего #}
+    <div class="panel" style="margin-bottom: 18px;">
         <div class="panel-head">
-            <h2>Тип проекта</h2>
-            <a href="{% url 'pm_portal:project_edit' project.pk 'type' %}" class="btn btn--secondary btn--sm">Изменить</a>
+            <h2>Тип проекта и ссылки</h2>
+            <span style="display: flex; gap: 8px;">
+                <a href="{% url 'pm_portal:project_edit' project.pk 'type' %}" class="btn btn--secondary btn--sm">Изменить тип</a>
+                <a href="{% url 'pm_portal:project_edit' project.pk 'links' %}" class="btn btn--secondary btn--sm">Изменить ссылки</a>
+            </span>
         </div>
         <dl class="def-grid">
             <div class="def">
@@ -65,21 +59,12 @@
                     {% else %}<span class="sub">не указан — от него зависят этапы и роли в команде</span>{% endif %}
                 </dd>
             </div>
-        </dl>
-    </div>
-    <div class="panel" style="margin: 0;">
-        <div class="panel-head">
-            <h2>Ссылки</h2>
-            <a href="{% url 'pm_portal:project_edit' project.pk 'links' %}" class="btn btn--secondary btn--sm">Изменить</a>
-        </div>
-        <dl class="def-grid">
-            <div class="def"><dt>Staging</dt><dd>{% if project.staging_url %}<a href="{{ project.staging_url }}" target="_blank" rel="noopener">{{ project.staging_url }}</a>{% else %}—{% endif %}</dd></div>
-            <div class="def"><dt>Production</dt><dd>{% if project.production_url %}<a href="{{ project.production_url }}" target="_blank" rel="noopener">{{ project.production_url }}</a>{% else %}—{% endif %}</dd></div>
-            <div class="def"><dt>Репозиторий</dt><dd>{% if project.github_url %}<a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url }}</a>{% else %}—{% endif %}</dd></div>
-            <div class="def"><dt>Figma</dt><dd>{% if project.figma_url %}<a href="{{ project.figma_url }}" target="_blank" rel="noopener">{{ project.figma_url }}</a>{% else %}—{% endif %}</dd></div>
             <div class="def"><dt>Домен</dt><dd>{{ project.domain|default:'—' }}</dd></div>
+            <div class="def"><dt>Staging</dt><dd>{% if project.staging_url %}<a href="{{ project.staging_url }}" target="_blank" rel="noopener">{{ project.staging_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Production</dt><dd>{% if project.production_url %}<a href="{{ project.production_url }}" target="_blank" rel="noopener">{{ project.production_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Репозиторий</dt><dd>{% if project.github_url %}<a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Figma</dt><dd>{% if project.figma_url %}<a href="{{ project.figma_url }}" target="_blank" rel="noopener">{{ project.figma_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
         </dl>
-    </div>
     </div>
 
     {% include 'projects/partials/tab_graphics.html' %}
