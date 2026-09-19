@@ -308,11 +308,11 @@ class AcademyBranchTests(TestCase):
         importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
         importer.apply(importer.parse(self.OSH_MESSAGE, 'Ош'))
         response = self.client.get(reverse('training:plan'), {'branch': 'Ош'})
-        dirs = {d['specialization'].name: d for d in response.context['directions']}
+        dirs = {d['specialization'].name: d for d in response.context['all_directions']}
         self.assertEqual(sorted(dirs), ['Backend', 'Mobile'])
         self.assertEqual([l['group'].number for l in dirs['Mobile']['lines']], ['2'])
         response = self.client.get(reverse('training:plan'), {'branch': 'Бишкек'})
-        self.assertEqual(len(response.context['directions']), 4)
+        self.assertEqual(len(response.context['all_directions']), 4)
 
     def test_tabs_carry_counts(self):
         importer.apply(importer.parse(self.OSH_MESSAGE, 'Ош'))
@@ -447,14 +447,30 @@ class AcademyViewsTests(TestCase):
         self.assertRedirects(response, reverse('training:plan') + '?branch=Бишкек')
         self.assertEqual(TrainingGroup.objects.count(), 18)
 
-    def test_plan_page_in_academy_format(self):
+    def test_branch_page_offers_directions_without_groups(self):
+        """Сначала выбор направления: группы на странице филиала не сыплются."""
         importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
         response = self.client.get(reverse('training:plan'))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context['directions']), 4)
-        self.assertContains(response, '39 группа')
-        self.assertContains(response, '09.06.2026')
-        self.assertContains(response, '4 студента')
+        self.assertEqual(len(response.context['all_directions']), 4)
+        self.assertEqual(response.context['directions'], [])
+        self.assertContains(response, 'Выберите направление')
+        self.assertContains(response, 'Backend')
+        self.assertNotContains(response, '39 группа')
+
+    def test_groups_appear_after_choosing_direction(self):
+        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        response = self.client.get(reverse('training:plan'), {
+            'branch': 'Бишкек', 'specialization': self.specs['Backend'].pk,
+        })
+        self.assertEqual(len(response.context['directions']), 1)
+        self.assertContains(response, '39 группа')       # Backend 39
+        self.assertContains(response, '25.03.2026')      # её старт
+        self.assertContains(response, '8 студентов')
+        self.assertNotContains(response, '09.06.2026')   # это дата группы Design
+        # другие направления остаются в выборе, чтобы переключаться
+        self.assertEqual(len(response.context['all_directions']), 4)
+        self.assertNotContains(response, 'Выберите направление')
 
     def test_empty_academy_page_opens(self):
         response = self.client.get(reverse('training:plan'))

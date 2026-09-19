@@ -24,6 +24,18 @@
     .branch-tab:hover { border-color: var(--border-strong); color: var(--text); }
     .branch-tab.is-active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
     .branch-tab--warn span { color: var(--orange); }
+    .dir-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; max-width: 820px; }
+    .dir-tab {
+        display: flex; align-items: center; gap: 10px; min-width: 210px;
+        padding: 12px 16px; border-radius: 12px; text-decoration: none;
+        background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    }
+    .dir-tab:hover { border-color: var(--border-strong); color: var(--text); }
+    .dir-tab.is-active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+    .dir-tab__icon { font-size: 20px; }
+    .dir-tab__body { display: flex; flex-direction: column; gap: 2px; }
+    .dir-tab__body strong { font-size: 15px; }
+    .dir-tab__body span { font-size: 12.5px; color: var(--text-muted); }
 </style>
 
 <div class="page-head">
@@ -32,7 +44,7 @@
         <div class="sub">
             {% if specialization %}
                 Направление «{{ specialization }}» в филиале {{ current.label }} —
-                <a href="?branch={{ branch }}">показать все направления</a>
+                <a href="?branch={{ branch }}">к списку направлений</a>
             {% else %}
                 Группы академии, из которых к нам приходят стажёры
             {% endif %}
@@ -63,7 +75,34 @@
     </div>
 {% endif %}
 
+{% if all_directions %}
+    <div class="dir-tabs">
+        {% for dir in all_directions %}
+            <a href="?branch={{ branch }}&specialization={{ dir.specialization.pk }}"
+               class="dir-tab {% if specialization and dir.specialization.pk == specialization.pk %}is-active{% endif %}">
+                <span class="dir-tab__icon">{{ dir.icon }}</span>
+                <span class="dir-tab__body">
+                    <strong>{{ dir.specialization }}</strong>
+                    <span>{{ dir.lines|length }} гр. · {{ dir.students }} студ.</span>
+                </span>
+            </a>
+        {% endfor %}
+    </div>
+{% endif %}
+
 <div class="academy-list">
+    {% if not specialization and not request.GET.specialization %}
+        <div class="panel">
+            <div class="sub">
+                {% if all_directions %}
+                    Выберите направление — покажу его группы в филиале {{ current.label }}.
+                {% else %}
+                    В филиале {{ current.label }} групп пока нет. Нажмите «Вставить сообщение академии»,
+                    выберите {{ current.label }} и вставьте присланный список.
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
     {% for dir in directions %}
         <div class="panel academy-dir">
             <h2>
@@ -80,13 +119,11 @@
             {% endfor %}
         </div>
     {% empty %}
-        <div class="panel">
-            {% if specialization is None and request.GET.specialization %}
-                <div class="sub">В филиале {{ current.label }} нет групп этого направления сейчас. <a href="?branch={{ branch }}">Показать все направления</a>.</div>
-            {% else %}
-                <div class="sub">В филиале {{ current.label }} групп пока нет. Нажмите «Вставить сообщение академии», выберите {{ current.label }} и вставьте присланный список.</div>
-            {% endif %}
-        </div>
+        {% if request.GET.specialization %}
+            <div class="panel">
+                <div class="sub">В филиале {{ current.label }} нет групп этого направления сейчас. <a href="?branch={{ branch }}">К списку направлений</a>.</div>
+            </div>
+        {% endif %}
     {% endfor %}
 </div>
 {% endblock %}

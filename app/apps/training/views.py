@@ -12,9 +12,8 @@ from apps.training.models import BRANCHES, GroupStatus, Specialization, Training
 def plan(request):
     """IT-академия: группы филиала по направлениям — как их присылает академия.
 
-    ?specialization=<pk> сужает список до одного направления — сайдбар
-    ведёт сюда из дерева «филиал → направление», чтобы смотреть их
-    по отдельности.
+    Без ?specialization показываем только список направлений филиала:
+    группы конкретного направления открываются, когда его выбрали.
     """
     tabs = selectors.branch_tabs()
     values = [tab['value'] for tab in tabs]
@@ -22,17 +21,23 @@ def plan(request):
     if branch not in values:
         # по умолчанию — первый филиал, где есть группы
         branch = next((tab['value'] for tab in tabs if tab['groups']), values[0])
-    directions = selectors.academy_list(branch)
+    all_directions = selectors.academy_list(branch)
+    directions = []
     specialization = None
     spec_id = request.GET.get('specialization')
     if spec_id and spec_id.isdigit():
-        directions = [d for d in directions if d['specialization'].pk == int(spec_id)]
+        # группы показываем только у выбранного направления: без выбора
+        # страница филиала — это список направлений, а не простыня групп
+        directions = [
+            d for d in all_directions if d['specialization'].pk == int(spec_id)
+        ]
         if directions:
             specialization = directions[0]['specialization']
     return render(request, 'training/plan.html', {
         'tabs': tabs,
         'branch': branch,
         'current': next(tab for tab in tabs if tab['value'] == branch),
+        'all_directions': all_directions,
         'directions': directions,
         'no_branch': selectors.NO_BRANCH,
         'specialization': specialization,
