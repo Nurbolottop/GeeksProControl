@@ -858,3 +858,87 @@ class PmOverviewGraphicsTests(PmProjectOwnershipTests):
         html = self.client.get(self.url).content.decode()
         self.assertIn("закрыт", html)
         self.assertNotRegex(html, r"<span>\s*·\s*закрыт")
+
+
+class PmProjectDetailsTests(TestCase):
+    """Тип проекта и ссылки заполняет ПМ у себя в портале."""
+
+    def setUp(self):
+        from apps.projects.models import ProjectType
+        from apps.projects.services import create_project
+
+        self.pm_user = Model.objects.create_user(
+            username="+996700000077", password="x", role=User.Role.PROJECT_MANAGER,
+        )
+        self.pm_intern = Intern.objects.create(full_name="ПМ Деталей", user=self.pm_user)
+        self.project = create_project(Project(name="Омур"))
+        TeamMember.objects.create(
+            project=self.project, intern=self.pm_intern,
+            role=TeamRole.PROJECT_MANAGER, status=TeamMember.Status.ACTIVE,
+        )
+        self.client.force_login(self.pm_user)
+        self.web = ProjectType.objects.create(name="Web-сайт")
+        self.mobile = ProjectType.objects.create(name="Мобильное приложение", is_mobile=True)
+
+    def _url(self, section):
+        return reverse("pm_portal:project_edit", args=[self.project.pk, section])
+
+    def test_overview_offers_type_and_links(self):
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project.pk]),
+        )
+        self.assertContains(response, "Тип проекта")
+        self.assertContains(response, self._url("type"))
+        self.assertContains(response, self._url("links"))
+
+    def test_pm_sets_project_type(self):
+        self.client.post(self._url("type"), {"project_type": self.web.pk})
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.project_type, self.web)
+
+    def test_mobile_type_swaps_the_development_stage(self):
+        from apps.projects.models import ProjectStageKey
+
+        self.client.post(self._url("type"), {"project_type": self.mobile.pk})
+        keys = list(self.project.stages.order_by("order").values_list("key", flat=True))
+        self.assertIn(ProjectStageKey.MOBILE_DEV, keys)
+        self.assertNotIn(ProjectStageKey.FRONTEND, keys)
+
+    def test_started_stage_is_not_dropped_when_type_changes(self):
+        from apps.projects.models import ProjectStage, ProjectStageKey
+
+        frontend = self.project.stages.get(key=ProjectStageKey.FRONTEND)
+        frontend.status = ProjectStage.Status.IN_PROGRESS
+        frontend.save(update_fields=["status"])
+        self.client.post(self._url("type"), {"project_type": self.mobile.pk})
+        keys = set(self.project.stages.values_list("key", flat=True))
+        self.assertIn(ProjectStageKey.FRONTEND, keys)
+        self.assertIn(ProjectStageKey.MOBILE_DEV, keys)
+
+    def test_pm_fills_links(self):
+        self.client.post(self._url("links"), {
+            "staging_url": "https://stage.omur.kg",
+            "production_url": "",
+            "github_url": "https://github.com/geekspro/omur",
+            "figma_url": "",
+            "domain": "omur.kg",
+        })
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.staging_url, "https://stage.omur.kg")
+        self.assertEqual(self.project.domain, "omur.kg")
+
+    def test_pm_cannot_touch_a_foreign_project(self):
+        other = Project.objects.create(name="Чужой")
+        response = self.client.post(
+            reverse("pm_portal:project_edit", args=[other.pk, "links"]),
+            {"domain": "hack.kg"},
+        )
+        self.assertEqual(response.status_code, 404)
+        other.refresh_from_db()
+        self.assertEqual(other.domain, "")
+
+    def test_unknown_section_is_404(self):
+        response = self.client.get(
+            reverse("pm_portal:project_edit", args=[self.project.pk, "status"]),
+        )
+        self.assertEqual(response.status_code, 404)

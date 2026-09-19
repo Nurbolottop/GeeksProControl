@@ -24,7 +24,7 @@
         <div class="meta-row"><span>Поток</span><div>{% if project.flow %}<a href="{{ project.flow.get_absolute_url }}">{{ project.flow }}</a>{% else %}—{% endif %}</div></div>
         <div class="meta-row"><span>Номер в потоке</span><div>{{ project.display_code }}</div></div>
         <div class="meta-row"><span>Приоритет</span><div>{{ project.get_priority_display }}</div></div>
-        <div class="meta-row"><span>Тип проекта</span><div>{{ project.project_type|default:'—' }}</div></div>
+        <div class="meta-row"><span>Тип проекта</span><div>{% if project.project_type %}{{ project.project_type }}{% else %}<span class="sub">указывает ПМ</span>{% endif %}</div></div>
         <div class="meta-row">
             <span>ПМ проекта</span>
             <div>{% if project.pm %}<a href="{{ project.pm.get_absolute_url }}">{{ project.pm.full_name }}</a>{% else %}<a href="?tab=team" class="badge badge--yellow">назначить</a>{% endif %}</div>

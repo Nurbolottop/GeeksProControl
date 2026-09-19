@@ -49,4 +49,5 @@ urlpatterns = [
         name='brief_link_create',
     ),
     path('<int:pk>/client/', views.client_edit, name='client_edit'),
+    path('<int:pk>/edit/<str:section>/', views.project_edit, name='project_edit'),
 ]

@@ -54,14 +54,15 @@ class ProjectForm(forms.ModelForm):
 class ProjectCreateForm(forms.ModelForm):
     """Новый проект: только то, что известно, когда проект берут в работу.
 
-    Ссылки, домен, staging, прод, сроки и прогресс появляются позже —
-    они заполняются поблочно в «Обзоре».
+    Поток и номер в потоке не спрашиваем — они проставляются сами по
+    текущему потоку (`services.ensure_group`). Тип проекта, ссылки,
+    домен, сроки и прогресс появляются позже: тип и ссылки заполняет ПМ
+    в своём портале, остальное — поблочно в «Обзоре».
     """
 
     class Meta:
         model = Project
-        fields = ['name', 'client', 'flow', 'city', 'project_type',
-                  'description']
+        fields = ['name', 'client', 'city', 'description']
         widgets = {
             'name': forms.TextInput(
                 attrs={'placeholder': 'Например: Омур', 'autofocus': True},
@@ -76,8 +77,6 @@ class ProjectCreateForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['client'].required = False
         self.fields['client'].empty_label = 'Выберите заказчика'
-        self.fields['flow'].required = False
-        self.fields['flow'].empty_label = 'Выберите поток'
 
 
 class ProjectProgressForm(forms.ModelForm):
@@ -160,18 +159,16 @@ class ProjectLinksForm(forms.ModelForm):
 
 
 class ProjectDetailsForm(forms.ModelForm):
-    """Инлайн-форма: статус, этап, поток, приоритет, тип.
+    """Инлайн-форма: статус, этап, приоритет, проблемность.
 
-    ПМ и тимлиды здесь не редактируются — они назначаются в команде
+    Потока и номера в потоке здесь нет — они считаются сами. Тип проекта
+    указывает ПМ в своём портале, ПМ и тимлиды назначаются в команде
     проекта, чтобы человек был один и в табеле, и в карточке.
     """
 
     class Meta:
         model = Project
-        fields = [
-            'status', 'current_stage', 'flow', 'priority', 'project_type',
-            'is_problematic',
-        ]
+        fields = ['status', 'current_stage', 'priority', 'is_problematic']
 
 
 class ProjectDatesForm(forms.ModelForm):

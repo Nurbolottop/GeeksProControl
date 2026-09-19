@@ -317,34 +317,49 @@ class ProjectCreationFlowTests(TestCase):
         self.assertNotIn("planned_end_date", fields)
         self.assertNotIn("progress", fields)
 
-    def test_new_flow_created_from_project_form(self):
+    def test_flow_and_number_assigned_automatically(self):
+        """Поток и номер в потоке не спрашиваем — проставляются сами."""
         from apps.flows.models import Flow
 
-        response = self.client.post(reverse("projects:create"), {
-            "name": "Учкун", "new_flow": "2",
-        })
+        Flow.objects.create(number=7, status=Flow.Status.ACTIVE)
+        response = self.client.post(reverse("projects:create"), {"name": "Учкун"})
         self.assertEqual(response.status_code, 302)
-        flow = Flow.objects.get(number=2)
         project = Project.objects.get(name="Учкун")
-        self.assertEqual(project.flow, flow)
-        self.assertEqual(project.group.flow, flow)
+        self.assertEqual(project.flow.number, 7)
+        self.assertEqual(project.number_in_flow, project.group.number)
+        self.assertEqual(project.display_code, f"7.{project.number_in_flow}")
 
-    def test_existing_flow_reused(self):
+    def test_active_flow_wins_over_older_ones(self):
         from apps.flows.models import Flow
 
-        Flow.objects.create(number=3, status=Flow.Status.ACTIVE)
-        self.client.post(reverse("projects:create"), {
-            "name": "Агартуу", "new_flow": "3",
-        })
-        self.assertEqual(Flow.objects.filter(number=3).count(), 1)
+        Flow.objects.create(number=5, status=Flow.Status.FINISHED)
+        Flow.objects.create(number=6, status=Flow.Status.ACTIVE)
+        self.client.post(reverse("projects:create"), {"name": "Агартуу"})
+        self.assertEqual(Project.objects.get(name="Агартуу").flow.number, 6)
+
+    def test_numbers_run_in_sequence_within_the_flow(self):
+        self.client.post(reverse("projects:create"), {"name": "Первый"})
+        self.client.post(reverse("projects:create"), {"name": "Второй"})
+        first = Project.objects.get(name="Первый")
+        second = Project.objects.get(name="Второй")
+        self.assertEqual(second.flow, first.flow)
+        self.assertEqual(second.number_in_flow, first.number_in_flow + 1)
 
     def test_create_form_fields(self):
+        """Ни потока, ни типа: поток считается сам, тип указывает ПМ."""
         from apps.projects.forms import ProjectCreateForm
 
         self.assertEqual(
             set(ProjectCreateForm().fields),
-            {"name", "client", "flow", "city", "project_type", "description"},
+            {"name", "client", "city", "description"},
         )
+
+    def test_details_panel_does_not_edit_flow_or_type(self):
+        from apps.projects.forms import ProjectDetailsForm
+
+        fields = set(ProjectDetailsForm().fields)
+        self.assertNotIn("flow", fields)
+        self.assertNotIn("project_type", fields)
 
 
 class ProjectReportTests(TestCase):

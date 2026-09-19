@@ -250,7 +250,8 @@ def project_create(request):
         data = request.POST.copy()
         changed = False
 
-        # Заказчика и поток можно завести прямо здесь, не уходя с формы
+        # Заказчика можно завести прямо здесь, не уходя с формы;
+        # поток и номер в потоке проставляет services.ensure_group
         new_client = data.get('new_client', '').strip()
         if new_client:
             client, created = Client.objects.get_or_create(
@@ -261,17 +262,6 @@ def project_create(request):
             changed = True
             if created:
                 messages.success(request, f'Заказчик «{client}» создан.')
-
-        new_flow = data.get('new_flow', '').strip()
-        if new_flow.isdigit():
-            flow, created = Flow.objects.get_or_create(
-                number=int(new_flow),
-                defaults={'status': Flow.Status.ACTIVE},
-            )
-            data['flow'] = flow.pk
-            changed = True
-            if created:
-                messages.success(request, f'Поток {flow.number} создан.')
 
         if changed:
             form = ProjectCreateForm(data)

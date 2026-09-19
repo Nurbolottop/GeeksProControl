@@ -11,9 +11,10 @@ from apps.attendance.models import GroupMeeting, WorkScore
 from apps.documents import services as document_services
 from apps.documents.models import Document, DocumentStatus
 from apps.pm_portal import services, stages as stage_reminders
-from apps.pm_portal.forms import PMClientForm, PMDocumentForm
+from apps.pm_portal.forms import PMClientForm, PMDocumentForm, PMProjectTypeForm
 from apps.projects.models import ProjectReport, ProjectStage
-from apps.projects.services import calculate_deadline_status
+from apps.projects.forms import ProjectLinksForm
+from apps.projects.services import calculate_deadline_status, sync_stages_to_type
 from apps.teams import services as team_services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
@@ -42,6 +43,30 @@ def dashboard(request):
         project.stage_check_needed = stage_reminders.needs_stage_check(project)
     return render(request, 'pm_portal/dashboard.html', {
         'projects': projects, 'category': category,
+    })
+
+
+PM_SECTIONS = {'type': PMProjectTypeForm, 'links': ProjectLinksForm}
+
+
+@login_required
+def project_edit(request, pk, section):
+    """ПМ заполняет то, что знает только он: тип проекта и ссылки."""
+    if section not in PM_SECTIONS:
+        raise Http404
+    project = services.pm_project_or_404(request.user, pk)
+    form = PM_SECTIONS[section](request.POST or None, instance=project)
+    if request.method == 'POST' and form.is_valid():
+        changed_type = 'project_type' in form.changed_data
+        form.save()
+        if changed_type:
+            # от типа зависит этап разработки: web → Frontend, мобильный → Mobile
+            sync_stages_to_type(project)
+        messages.success(request, 'Сохранено.')
+        return redirect(f"{reverse('pm_portal:project_detail', args=[project.pk])}?tab=overview")
+    return render(request, 'pm_portal/project_edit.html', {
+        'project': project, 'form': form, 'section': section,
+        'title': 'Тип проекта' if section == 'type' else 'Ссылки проекта',
     })
 
 

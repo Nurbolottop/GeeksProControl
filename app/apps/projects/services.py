@@ -162,6 +162,32 @@ def ensure_group(project: Project):
     return group
 
 
+def sync_stages_to_type(project: Project) -> None:
+    """Приводит набор этапов к типу проекта.
+
+    Тип указывает ПМ уже после создания, а от него зависит, какой этап
+    разработки нужен: у мобильного — «Мобильная разработка», у веба —
+    «Frontend». Недостающий этап добавляем, лишний убираем только если
+    его ещё не трогали, и заново расставляем порядок.
+    """
+    desired = lifecycle_stages(project.project_type)
+    stages = {stage.key: stage for stage in project.stages.all()}
+    for index, key in enumerate(desired):
+        stage = stages.get(key)
+        if stage is None:
+            ProjectStage.objects.create(project=project, key=key, order=index)
+        elif stage.order != index:
+            stage.order = index
+            stage.save(update_fields=['order', 'updated_at'])
+    for key, stage in stages.items():
+        untouched = (
+            stage.status == ProjectStage.Status.NOT_STARTED
+            and not stage.progress and not stage.start_date and not stage.end_date
+        )
+        if key not in desired and untouched:
+            stage.delete()
+
+
 @transaction.atomic
 def create_project(project: Project, user=None) -> Project:
     """Сохраняет новый проект и создаёт полный набор этапов жизненного цикла.

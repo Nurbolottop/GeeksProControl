@@ -47,6 +47,37 @@
             <div class="def"><dt>Срок</dt><dd>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</dd></div>
             <div class="def"><dt>Клиент</dt><dd>{{ project.client|default:'—' }}</dd></div>
             <div class="def"><dt>Плановая дата завершения</dt><dd>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div class="def"><dt>Поток</dt><dd>{{ project.display_code|default:'—' }}{% if project.flow %} · {{ project.flow }}{% endif %}</dd></div>
+        </dl>
+    </div>
+
+    <div class="panel" style="margin-top: 18px;">
+        <div class="panel-head">
+            <h2>Тип проекта</h2>
+            <a href="{% url 'pm_portal:project_edit' project.pk 'type' %}" class="btn btn--secondary btn--sm">Изменить</a>
+        </div>
+        <dl class="def-grid">
+            <div class="def">
+                <dt>Тип</dt>
+                <dd>
+                    {% if project.project_type %}{{ project.project_type }}
+                    {% else %}<span class="sub">не указан — от него зависят этапы и роли в команде</span>{% endif %}
+                </dd>
+            </div>
+        </dl>
+    </div>
+
+    <div class="panel" style="margin-top: 18px;">
+        <div class="panel-head">
+            <h2>Ссылки</h2>
+            <a href="{% url 'pm_portal:project_edit' project.pk 'links' %}" class="btn btn--secondary btn--sm">Изменить</a>
+        </div>
+        <dl class="def-grid">
+            <div class="def"><dt>Staging</dt><dd>{% if project.staging_url %}<a href="{{ project.staging_url }}" target="_blank" rel="noopener">{{ project.staging_url }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Production</dt><dd>{% if project.production_url %}<a href="{{ project.production_url }}" target="_blank" rel="noopener">{{ project.production_url }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Репозиторий</dt><dd>{% if project.github_url %}<a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Figma</dt><dd>{% if project.figma_url %}<a href="{{ project.figma_url }}" target="_blank" rel="noopener">{{ project.figma_url }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Домен</dt><dd>{{ project.domain|default:'—' }}</dd></div>
         </dl>
     </div>
 {% endif %}

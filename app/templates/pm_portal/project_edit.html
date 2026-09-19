@@ -1,0 +1,33 @@
+{% extends 'pm_portal/base.html' %}
+
+{% block title %}{{ title }} — {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ title }}</h1>
+        <div class="sub">{{ project.name }}</div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'pm_portal:project_detail' project.pk %}?tab=overview" class="btn btn--secondary">Отмена</a>
+    </div>
+</div>
+
+<div class="panel">
+    <form method="post">
+        {% csrf_token %}
+        {% for field in form %}
+            <div class="form-field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="sub">{{ field.help_text }}</div>{% endif %}
+                {% if field.errors %}<div class="form-errors">{{ field.errors.0 }}</div>{% endif %}
+            </div>
+        {% endfor %}
+        <div class="form-actions">
+            <button type="submit" class="btn">Сохранить</button>
+            <a href="{% url 'pm_portal:project_detail' project.pk %}?tab=overview" class="btn btn--secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
