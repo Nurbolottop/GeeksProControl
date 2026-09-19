@@ -3,6 +3,15 @@
 {% block title %}{{ project.name }} — Портал ПМ{% endblock %}
 
 {% block content %}
+<style>
+    .pm-first-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+        gap: 14px;
+        margin-bottom: 18px;
+        align-items: start;
+    }
+</style>
 <p><a href="{% url 'pm_portal:dashboard' %}">← Мои проекты</a></p>
 <div class="page-head">
     <div>
@@ -41,17 +50,9 @@
 {% elif tab == 'client' %}
     {% include 'pm_portal/partials/tab_client.html' %}
 {% else %}
-    {% include 'projects/partials/tab_graphics.html' %}
-    <div class="panel" style="margin-top: 18px;">
-        <dl class="def-grid">
-            <div class="def"><dt>Срок</dt><dd>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</dd></div>
-            <div class="def"><dt>Клиент</dt><dd>{{ project.client|default:'—' }}</dd></div>
-            <div class="def"><dt>Плановая дата завершения</dt><dd>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
-            <div class="def"><dt>Поток</dt><dd>{{ project.display_code|default:'—' }}{% if project.flow %} · {{ project.flow }}{% endif %}</dd></div>
-        </dl>
-    </div>
-
-    <div class="panel" style="margin-top: 18px;">
+    {# Тип и ссылки — первым рядом: ПМ правит их чаще всего #}
+    <div class="pm-first-row">
+    <div class="panel" style="margin: 0;">
         <div class="panel-head">
             <h2>Тип проекта</h2>
             <a href="{% url 'pm_portal:project_edit' project.pk 'type' %}" class="btn btn--secondary btn--sm">Изменить</a>
@@ -66,8 +67,7 @@
             </div>
         </dl>
     </div>
-
-    <div class="panel" style="margin-top: 18px;">
+    <div class="panel" style="margin: 0;">
         <div class="panel-head">
             <h2>Ссылки</h2>
             <a href="{% url 'pm_portal:project_edit' project.pk 'links' %}" class="btn btn--secondary btn--sm">Изменить</a>
@@ -78,6 +78,17 @@
             <div class="def"><dt>Репозиторий</dt><dd>{% if project.github_url %}<a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url }}</a>{% else %}—{% endif %}</dd></div>
             <div class="def"><dt>Figma</dt><dd>{% if project.figma_url %}<a href="{{ project.figma_url }}" target="_blank" rel="noopener">{{ project.figma_url }}</a>{% else %}—{% endif %}</dd></div>
             <div class="def"><dt>Домен</dt><dd>{{ project.domain|default:'—' }}</dd></div>
+        </dl>
+    </div>
+    </div>
+
+    {% include 'projects/partials/tab_graphics.html' %}
+    <div class="panel" style="margin-top: 18px;">
+        <dl class="def-grid">
+            <div class="def"><dt>Срок</dt><dd>{% include 'projects/partials/deadline_badge.html' with status=project.deadline_status %}</dd></div>
+            <div class="def"><dt>Клиент</dt><dd>{{ project.client|default:'—' }}</dd></div>
+            <div class="def"><dt>Плановая дата завершения</dt><dd>{{ project.planned_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div class="def"><dt>Поток</dt><dd>{{ project.display_code|default:'—' }}{% if project.flow %} · {{ project.flow }}{% endif %}</dd></div>
         </dl>
     </div>
 {% endif %}
