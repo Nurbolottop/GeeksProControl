@@ -92,3 +92,18 @@ def lead_intern_ids() -> set:
         .exclude(intern__isnull=True)
         .values_list('intern_id', flat=True),
     )
+
+
+def pm_intern_ids() -> set:
+    """Кто из людей — ПМ. Как и тимлиды, ПМ сотрудники, а не стажёры."""
+    return set(
+        TeamMember.objects.filter(role=TeamRole.PROJECT_MANAGER)
+        .exclude(intern__isnull=True)
+        .values_list('intern_id', flat=True),
+    )
+
+
+def staff_intern_ids() -> set:
+    """Тимлиды и ПМ вместе — все, кого не нужно показывать/считать в
+    списках и цифрах по стажёрам."""
+    return lead_intern_ids() | pm_intern_ids()

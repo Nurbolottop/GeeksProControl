@@ -77,6 +77,44 @@ class LeadsHiddenFromInternListTests(TestCase):
         self.assertEqual(response.context["kind"], "Тимлид направления")
 
 
+class PMsHiddenFromInternListTests(TestCase):
+    """ПМ, как и тимлиды, — сотрудники на зарплате, в общем списке
+    стажёров их быть не должно (карточка и бейдж «Стажёр» остаются —
+    см. InternKindBadgeTests, это только про список)."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        self.user = get_user_model().objects.create_user(
+            username="head", password="x",
+        )
+        self.client.force_login(self.user)
+        self.project = Project.objects.create(name="Балажан")
+        self.pm = Intern.objects.create(full_name="Болотбекова Умутай")
+        self.dev = Intern.objects.create(full_name="Капаров Улар")
+        TeamMember.objects.create(
+            project=self.project, intern=self.pm, role=TeamRole.PROJECT_MANAGER,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.dev, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+    def test_pm_not_in_list(self):
+        response = self.client.get(reverse("interns:list"))
+        names = [p.full_name for p in response.context["page"].object_list]
+        self.assertIn("Капаров Улар", names)
+        self.assertNotIn("Болотбекова Умутай", names)
+
+    def test_pm_card_still_opens(self):
+        response = self.client.get(self.pm.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Болотбекова Умутай")
+
+
 class InternKindBadgeTests(TestCase):
     """ПМ — тоже стажёр, а не отдельная категория (в отличие от тимлида,
     который считается сотрудником): бейдж «Кто в команде» не должен
@@ -935,6 +973,44 @@ class GraduateWorkflowTests(TestCase):
 
         intern.refresh_from_db()
         self.assertEqual(intern.graduate_status, GraduateStatus.PENDING)
+
+    def test_completing_project_moves_active_intern_to_ready(self):
+        """Раньше «Статус» так и оставался «Активный», хотя человек
+        по факту свободен между проектами — список стажёров это скрывал."""
+        from apps.projects.models import Project, ProjectStatus
+        from apps.projects.services import release_team
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Проект", status=ProjectStatus.COMPLETED)
+        intern = Intern.objects.create(full_name="Стажёр", status=InternStatus.ACTIVE)
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        release_team(project)
+
+        intern.refresh_from_db()
+        self.assertEqual(intern.status, InternStatus.READY)
+
+    def test_completing_project_does_not_unpause_intern(self):
+        """Замороженный стажёр остаётся замороженным — завершение проекта
+        не должно тихо его «размораживать»."""
+        from apps.projects.models import Project, ProjectStatus
+        from apps.projects.services import release_team
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Проект", status=ProjectStatus.COMPLETED)
+        intern = Intern.objects.create(full_name="Стажёр", status=InternStatus.PAUSED)
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        release_team(project)
+
+        intern.refresh_from_db()
+        self.assertEqual(intern.status, InternStatus.PAUSED)
 
     def test_cancelling_project_does_not_mark_interns_pending(self):
         """Проект отменён/отказ клиента — это не «успешный выпуск»."""

@@ -15,11 +15,11 @@ FORECAST_MONTHS = 3
 def interns_summary() -> list[dict]:
     """По каждому направлению: всего стажёров, занято на проектах, свободно.
 
-    Тимлиды сюда не входят — они сотрудники, а не стажёры.
+    Тимлиды и ПМ сюда не входят — они сотрудники, а не стажёры.
     """
-    from apps.teams.selectors import lead_intern_ids
+    from apps.teams.selectors import staff_intern_ids
 
-    leads = lead_intern_ids()
+    leads = staff_intern_ids()
     busy_ids = set(
         TeamMember.objects.filter(
             status=TeamMember.Status.ACTIVE, intern__isnull=False,
@@ -51,9 +51,9 @@ def interns_total() -> dict:
     Считается по людям, а не сложением направлений: человек без
     направления тоже попадает в общее число.
     """
-    from apps.teams.selectors import lead_intern_ids
+    from apps.teams.selectors import staff_intern_ids
 
-    leads = lead_intern_ids()
+    leads = staff_intern_ids()
     busy_ids = set(
         TeamMember.objects.filter(
             status=TeamMember.Status.ACTIVE, intern__isnull=False,

@@ -22,10 +22,10 @@ from apps.training.models import Specialization
 
 
 def lead_ids() -> set:
-    """Тимлиды — сотрудники на зарплате, в списке стажёров их нет."""
-    from apps.teams.selectors import lead_intern_ids
+    """Тимлиды и ПМ — сотрудники на зарплате, в списке стажёров их нет."""
+    from apps.teams.selectors import staff_intern_ids
 
-    return lead_intern_ids()
+    return staff_intern_ids()
 
 
 def _attach_current_projects(interns) -> None:

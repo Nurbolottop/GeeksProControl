@@ -52,7 +52,7 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
     Тимлидам уходит личное уведомление в портал: проект после этого из
     их портала пропадает, и без уведомления это выглядело бы как сбой.
     """
-    from apps.interns.models import GraduateStatus, Intern
+    from apps.interns.models import GraduateStatus, Intern, InternStatus
     from apps.teams.models import TeamMember, TeamRole
 
     members = project.team_members.filter(status=TeamMember.Status.ACTIVE)
@@ -71,6 +71,11 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
         Intern.objects.filter(pk__in=intern_ids).update(
             graduate_status=GraduateStatus.PENDING,
         )
+        # Раньше проект заканчивался, а «Статус» стажёра так и оставался
+        # «Активный» — по списку было не понять, что человек свободен.
+        Intern.objects.filter(
+            pk__in=intern_ids, status=InternStatus.ACTIVE,
+        ).update(status=InternStatus.READY)
     notify_leads_project_closed(project, Intern.objects.filter(pk__in=lead_ids))
 
 
