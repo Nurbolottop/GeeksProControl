@@ -5,13 +5,17 @@
  *   data-confirm-input="1.15"                 — требует ввести это значение
  *                                               (попадает в input[name=confirm_code])
  *   data-confirm-ok="Удалить"                 — подпись кнопки (необязательно)
+ *   data-confirm-reasons='[["self","Сам ушёл"], ...]'
+ *                                              — необязательный выпадающий список причины,
+ *                                                выбор попадает в input[name=left_reason]
  */
 (function () {
   'use strict';
 
   var DANGER_RE = /удал|убрать|снять|расформ|безвозвратно|пропад|отозв/i;
 
-  var modal, titleEl, textEl, inputWrap, inputEl, inputHint, errorEl, okBtn, cancelBtn;
+  var modal, titleEl, textEl, inputWrap, inputEl, inputHint, errorEl,
+      reasonWrap, reasonSelect, okBtn, cancelBtn;
   var activeForm = null;
   var activeSubmitter = null;
   var lastFocused = null;
@@ -30,6 +34,10 @@
       '    <input type="text" class="cmodal__input" autocomplete="off" spellcheck="false">' +
       '    <div class="cmodal__error" hidden>Код не совпадает</div>' +
       '  </div>' +
+      '  <div class="cmodal__reason-wrap" hidden>' +
+      '    <label class="cmodal__label">Причина (необязательно)</label>' +
+      '    <select class="cmodal__select"></select>' +
+      '  </div>' +
       '  <div class="cmodal__actions">' +
       '    <button type="button" class="btn btn--secondary cmodal__cancel">Отмена</button>' +
       '    <button type="button" class="btn cmodal__ok">Подтвердить</button>' +
@@ -43,6 +51,8 @@
     inputEl = modal.querySelector('.cmodal__input');
     inputHint = modal.querySelector('.cmodal__code');
     errorEl = modal.querySelector('.cmodal__error');
+    reasonWrap = modal.querySelector('.cmodal__reason-wrap');
+    reasonSelect = modal.querySelector('.cmodal__select');
     okBtn = modal.querySelector('.cmodal__ok');
     cancelBtn = modal.querySelector('.cmodal__cancel');
 
@@ -90,6 +100,17 @@
       okBtn.disabled = false;
     }
 
+    var reasonsRaw = form.dataset.confirmReasons || '';
+    reasonWrap.hidden = !reasonsRaw;
+    if (reasonsRaw) {
+      var reasons = JSON.parse(reasonsRaw);
+      var options = '<option value="">Без причины</option>';
+      reasons.forEach(function (pair) {
+        options += '<option value="' + pair[0] + '">' + pair[1] + '</option>';
+      });
+      reasonSelect.innerHTML = options;
+    }
+
     modal.classList.add('is-open');
     document.body.classList.add('cmodal-open');
     setTimeout(function () { (expected ? inputEl : okBtn).focus(); }, 30);
@@ -114,6 +135,10 @@
       }
       var codeField = activeForm.querySelector('[name=confirm_code]');
       if (codeField) codeField.value = inputEl.value.trim();
+    }
+    if (!reasonWrap.hidden) {
+      var reasonField = activeForm.querySelector('[name=left_reason]');
+      if (reasonField) reasonField.value = reasonSelect.value;
     }
     var form = activeForm;
     var submitter = activeSubmitter;

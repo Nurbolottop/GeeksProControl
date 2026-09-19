@@ -1,7 +1,9 @@
 """Бизнес-логика стажёров: пересчёт рейтинга (ТЗ §12.1)."""
 from decimal import Decimal
 
-from apps.interns.models import GraduateStatus, Intern, InternEvaluation, ProfileFormLink
+from apps.interns.models import (
+    GraduateStatus, Intern, InternEvaluation, InternStatus, ProfileFormLink,
+)
 
 
 def add_evaluation(evaluation: InternEvaluation) -> InternEvaluation:
@@ -265,6 +267,36 @@ def unarchive_person(intern: Intern, user=None) -> None:
         audit_log(intern, 'Из архива', user=user)
 
 
+def pause_person(intern: Intern, user=None) -> bool:
+    """Заморозить стажировку: пока статус «Приостановлен», в табеле
+    посещаемости и активности его не отмечают (см.
+    ``apps.attendance.services.attendance_eligible_members``). Участие
+    в командах не трогаем — заморозка не то же самое, что выход.
+
+    Возвращает False, если менять было не с чего (уже не «Активен»).
+    """
+    from apps.audit.services import log as audit_log
+
+    if intern.status != InternStatus.ACTIVE:
+        return False
+    intern.status = InternStatus.PAUSED
+    intern.save(update_fields=['status', 'updated_at'])
+    audit_log(intern, 'Стажировка заморожена', user=user)
+    return True
+
+
+def unpause_person(intern: Intern, user=None) -> bool:
+    """Возобновить стажировку после заморозки."""
+    from apps.audit.services import log as audit_log
+
+    if intern.status != InternStatus.PAUSED:
+        return False
+    intern.status = InternStatus.ACTIVE
+    intern.save(update_fields=['status', 'updated_at'])
+    audit_log(intern, 'Стажировка возобновлена', user=user)
+    return True
+
+
 
 def join_project_from_form(intern: Intern, link: ProfileFormLink):
     """Анкета заполнена по ссылке проекта — человек сразу в команде.
@@ -302,6 +334,13 @@ def join_project_from_form(intern: Intern, link: ProfileFormLink):
         intern.status = InternStatus.ACTIVE
         update_fields.append('status')
     if intern.graduate_status:
+        from apps.audit.services import log as audit_log
+
+        audit_log(
+            intern, 'Статус выпускника снят',
+            old_value=intern.get_graduate_status_display(),
+            reason=f'заполнил(а) анкету — в команде «{project.name}»',
+        )
         intern.graduate_status = ''
         update_fields.append('graduate_status')
     if update_fields:

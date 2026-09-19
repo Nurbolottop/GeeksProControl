@@ -14,6 +14,7 @@ from apps.pm_portal import services, stages as stage_reminders
 from apps.pm_portal.forms import PMClientForm, PMDocumentForm
 from apps.projects.models import ProjectReport, ProjectStage
 from apps.projects.services import calculate_deadline_status
+from apps.teams import services as team_services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
 from apps.teams.selectors import group_by_role
@@ -300,7 +301,7 @@ def member_delete(request, pk, member_pk):
     member = get_object_or_404(TeamMember, pk=member_pk, project=project)
     if request.method == 'POST':
         name = member.person_name
-        member.delete()
+        team_services.leave_team(member, reason=request.POST.get('left_reason', ''))
         messages.success(request, f'{name} убран(а) из команды.')
     return redirect(_team_url(project))
 
@@ -329,6 +330,7 @@ def intern_detail(request, pk, intern_pk):
         'project': project, 'member': member, 'intern': intern,
         'scores': scores,
         'average_score': round(sum(values) / len(values), 1) if values else None,
+        'projects_count': intern.team_memberships.count(),
     })
 
 

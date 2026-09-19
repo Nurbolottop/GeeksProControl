@@ -175,8 +175,11 @@ class PmTeamManagementTests(PmProjectOwnershipTests):
         )
         self.client.post(
             reverse("pm_portal:member_delete", args=[self.project_a.pk, member.pk]),
+            {"left_reason": "self"},
         )
-        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
+        self.assertEqual(member.left_reason, "self")
 
     def test_team_tab_shows_only_own_project_members(self):
         intern = Intern.objects.create(full_name="Участник А")
@@ -343,6 +346,21 @@ class PmInternDetailTests(PmProjectOwnershipTests):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Стажёров Детализируемый")
         self.assertContains(response, "0700111222")
+
+    def test_shows_total_projects_count(self):
+        member_intern = Intern.objects.create(full_name="Стажёров Считаемый")
+        TeamMember.objects.create(
+            project=self.project_a, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project_b, intern=member_intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        response = self.client.get(
+            reverse("pm_portal:intern_detail", args=[self.project_a.pk, member_intern.pk]),
+        )
+        self.assertEqual(response.context["projects_count"], 2)
 
     def test_cannot_view_intern_not_on_own_project(self):
         outsider = Intern.objects.create(full_name="Не в команде")

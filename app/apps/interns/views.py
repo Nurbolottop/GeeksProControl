@@ -294,6 +294,12 @@ def intern_detail(request, pk):
         # видна по проектам ниже и по направлению «PM» в шапке.
         kind, kind_tone = 'Стажёр', 'gray'
 
+    from apps.audit.models import AuditLog
+
+    history = AuditLog.objects.filter(
+        object_type='Intern', object_id=str(intern.pk),
+    ).select_related('user').order_by('-created_at')[:20]
+
     context = {
         'intern': intern,
         'is_lead': is_lead,
@@ -309,6 +315,7 @@ def intern_detail(request, pk):
         'evaluations': intern.evaluations.select_related('project', 'evaluator'),
         'criteria': InternEvaluation.CRITERIA,
         'is_pm': is_pm,
+        'history': history,
     }
     return render(request, 'interns/detail.html', context)
 
@@ -337,6 +344,14 @@ def intern_project_add(request, pk):
             intern.status = InternStatus.ACTIVE
             update_fields.append('status')
         if intern.graduate_status:
+            from apps.audit.services import log as audit_log
+
+            audit_log(
+                intern, 'Статус выпускника снят',
+                old_value=intern.get_graduate_status_display(),
+                reason=f'переведён(а) на проект «{member.project.name}»',
+                user=request.user,
+            )
             intern.graduate_status = ''
             update_fields.append('graduate_status')
         if update_fields:
@@ -353,11 +368,13 @@ def intern_project_add(request, pk):
 @login_required
 def intern_project_remove(request, pk, member_pk):
     """Убрать стажёра с проекта прямо с его карточки."""
+    from apps.teams import services as team_services
+
     intern = get_object_or_404(Intern, pk=pk)
     member = get_object_or_404(TeamMember, pk=member_pk, intern=intern)
     if request.method == 'POST':
         name = member.project.name if member.project_id else 'проекта'
-        member.delete()
+        team_services.leave_team(member, reason=request.POST.get('left_reason', ''))
         messages.success(request, f'Убран(а) с «{name}».')
     return redirect(intern.get_absolute_url())
 
@@ -430,6 +447,30 @@ def intern_unarchive(request, pk):
             request,
             f'{intern.full_name} возвращён(а) из архива. На проекты назначьте заново.',
         )
+    return redirect(intern.get_absolute_url())
+
+
+@login_required
+def intern_pause(request, pk):
+    """Заморозить стажировку — из табеля посещаемости пропадает, из
+    команды проекта нет."""
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        if services.pause_person(intern, user=request.user):
+            messages.success(request, f'Стажировка {intern.full_name} заморожена.')
+        else:
+            messages.error(request, 'Заморозить можно только активную стажировку.')
+    return redirect(intern.get_absolute_url())
+
+
+@login_required
+def intern_unpause(request, pk):
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        if services.unpause_person(intern, user=request.user):
+            messages.success(request, f'Стажировка {intern.full_name} возобновлена.')
+        else:
+            messages.error(request, 'Возобновить можно только замороженную стажировку.')
     return redirect(intern.get_absolute_url())
 
 

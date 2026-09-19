@@ -151,8 +151,8 @@ def toggle(request, pk):
     if request.method != 'POST':
         raise Http404
     intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
-    if meeting.group.members.filter(
-        intern=intern, role__in=services.ATTENDANCE_EXCLUDED_ROLES,
+    if not services.attendance_eligible_members(meeting.group).filter(
+        intern=intern,
     ).exists():
         raise Http404
     mark = services.toggle_mark(meeting, intern, user=request.user)
@@ -321,8 +321,8 @@ def mark_person(request, pk):
     if request.method != 'POST':
         raise Http404
     intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
-    if meeting.group.members.filter(
-        intern=intern, role__in=services.ATTENDANCE_EXCLUDED_ROLES,
+    if not services.attendance_eligible_members(meeting.group).filter(
+        intern=intern,
     ).exists():
         raise Http404
     status = request.POST.get('status', '')
@@ -359,8 +359,8 @@ def score_person(request, pk):
     if request.method != 'POST':
         raise Http404
     intern = get_object_or_404(Intern, pk=request.POST.get('intern'))
-    if meeting.group.members.filter(
-        intern=intern, role__in=services.ATTENDANCE_EXCLUDED_ROLES,
+    if not services.attendance_eligible_members(meeting.group).filter(
+        intern=intern,
     ).exists():
         raise Http404
     entry = WorkScore.objects.filter(meeting=meeting, intern=intern).first()

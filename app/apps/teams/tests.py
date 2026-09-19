@@ -323,7 +323,8 @@ class LeadSectionTests(TestCase):
             project=self.project, intern=self.person, role=TeamRole.TEAM_LEAD,
         )
         self.client.post(reverse("teams:lead_remove", args=[member.pk]))
-        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
         self.assertTrue(Intern.objects.filter(pk=self.person.pk).exists())
 
     def test_new_person_can_be_assigned_lead(self):
@@ -440,7 +441,8 @@ class PMSectionTests(TestCase):
             project=self.project, intern=self.person, role=TeamRole.PROJECT_MANAGER,
         )
         self.client.post(reverse("teams:pm_remove", args=[member.pk]))
-        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
         self.assertTrue(Intern.objects.filter(pk=self.person.pk).exists())
 
     def test_pm_not_shown_on_lead_page(self):
@@ -498,14 +500,18 @@ class MemberDeleteTests(TestCase):
     def test_member_removed_person_stays(self):
         response = self.client.post(
             reverse("teams:member_delete", args=[self.member.pk]),
+            {"left_reason": "not_fit"},
         )
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(TeamMember.objects.filter(pk=self.member.pk).exists())
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.status, TeamMember.Status.LEFT)
+        self.assertEqual(self.member.left_reason, "not_fit")
         self.assertTrue(Intern.objects.filter(pk=self.person.pk).exists())
 
     def test_get_does_not_remove_member(self):
         self.client.get(reverse("teams:member_delete", args=[self.member.pk]))
-        self.assertTrue(TeamMember.objects.filter(pk=self.member.pk).exists())
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.status, TeamMember.Status.ACTIVE)
 
     def test_team_cleared(self):
         other = Intern.objects.create(full_name="Бекназар")
@@ -513,7 +519,10 @@ class MemberDeleteTests(TestCase):
             project=self.project, intern=other, role=TeamRole.BACKEND,
         )
         self.client.post(reverse("teams:team_clear", args=[self.project.pk]))
-        self.assertEqual(self.project.team_members.count(), 0)
+        self.assertEqual(
+            self.project.team_members.filter(status=TeamMember.Status.ACTIVE).count(), 0,
+        )
+        self.assertEqual(self.project.team_members.count(), 2)
         self.assertEqual(Intern.objects.count(), 2)
 
     def test_duplicate_membership_removed_by_command(self):

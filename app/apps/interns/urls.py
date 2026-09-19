@@ -41,6 +41,8 @@ urlpatterns = [
     path('<int:pk>/delete/', views.intern_delete, name='delete'),
     path('<int:pk>/archive/', views.intern_archive, name='archive'),
     path('<int:pk>/unarchive/', views.intern_unarchive, name='unarchive'),
+    path('<int:pk>/pause/', views.intern_pause, name='pause'),
+    path('<int:pk>/unpause/', views.intern_unpause, name='unpause'),
     path('<int:pk>/grant-access/', views.grant_pm_access, name='grant_access'),
     path(
         '<int:pk>/grant-lead-access/', views.grant_lead_access,

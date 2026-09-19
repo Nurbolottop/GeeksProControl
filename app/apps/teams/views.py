@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.common.text import plural
@@ -323,7 +324,7 @@ def lead_remove(request, pk):
     if request.method == 'POST':
         name = member.person_name
         project = member.project.name if member.project_id else 'проекте'
-        member.delete()
+        services.leave_team(member)
         messages.success(request, f'{name} больше не тимлид в «{project}».')
     return redirect('teams:lead_list')
 
@@ -408,7 +409,7 @@ def pm_remove(request, pk):
     if request.method == 'POST':
         name = member.person_name
         project = member.project.name if member.project_id else 'проекте'
-        member.delete()
+        services.leave_team(member)
         messages.success(request, f'{name} больше не ПМ в «{project}».')
     return redirect('teams:pm_list')
 
@@ -422,7 +423,7 @@ def member_delete(request, pk):
     project, group = member.project, member.group
     if request.method == 'POST':
         name = member.person_name
-        member.delete()
+        services.leave_team(member, reason=request.POST.get('left_reason', ''))
         messages.success(request, f'{name} убран(а) из команды.')
     if project:
         return redirect(f'{project.get_absolute_url()}?tab=team')
@@ -436,8 +437,9 @@ def team_clear(request, project_pk):
     """Расформировать команду проекта: снять всех участников."""
     project = get_object_or_404(Project, pk=project_pk)
     if request.method == 'POST':
-        removed = project.team_members.count()
-        project.team_members.all().delete()
+        active = project.team_members.filter(status=TeamMember.Status.ACTIVE)
+        removed = active.count()
+        active.update(status=TeamMember.Status.LEFT, left_at=timezone.localdate())
         messages.success(
             request, f'Команда расформирована, снято участников: {removed}.',
         )

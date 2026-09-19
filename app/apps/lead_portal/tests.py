@@ -145,8 +145,11 @@ class LeadTeamManagementTests(LeadProjectOwnershipTests):
         )
         self.client.post(
             reverse("lead_portal:member_delete", args=[self.project_a.pk, member.pk]),
+            {"left_reason": "not_fit"},
         )
-        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
+        self.assertEqual(member.left_reason, "not_fit")
 
     def test_team_tab_shows_only_own_project_members(self):
         intern = Intern.objects.create(full_name="Участник А")
@@ -516,6 +519,21 @@ class LeadInternDetailTests(LeadProjectOwnershipTests):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Видимый Стажёр")
+
+    def test_shows_total_projects_count(self):
+        intern = Intern.objects.create(full_name="Считаемый Стажёр")
+        TeamMember.objects.create(
+            project=self.project_a, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.project_b, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        response = self.client.get(
+            reverse("lead_portal:intern_detail", args=[self.project_a.pk, intern.pk]),
+        )
+        self.assertEqual(response.context["projects_count"], 2)
 
     def test_cannot_view_foreign_project_intern(self):
         intern = Intern.objects.create(full_name="Чужой Стажёр")

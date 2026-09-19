@@ -173,6 +173,22 @@ def attention_items() -> list[dict]:
                 'url': reverse('teams:overview'),
             })
 
+    # Выпускники, зависшие «на проверке» без решения (ТЗ: продолжает
+    # стажировку / не хочет продолжать)
+    from apps.interns.models import GraduateStatus
+    from apps.interns.services import graduated_interns
+
+    for intern in graduated_interns():
+        if intern.graduate_status != GraduateStatus.PENDING or not intern.graduated_at:
+            continue
+        days = (today - intern.graduated_at).days
+        if days > 14:
+            items.append({
+                'level': 'yellow',
+                'text': f'{intern.full_name} — на проверке выпуска уже {days} дн., нужно решить',
+                'url': intern.get_absolute_url(),
+            })
+
     order = {'red': 0, 'orange': 1, 'yellow': 2}
     items.sort(key=lambda item: order.get(item['level'], 3))
     return items

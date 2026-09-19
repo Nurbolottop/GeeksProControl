@@ -329,8 +329,11 @@ class InternProjectAddRemoveTests(TestCase):
         )
         response = self.client.post(
             reverse("interns:project_remove", args=[self.intern.pk, member.pk]),
+            {"left_reason": "unresponsive"},
         )
-        self.assertFalse(TeamMember.objects.filter(pk=member.pk).exists())
+        member.refresh_from_db()
+        self.assertEqual(member.status, TeamMember.Status.LEFT)
+        self.assertEqual(member.left_reason, "unresponsive")
         self.assertRedirects(response, self.intern.get_absolute_url())
 
     def test_cannot_remove_membership_belonging_to_another_intern(self):
@@ -348,6 +351,68 @@ class InternProjectAddRemoveTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertTrue(TeamMember.objects.filter(pk=member.pk).exists())
+
+
+class InternPauseTests(TestCase):
+    """Заморозка стажировки: статус «Приостановлен» + кнопка на карточке."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.intern = Intern.objects.create(
+            full_name="Аскар Тестов", status=InternStatus.ACTIVE,
+        )
+
+    def test_pause_active_intern(self):
+        response = self.client.post(reverse("interns:pause", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, InternStatus.PAUSED)
+        self.assertRedirects(response, self.intern.get_absolute_url())
+
+    def test_cannot_pause_non_active_intern(self):
+        self.intern.status = InternStatus.WAITING
+        self.intern.save(update_fields=["status"])
+        self.client.post(reverse("interns:pause", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, InternStatus.WAITING)
+
+    def test_unpause_paused_intern(self):
+        self.intern.status = InternStatus.PAUSED
+        self.intern.save(update_fields=["status"])
+        response = self.client.post(reverse("interns:unpause", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, InternStatus.ACTIVE)
+        self.assertRedirects(response, self.intern.get_absolute_url())
+
+    def test_cannot_unpause_non_paused_intern(self):
+        response = self.client.post(reverse("interns:unpause", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, InternStatus.ACTIVE)
+        self.assertRedirects(response, self.intern.get_absolute_url())
+
+    def test_pause_writes_audit_log(self):
+        from apps.audit.models import AuditLog
+
+        self.client.post(reverse("interns:pause", args=[self.intern.pk]))
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_type="Intern", object_id=str(self.intern.pk),
+                action="Стажировка заморожена",
+            ).exists(),
+        )
+
+    def test_detail_page_shows_pause_button_only_for_active(self):
+        response = self.client.get(self.intern.get_absolute_url())
+        self.assertContains(response, reverse("interns:pause", args=[self.intern.pk]))
+        self.assertNotContains(response, reverse("interns:unpause", args=[self.intern.pk]))
+
+        self.intern.status = InternStatus.PAUSED
+        self.intern.save(update_fields=["status"])
+        response = self.client.get(self.intern.get_absolute_url())
+        self.assertContains(response, reverse("interns:unpause", args=[self.intern.pk]))
+        self.assertNotContains(response, reverse("interns:pause", args=[self.intern.pk]))
 
 
 class GrantPMAccessTests(TestCase):
@@ -907,6 +972,57 @@ class GraduateWorkflowTests(TestCase):
         graduate.refresh_from_db()
         self.assertEqual(graduate.graduate_status, "")
         self.assertNotIn(graduate, services.graduated_interns())
+
+    def test_assigning_new_project_logs_graduate_status_reset(self):
+        """Сброс статуса выпускника не должен происходить незаметно —
+        должна остаться запись в истории карточки."""
+        from apps.audit.models import AuditLog
+        from apps.projects.models import Project
+
+        graduate = Intern.objects.create(
+            full_name="Продолжает", graduate_status=GraduateStatus.PENDING,
+            status=InternStatus.ACTIVE,
+        )
+        new_project = Project.objects.create(name="Новый проект")
+
+        self.client.post(
+            reverse("interns:project_add", args=[graduate.pk]),
+            {"project": new_project.pk},
+        )
+
+        entry = AuditLog.objects.get(
+            object_type="Intern", object_id=str(graduate.pk),
+            action="Статус выпускника снят",
+        )
+        self.assertIn("Новый проект", entry.reason)
+        self.assertEqual(entry.user, self.user)
+
+        response = self.client.get(graduate.get_absolute_url())
+        self.assertContains(response, "Статус выпускника снят")
+
+    def test_join_project_from_form_logs_graduate_status_reset(self):
+        """Тот же сброс статуса выпускника, но по анкете-ссылке проекта —
+        тоже не должен проходить незаметно."""
+        from apps.audit.models import AuditLog
+        from apps.interns.models import ProfileFormLink
+        from apps.projects.models import Project
+
+        graduate = Intern.objects.create(
+            full_name="Заполнил Анкету", graduate_status=GraduateStatus.PENDING,
+            status=InternStatus.ACTIVE,
+        )
+        project = Project.objects.create(name="Проект по ссылке")
+        link = ProfileFormLink.objects.create(project=project)
+
+        services.join_project_from_form(graduate, link)
+
+        graduate.refresh_from_db()
+        self.assertEqual(graduate.graduate_status, "")
+        entry = AuditLog.objects.get(
+            object_type="Intern", object_id=str(graduate.pk),
+            action="Статус выпускника снят",
+        )
+        self.assertIn("Проект по ссылке", entry.reason)
 
     def test_decline_sets_status_without_touching_resume_bank(self):
         graduate = Intern.objects.create(

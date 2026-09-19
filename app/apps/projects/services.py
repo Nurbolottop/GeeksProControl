@@ -65,6 +65,7 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
     )
     members.update(
         status=TeamMember.Status.LEFT, left_at=when or timezone.localdate(),
+        left_reason=TeamMember.LeftReason.PROJECT_ENDED,
     )
     if project.status == ProjectStatus.COMPLETED and intern_ids:
         Intern.objects.filter(pk__in=intern_ids).update(

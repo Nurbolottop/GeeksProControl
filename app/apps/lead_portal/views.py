@@ -11,6 +11,7 @@ from apps.attendance import services as attendance_services
 from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
 from apps.lead_portal import services
 from apps.projects.services import calculate_deadline_status
+from apps.teams import services as team_services
 from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
 from apps.teams.models import TeamMember
 from apps.teams.selectors import ROLE_LABELS, ROLE_TONE, group_by_role
@@ -250,7 +251,7 @@ def member_delete(request, pk, member_pk):
     member = _own_direction_member_or_404(request, project, member_pk)
     if request.method == 'POST':
         name = member.person_name
-        member.delete()
+        team_services.leave_team(member, reason=request.POST.get('left_reason', ''))
         messages.success(request, f'{name} убран(а) из команды.')
     return redirect(_team_url(project))
 
@@ -457,6 +458,7 @@ def intern_detail(request, pk, intern_pk):
         'project': project, 'member': member, 'intern': intern,
         'scores': scores,
         'average_score': round(sum(values) / len(values), 1) if values else None,
+        'projects_count': intern.team_memberships.count(),
     })
 
 

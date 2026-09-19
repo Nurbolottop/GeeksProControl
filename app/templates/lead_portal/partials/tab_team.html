@@ -80,14 +80,16 @@
                         {% endif %}
                         <div class="member__meta">
                             {{ member.intern.specialization|default:'—' }}
-                            {% if member.status != 'active' %} · вышел{% endif %}
+                            {% if member.status != 'active' %} · вышел{% if member.left_reason %} ({{ member.get_left_reason_display }}){% endif %}{% endif %}
                         </div>
                     </div>
                     <div class="member__actions">
                         <a href="{% url 'lead_portal:member_edit' project.pk member.pk %}" class="btn-edit" title="Изменить">✎</a>
                         <form method="post" action="{% url 'lead_portal:member_delete' project.pk member.pk %}" style="margin:0"
-                              data-confirm="Убрать {{ member.person_name|escapejs }} из команды?">
+                              data-confirm="Убрать {{ member.person_name|escapejs }} из команды?"
+                              data-confirm-reasons='[["self","Сам ушёл"],["unresponsive","Не отвечает"],["not_fit","Не подошёл"],["other","Другое"]]'>
                             {% csrf_token %}
+                            <input type="hidden" name="left_reason">
                             <button type="submit" class="btn-edit btn-edit--danger" title="Убрать из команды">✕</button>
                         </form>
                     </div>

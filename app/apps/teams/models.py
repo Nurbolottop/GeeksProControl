@@ -26,6 +26,13 @@ class TeamMember(TimeStampedModel):
         ACTIVE = 'active', 'Активен'
         LEFT = 'left', 'Вышел'
 
+    class LeftReason(models.TextChoices):
+        SELF = 'self', 'Сам ушёл'
+        UNRESPONSIVE = 'unresponsive', 'Не отвечает'
+        NOT_FIT = 'not_fit', 'Не подошёл'
+        PROJECT_ENDED = 'project_ended', 'Проект завершён'
+        OTHER = 'other', 'Другое'
+
     group = models.ForeignKey(
         'flows.Group', on_delete=models.CASCADE, related_name='members',
         verbose_name='Группа', null=True, blank=True,
@@ -51,6 +58,9 @@ class TeamMember(TimeStampedModel):
     status = models.CharField(
         'Статус', max_length=10,
         choices=Status.choices, default=Status.ACTIVE, db_index=True,
+    )
+    left_reason = models.CharField(
+        'Причина выхода', max_length=20, choices=LeftReason.choices, blank=True,
     )
     comment = models.TextField('Комментарий', blank=True)
 

@@ -30,6 +30,23 @@
             </a>
         {% endif %}
         <a href="{% url 'interns:update' intern.pk %}" class="btn btn--secondary">Редактировать</a>
+        {% if not intern.is_archived %}
+            {% if intern.status == 'paused' %}
+                <form method="post" action="{% url 'interns:unpause' intern.pk %}" style="margin:0"
+                      data-confirm="Возобновить стажировку {{ intern.full_name|escapejs }}? Снова появится в табеле посещаемости."
+                      data-confirm-ok="Возобновить">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--secondary">Возобновить</button>
+                </form>
+            {% elif intern.status == 'active' %}
+                <form method="post" action="{% url 'interns:pause' intern.pk %}" style="margin:0"
+                      data-confirm="Заморозить стажировку {{ intern.full_name|escapejs }}? Пока заморожена, его не будут отмечать в табеле посещаемости. Участие в командах не меняется."
+                      data-confirm-ok="Заморозить">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--secondary">Заморозить</button>
+                </form>
+            {% endif %}
+        {% endif %}
         {% if intern.is_archived %}
             <form method="post" action="{% url 'interns:unarchive' intern.pk %}" style="margin:0"
                   data-confirm="Вернуть {{ intern.full_name|escapejs }} из архива? Вход в систему откроется, на проекты нужно будет назначить заново."
@@ -125,8 +142,10 @@
                     </form>
                 {% endif %}
                 <form method="post" action="{% url 'interns:project_remove' intern.pk member.pk %}" style="margin:0"
-                      data-confirm="Убрать {{ intern.full_name|escapejs }} с проекта «{{ member.project.name|escapejs }}»?">
+                      data-confirm="Убрать {{ intern.full_name|escapejs }} с проекта «{{ member.project.name|escapejs }}»?"
+                      data-confirm-reasons='[["self","Сам ушёл"],["unresponsive","Не отвечает"],["not_fit","Не подошёл"],["other","Другое"]]'>
                     {% csrf_token %}
+                    <input type="hidden" name="left_reason">
                     <button type="submit" class="btn-edit btn-edit--danger" title="Убрать с проекта">✕</button>
                 </form>
             </div>
@@ -140,6 +159,7 @@
             <div style="padding: 6px 0; border-bottom: 1px solid var(--border); color: var(--text-muted)">
                 <a href="{{ member.project.get_absolute_url }}">{{ member.project.name }}</a>
                 — {{ member.get_role_display }}
+                {% if member.left_reason %} · {{ member.get_left_reason_display }}{% endif %}
             </div>
         {% endfor %}
     {% endif %}
@@ -166,6 +186,22 @@
         </div>
     {% empty %}
         <div class="empty">Оценок пока нет.</div>
+    {% endfor %}
+</div>
+
+<div class="panel">
+    <h2>История</h2>
+    {% for entry in history %}
+        <div style="padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;">
+            <strong>{{ entry.action }}</strong>
+            {% if entry.reason %} — {{ entry.reason }}{% endif %}
+            {% if entry.old_value %}<div style="color: var(--text-muted); margin-top:2px">{{ entry.old_value }}</div>{% endif %}
+            <div style="color: var(--text-muted); font-size:11.5px; margin-top:2px">
+                {{ entry.created_at|date:'d.m.Y H:i' }}{% if entry.user %} · {{ entry.user.display_name }}{% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <div class="empty">Записей пока нет.</div>
     {% endfor %}
 </div>
 {% endblock %}

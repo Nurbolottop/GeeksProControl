@@ -29,6 +29,7 @@
         <div class="def"><dt>Филиал</dt><dd>{{ intern.branch|default:'—' }}</dd></div>
         <div class="def"><dt>Начало стажировки</dt><dd>{{ intern.internship_start_date|date:'d.m.Y'|default:'—' }}</dd></div>
         <div class="def"><dt>Стажировка по счёту</dt><dd>{{ intern.internship_attempt }}-й раз</dd></div>
+        <div class="def"><dt>Проектов у нас</dt><dd>{{ projects_count }}</dd></div>
     </dl>
 </div>
 

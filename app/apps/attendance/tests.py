@@ -144,6 +144,36 @@ class MeetingScoreTests(TestCase):
         self.assertEqual(score_response.status_code, 404)
         self.assertFalse(WorkScore.objects.filter(meeting=self.meeting, intern=pm).exists())
 
+    def test_paused_intern_excluded_from_marking_and_scoring(self):
+        """Заморозил стажировку — пропал из табеля, пока не разморозят."""
+        from apps.interns.models import InternStatus
+
+        self.person.status = InternStatus.PAUSED
+        self.person.save(update_fields=['status'])
+
+        detail = self.client.get(
+            reverse('attendance:meeting_detail', args=[self.meeting.pk]),
+        )
+        self.assertNotContains(detail, self.person.full_name)
+
+        mark_response = self.client.post(
+            reverse('attendance:mark_person', args=[self.meeting.pk]),
+            {'intern': self.person.pk, 'status': 'present'},
+        )
+        self.assertEqual(mark_response.status_code, 404)
+        self.assertFalse(
+            Attendance.objects.filter(meeting=self.meeting, intern=self.person).exists(),
+        )
+
+        score_response = self.client.post(
+            reverse('attendance:score_person', args=[self.meeting.pk]),
+            {'intern': self.person.pk, 'score': '9'},
+        )
+        self.assertEqual(score_response.status_code, 404)
+        self.assertFalse(
+            WorkScore.objects.filter(meeting=self.meeting, intern=self.person).exists(),
+        )
+
 
 class MeetingCompletionTests(TestCase):
     """meeting_completion: закрыт ли табель собрания для списка людей —

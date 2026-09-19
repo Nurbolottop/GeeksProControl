@@ -17,8 +17,13 @@ ATTENDANCE_EXCLUDED_ROLES = (TeamRole.PROJECT_MANAGER, TeamRole.TEAM_LEAD)
 
 
 def attendance_eligible_members(group):
-    """Участники группы, которых можно отмечать/оценивать — без ПМ и тимлида."""
-    return group.members.exclude(role__in=ATTENDANCE_EXCLUDED_ROLES)
+    """Участники группы, которых можно отмечать/оценивать — без ПМ,
+    тимлида и стажёров, чья стажировка сейчас заморожена."""
+    from apps.interns.models import InternStatus
+
+    return group.members.exclude(
+        role__in=ATTENDANCE_EXCLUDED_ROLES,
+    ).exclude(intern__status=InternStatus.PAUSED)
 
 
 def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
