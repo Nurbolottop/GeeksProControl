@@ -534,14 +534,17 @@ class AcademyViewsTests(TestCase):
         self.assertEqual(response.context['directions'], [])
         self.assertIsNone(response.context['specialization'])
 
-    def test_sidebar_shows_branch_and_direction_tree(self):
+    def test_sidebar_lists_branches_only(self):
+        """В меню — только филиалы: направления показывает сама страница
+        филиала, а «План-график» и «Все группы» из меню убраны."""
         importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
         response = self.client.get(reverse('training:plan'))
-        self.assertContains(response, 'Бишкек')
-        self.assertContains(
-            response,
-            f"?branch=Бишкек&specialization={self.specs['Backend'].pk}",
-        )
+        html = response.content.decode()
+        sidebar = html[html.index('IT-академия'):html.index('Резерв')]
+        self.assertIn('?branch=%D0%91%D0%B8%D1%88%D0%BA%D0%B5%D0%BA', sidebar)
+        self.assertNotIn('specialization=', sidebar)
+        self.assertNotIn('План-график', sidebar)
+        self.assertNotIn('Все группы', sidebar)
 
     def test_sidebar_tree_empty_when_no_groups(self):
         response = self.client.get(reverse('training:plan'))
