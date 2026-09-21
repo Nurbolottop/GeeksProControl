@@ -917,16 +917,23 @@ class PmProjectDetailsTests(TestCase):
         self.assertIn(ProjectStageKey.MOBILE_DEV, keys)
         self.assertNotIn(ProjectStageKey.FRONTEND, keys)
 
-    def test_started_stage_is_not_dropped_when_type_changes(self):
+    def test_started_stage_moves_to_the_new_type(self):
+        """Начатый этап разработки не теряется и не остаётся вторым:
+        он переезжает на новый ключ вместе со статусом и датами —
+        иначе у мобильного проекта в этапах так и висел бы Frontend."""
         from apps.projects.models import ProjectStage, ProjectStageKey
 
         frontend = self.project.stages.get(key=ProjectStageKey.FRONTEND)
         frontend.status = ProjectStage.Status.IN_PROGRESS
-        frontend.save(update_fields=["status"])
+        frontend.start_date = "2026-09-12"
+        frontend.save(update_fields=["status", "start_date"])
         self.client.post(self._url("type"), {"project_type": self.mobile.pk})
         keys = set(self.project.stages.values_list("key", flat=True))
-        self.assertIn(ProjectStageKey.FRONTEND, keys)
         self.assertIn(ProjectStageKey.MOBILE_DEV, keys)
+        self.assertNotIn(ProjectStageKey.FRONTEND, keys)
+        moved = self.project.stages.get(key=ProjectStageKey.MOBILE_DEV)
+        self.assertEqual(moved.status, ProjectStage.Status.IN_PROGRESS)
+        self.assertEqual(str(moved.start_date), "2026-09-12")
 
     def test_pm_fills_links(self):
         self.client.post(self._url("links"), {

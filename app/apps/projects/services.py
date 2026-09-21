@@ -33,6 +33,7 @@ TRACKED_FIELDS = {
     'planned_end_date': 'Плановая дата завершения',
     'progress': 'Прогресс',
     'priority': 'Приоритет',
+    'project_type': 'Тип проекта',
 }
 
 # Статусы, после которых команда больше не работает над проектом:
@@ -167,16 +168,37 @@ def ensure_group(project: Project):
     return group
 
 
+# Этап разработки зависит от типа проекта: у веба Frontend, у мобильного
+# «Мобильная разработка». Это одна и та же работа, поэтому при смене типа
+# этап переименовываем, а не заводим заново — статус, даты и прогресс
+# остаются на месте.
+DEV_STAGE_PAIR = (ProjectStageKey.FRONTEND, ProjectStageKey.MOBILE_DEV)
+
+
 def sync_stages_to_type(project: Project) -> None:
     """Приводит набор этапов к типу проекта.
 
     Тип указывает ПМ уже после создания, а от него зависит, какой этап
-    разработки нужен: у мобильного — «Мобильная разработка», у веба —
-    «Frontend». Недостающий этап добавляем, лишний убираем только если
-    его ещё не трогали, и заново расставляем порядок.
+    разработки нужен. Уже начатый этап разработки переносим на новый ключ
+    вместе со статусом и датами; недостающие этапы добавляем, лишние
+    убираем только если их ещё не трогали, и заново расставляем порядок.
     """
     desired = lifecycle_stages(project.project_type)
     stages = {stage.key: stage for stage in project.stages.all()}
+
+    wanted_dev = next((key for key in DEV_STAGE_PAIR if key in desired), None)
+    stale_dev = next(
+        (key for key in DEV_STAGE_PAIR if key != wanted_dev and key in stages), None,
+    )
+    if wanted_dev and stale_dev and wanted_dev not in stages:
+        stage = stages.pop(stale_dev)
+        stage.key = wanted_dev
+        stage.save(update_fields=['key', 'updated_at'])
+        stages[wanted_dev] = stage
+        if project.current_stage == stale_dev:
+            project.current_stage = wanted_dev
+            project.save(update_fields=['current_stage', 'updated_at'])
+
     for index, key in enumerate(desired):
         stage = stages.get(key)
         if stage is None:
@@ -251,6 +273,9 @@ def update_project(
             ))
     project.last_activity_at = timezone.now()
     project.save()
+    if old_values.get('project_type') != project.project_type:
+        # сменили тип — этап разработки должен стать Frontend или Mobile
+        sync_stages_to_type(project)
     old_status = old_values.get('status')
     if project.status in TERMINAL_STATUSES and old_status != project.status:
         release_team(project)

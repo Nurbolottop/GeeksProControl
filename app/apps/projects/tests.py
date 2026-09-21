@@ -959,3 +959,68 @@ class ProblematicProjectTests(TestCase):
     def test_not_problematic_by_default(self):
         response = self.client.get(self.project.get_absolute_url())
         self.assertContains(response, '<span class="badge badge--gray">Нет</span>')
+
+
+class StagesFollowProjectTypeTests(TestCase):
+    """Этап разработки идёт за типом проекта: web → Frontend, мобильный → Mobile."""
+
+    def setUp(self):
+        from apps.projects.models import ProjectType
+        from apps.projects.services import create_project
+
+        self.user = User.objects.create_user(username="head-type", password="x")
+        self.client.force_login(self.user)
+        self.web = ProjectType.objects.create(name="Web-сайт")
+        self.mobile = ProjectType.objects.create(name="Mobile App", is_mobile=True)
+        self.project = make_project(name="Greenbonus", project_type=self.web)
+        create_project(self.project)
+
+    def _keys(self):
+        return [stage.key for stage in self.project.stages.order_by("order")]
+
+    def test_started_frontend_stage_becomes_mobile(self):
+        """Этап уже в работе — переносим его, а не заводим второй."""
+        from apps.pm_portal.stages import set_stage_status
+        from apps.projects.services import sync_stages_to_type
+
+        for key in ("new", "documents", "requirements", "team_forming", "design", "backend"):
+            set_stage_status(self.project, self.project.stages.get(key=key), "done")
+        stage = self.project.stages.get(key="frontend")
+        set_stage_status(self.project, stage, "in_progress")
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.current_stage, "frontend")
+        self.project.project_type = self.mobile
+        self.project.save(update_fields=["project_type"])
+
+        sync_stages_to_type(self.project)
+        keys = self._keys()
+        self.assertIn("mobile_dev", keys)
+        self.assertNotIn("frontend", keys)
+        moved = self.project.stages.get(key="mobile_dev")
+        self.assertEqual(moved.status, "in_progress")
+        self.assertIsNotNone(moved.start_date)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.current_stage, "mobile_dev")
+
+    def test_type_change_through_edit_syncs_stages(self):
+        from apps.projects import services
+
+        old_values = {f: getattr(self.project, f) for f in services.TRACKED_FIELDS}
+        self.project.project_type = self.mobile
+        services.update_project(self.project, old_values, user=self.user)
+        self.assertIn("mobile_dev", self._keys())
+        self.assertNotIn("frontend", self._keys())
+        self.assertTrue(self.project.history.filter(field="Тип проекта").exists())
+
+    def test_command_fixes_existing_projects(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        Project.objects.filter(pk=self.project.pk).update(project_type=self.mobile)
+        out = StringIO()
+        call_command("sync_project_stages", stdout=out)
+        self.assertIn("Greenbonus", out.getvalue())
+        self.assertIn("frontend", self._keys())      # предпросмотр ничего не менял
+        call_command("sync_project_stages", apply=True, stdout=StringIO())
+        self.assertIn("mobile_dev", self._keys())
