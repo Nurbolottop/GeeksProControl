@@ -73,5 +73,21 @@ services:
       redis:
         condition: service_started
 
+  graduate_bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: always
+    command: python manage.py run_graduate_bot
+    volumes:
+      - ./app:/app
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings.prod
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres_data:

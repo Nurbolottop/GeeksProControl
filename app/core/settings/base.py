@@ -24,6 +24,13 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in _csrf_trusted_origins_env.split(',') if origin.strip()
 ]
 
+# Публичный адрес сайта — нужен там, где нет request (например, боту
+# в Telegram) для ссылок на публичные формы.
+SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000').rstrip('/')
+
+# Токен бота-выпускника (apps.graduate_bot) — пусто, если бот не настроен.
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True
@@ -70,6 +77,7 @@ INSTALLED_APPS = [
     'apps.pm_portal',
     'apps.lead_portal',
     'apps.scripts',
+    'apps.graduate_bot',
 ]
 
 # =============================================================================
