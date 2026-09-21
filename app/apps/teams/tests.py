@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from apps.interns.models import Intern
+from apps.interns.models import Intern, InternStatus
 from apps.projects.models import Project
 from apps.teams import services
 from apps.teams.forms import TeamMemberForm
@@ -207,6 +207,36 @@ class RoleSectionAddTests(TestCase):
         roles = [s["role"] for s in response.context["team_sections"]]
         self.assertIn("mobile", roles)
         self.assertNotIn("frontend", roles)
+
+
+class PausedInternBadgeTests(TestCase):
+    """Замороженный стажёр остаётся активным участником команды (не
+    «вышел»), но на странице команды это должно быть видно — иначе
+    выглядит как будто он просто активно работает."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+
+        self.user = User.objects.create_user(username="head_pause_badge", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Гринбонус"))
+        self.intern = Intern.objects.create(
+            full_name="Сабыралиева Даяна", status=InternStatus.PAUSED,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.intern, role=TeamRole.UXUI,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+    def test_paused_badge_shown_on_project_team_tab(self):
+        response = self.client.get(f"{self.project.get_absolute_url()}?tab=team")
+        self.assertContains(response, "Приостановлен")
+
+    def test_no_paused_badge_for_active_intern(self):
+        self.intern.status = InternStatus.ACTIVE
+        self.intern.save(update_fields=["status"])
+        response = self.client.get(f"{self.project.get_absolute_url()}?tab=team")
+        self.assertNotContains(response, "Приостановлен")
 
 
 class LeadCurrentProjectsTests(TestCase):

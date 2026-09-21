@@ -41,6 +41,7 @@
                                 {% else %}
                                     <span class="member__name">{{ member.person_name }}</span>
                                 {% endif %}
+                                {% if member.intern.status == 'paused' %}<span class="badge badge--gray" style="margin-left:6px;">Приостановлен</span>{% endif %}
                                 <div class="member__meta">
                                     {{ member.intern.specialization|default:'—' }} · загрузка {{ member.workload }}%
                                     {% if member.status != 'active' %} · вышел{% if member.left_reason %} ({{ member.get_left_reason_display }}){% endif %}{% endif %}

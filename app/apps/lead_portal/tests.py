@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.accounts.models import User
-from apps.interns.models import Intern
+from apps.interns.models import Intern, InternStatus
 from apps.projects.models import Project
 from apps.teams.models import TeamMember, TeamRole
 
@@ -161,6 +161,19 @@ class LeadTeamManagementTests(LeadProjectOwnershipTests):
             reverse("lead_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
         )
         self.assertContains(response, "Участник А")
+
+    def test_paused_intern_shows_badge_on_team_tab(self):
+        intern = Intern.objects.create(
+            full_name="Замороженный", status=InternStatus.PAUSED,
+        )
+        TeamMember.objects.create(
+            project=self.project_a, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        response = self.client.get(
+            reverse("lead_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
+        )
+        self.assertContains(response, "Приостановлен")
 
     def test_team_tab_shows_only_own_direction(self):
         """Тимлид по бэкенду видит только бэкенд-стажёров — ни ПМ, ни
