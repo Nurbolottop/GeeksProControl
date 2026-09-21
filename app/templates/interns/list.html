@@ -98,8 +98,9 @@
     <input type="text" name="q" placeholder="Поиск: ФИО, телефон, email, telegram" value="{{ params.q|default:'' }}">
     <select name="availability">
         <option value="">Занятость: все</option>
-        <option value="free" {% if params.availability == 'free' %}selected{% endif %}>Свободен</option>
-        <option value="busy" {% if params.availability == 'busy' %}selected{% endif %}>Занят</option>
+        {% for value, label in availability_choices %}
+            <option value="{{ value }}" {% if params.availability == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
     </select>
     <button type="submit" class="btn btn--secondary btn--sm">Применить</button>
     <a href="{% url 'interns:list' %}" class="btn btn--secondary btn--sm">Сбросить</a>
@@ -147,8 +148,7 @@
                     <td>{{ intern.training_group|default:'—' }}</td>
                     <td>{{ intern.team_lead.display_name|default:'—' }}</td>
                     <td>
-                        {% if intern.is_busy %}<span class="badge badge--orange">На проекте</span>
-                        {% else %}<span class="badge badge--gray">Свободен</span>{% endif %}
+                        <span class="badge badge--{{ intern.availability.tone }}">{{ intern.availability.label }}</span>
                     </td>
                     <td>{% if intern.rating %}★ {{ intern.rating }}{% else %}—{% endif %}</td>
                 </tr>

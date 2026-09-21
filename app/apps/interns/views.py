@@ -13,12 +13,37 @@ from apps.interns.forms import (
     ResumeBankApplyForm, TalentReserveApplyForm, TalentReserveForm,
 )
 from apps.interns.models import (
-    GraduateStatus, Intern, InternEvaluation, InternStatus, ProfileFormLink,
-    ProfileFormSubmission, TalentReserveCandidate,
+    AVAILABLE_STATUSES, GraduateStatus, Intern, InternEvaluation, InternStatus,
+    ProfileFormLink, ProfileFormSubmission, TalentReserveCandidate,
 )
 from apps.teams.forms import ROLE_BY_SPECIALIZATION, InternProjectAddForm
 from apps.teams.models import TeamMember, TeamRole
 from apps.training.models import Specialization
+
+
+AVAILABILITY_CHOICES = [
+    ('free', 'Свободен'),
+    ('busy', 'На проекте'),
+    ('paused', 'Заморозка'),
+    ('graduates', 'Выпускники'),
+    ('waiting', 'Ожидают старта'),
+]
+
+
+def _availability_of(intern):
+    """Что показать в колонке «Занятость»: одна понятная метка вместо
+    «свободен» у всех, кто просто не в проекте."""
+    if intern.is_busy:
+        return {'label': 'На проекте', 'tone': 'orange'}
+    if intern.status == InternStatus.PAUSED:
+        return {'label': 'Заморозка', 'tone': 'yellow'}
+    if intern.graduate_status:
+        return {'label': 'Выпускник', 'tone': 'blue'}
+    if intern.status == InternStatus.WAITING:
+        return {'label': 'Ожидает старта', 'tone': 'gray'}
+    if intern.status in AVAILABLE_STATUSES:
+        return {'label': 'Свободен', 'tone': 'green'}
+    return {'label': intern.get_status_display(), 'tone': 'gray'}
 
 
 def lead_ids() -> set:
@@ -87,15 +112,28 @@ def intern_list(request):
             status=TeamMember.Status.ACTIVE, intern__isnull=False,
         ).values_list('intern_id', flat=True),
     )
-    if params.get('availability') == 'free':
-        qs = qs.exclude(pk__in=busy_ids)
-    elif params.get('availability') == 'busy':
+    availability = params.get('availability')
+    if availability == 'free':
+        # свободен — кого можно занять прямо сейчас: без проекта, в рабочем
+        # статусе и не из «Выпускников» (их ещё не разобрали)
+        qs = (
+            qs.exclude(pk__in=busy_ids)
+            .filter(status__in=AVAILABLE_STATUSES, graduate_status='')
+        )
+    elif availability == 'busy':
         qs = qs.filter(pk__in=busy_ids)
+    elif availability == 'paused':
+        qs = qs.filter(status=InternStatus.PAUSED)
+    elif availability == 'graduates':
+        qs = qs.exclude(graduate_status='')
+    elif availability == 'waiting':
+        qs = qs.filter(status=InternStatus.WAITING)
 
     paginator = Paginator(qs, 50)
     page = paginator.get_page(params.get('page'))
     for intern in page.object_list:
         intern.is_busy = intern.pk in busy_ids
+        intern.availability = _availability_of(intern)
     _attach_current_projects(page.object_list)
     base_params = params.copy()
     base_params.pop('specialization', None)
@@ -108,6 +146,7 @@ def intern_list(request):
         'specializations': Specialization.objects.all(),
         'cities': Intern.objects.active().exclude(city='')
                   .values_list('city', flat=True).distinct().order_by('city'),
+        'availability_choices': AVAILABILITY_CHOICES,
         'profile_link': services.active_profile_form_link(),
         'profile_link_ttls': PROFILE_LINK_TTL_CHOICES,
         'answers_count': ProfileFormSubmission.objects.count(),

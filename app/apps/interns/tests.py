@@ -1466,3 +1466,64 @@ class InternsByProjectTests(TestCase):
         )
         response = self.client.get(self.url)
         self.assertEqual(self._row(response, self.beta)["interns"], [])
+
+
+class InternListAvailabilityTests(TestCase):
+    """«Свободен» в списке — только тот, кого можно занять: без проекта и
+    в рабочем статусе. Заморозка и выпускники — со своими метками."""
+
+    def setUp(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.user = User.objects.create_user(username="head-av", password="x")
+        self.client.force_login(self.user)
+        spec = Specialization.objects.create(name="Backend")
+        project = Project.objects.create(name="Омур")
+        self.busy = Intern.objects.create(
+            full_name="Занятый", specialization=spec, status=InternStatus.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=project, intern=self.busy, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.free = Intern.objects.create(
+            full_name="Свободный", specialization=spec, status=InternStatus.ACTIVE,
+        )
+        self.paused = Intern.objects.create(
+            full_name="Замороженный", specialization=spec, status=InternStatus.PAUSED,
+        )
+        self.graduate = Intern.objects.create(
+            full_name="Выпускник", specialization=spec, status=InternStatus.ACTIVE,
+            graduate_status=GraduateStatus.PENDING,
+        )
+        self.waiting = Intern.objects.create(
+            full_name="Ожидает", specialization=spec, status=InternStatus.WAITING,
+        )
+        self.url = reverse("interns:list")
+
+    def _names(self, **params):
+        response = self.client.get(self.url, params)
+        return [p.full_name for p in response.context["page"].object_list]
+
+    def test_free_filter_skips_paused_graduates_and_waiting(self):
+        self.assertEqual(self._names(availability="free"), ["Свободный"])
+
+    def test_separate_filters(self):
+        self.assertEqual(self._names(availability="busy"), ["Занятый"])
+        self.assertEqual(self._names(availability="paused"), ["Замороженный"])
+        self.assertEqual(self._names(availability="graduates"), ["Выпускник"])
+        self.assertEqual(self._names(availability="waiting"), ["Ожидает"])
+
+    def test_column_shows_real_state(self):
+        response = self.client.get(self.url)
+        labels = {
+            p.full_name: p.availability["label"] for p in response.context["page"].object_list
+        }
+        self.assertEqual(labels["Занятый"], "На проекте")
+        self.assertEqual(labels["Свободный"], "Свободен")
+        self.assertEqual(labels["Замороженный"], "Заморозка")
+        self.assertEqual(labels["Выпускник"], "Выпускник")
+        self.assertEqual(labels["Ожидает"], "Ожидает старта")
+        self.assertContains(response, "Заморозка")

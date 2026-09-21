@@ -24,6 +24,12 @@ class InternStatus(models.TextChoices):
 # Статусы, при которых стажёр считается работающим в GeeksPro
 WORKING_STATUSES = (InternStatus.ACTIVE,)
 
+# Кого можно поставить на проект прямо сейчас. Замороженных, не начавших
+# стажировку и выпускников (их ещё не разобрали) свободными не считаем.
+AVAILABLE_STATUSES = (
+    InternStatus.ACTIVE, InternStatus.READY, InternStatus.EMPLOYABLE,
+)
+
 
 class Branch(models.TextChoices):
     """Филиал — сейчас у студии их два."""

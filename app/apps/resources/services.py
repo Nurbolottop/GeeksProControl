@@ -3,7 +3,9 @@ import datetime
 
 from django.utils import timezone
 
-from apps.interns.models import Intern, WORKING_STATUSES, InternStatus
+from apps.interns.models import (
+    AVAILABLE_STATUSES, WORKING_STATUSES, Intern, InternStatus,
+)
 from apps.resources.models import PlannedProject, PlannedProjectNeed
 from apps.teams.models import TeamMember
 from apps.training.models import Specialization, TrainingGroup
@@ -34,25 +36,20 @@ def _people_for_summary():
     return people, busy_ids, staff
 
 
-# Кого можно поставить на проект прямо сейчас. Замороженных и тех, кто
-# ещё не начал стажировку, в «свободные» не берём — их нельзя занять.
-AVAILABLE_STATUSES = (
-    InternStatus.ACTIVE, InternStatus.READY, InternStatus.EMPLOYABLE,
-)
-
-
 def _counts(people, busy_ids) -> dict:
     """Разрез по одной группе людей: сколько всего и кто в каком состоянии.
 
     «Выпускники» — те, у кого стоит статус выпускника (вышли с завершённого
     проекта и ещё не разобраны), «заморозка» — стажировка приостановлена,
     «ожидают» — ещё не начали стажировку, «свободные» — кого можно занять
-    прямо сейчас: без активного проекта и в рабочем статусе.
+    прямо сейчас: без проекта, в рабочем статусе и не из «Выпускников».
     """
     busy = sum(1 for person in people if person.pk in busy_ids)
     free = sum(
         1 for p in people
-        if p.pk not in busy_ids and p.status in AVAILABLE_STATUSES
+        if p.pk not in busy_ids
+        and p.status in AVAILABLE_STATUSES
+        and not p.graduate_status
     )
     return {
         'total': len(people),
