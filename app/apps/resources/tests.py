@@ -72,9 +72,13 @@ class InternsTotalTests(TestCase):
 
         self.back = Specialization.objects.create(name="Backend")
         self.project = Project.objects.create(name="Омур")
-        busy = Intern.objects.create(full_name="Занятый", specialization=self.back)
-        Intern.objects.create(full_name="Свободный", specialization=self.back)
-        Intern.objects.create(full_name="Без направления")
+        busy = Intern.objects.create(
+            full_name="Занятый", specialization=self.back, status=InternStatus.ACTIVE,
+        )
+        Intern.objects.create(
+            full_name="Свободный", specialization=self.back, status=InternStatus.ACTIVE,
+        )
+        Intern.objects.create(full_name="Без направления", status=InternStatus.ACTIVE)
         TeamMember.objects.create(
             project=self.project, intern=busy, role=TeamRole.BACKEND,
         )
@@ -108,6 +112,29 @@ class InternsTotalTests(TestCase):
             self.assertContains(response, label)
         self.assertContains(response, "Без направления")
         self.assertContains(response, "Итого")
+
+    def test_free_excludes_paused_and_not_started(self):
+        """«Свободные» — кого реально можно занять: без проекта и в рабочем
+        статусе. Заморозка и «ожидает стажировки» туда не попадают."""
+        Intern.objects.create(
+            full_name="На заморозке", specialization=self.back,
+            status=InternStatus.PAUSED,
+        )
+        Intern.objects.create(
+            full_name="Ещё не начал", specialization=self.back,
+            status=InternStatus.WAITING,
+        )
+        totals = services.interns_total()
+        self.assertEqual(totals["total"], 5)
+        self.assertEqual(totals["paused"], 1)
+        self.assertEqual(totals["waiting"], 1)
+        # свободен только тот, кто активен и не в проекте
+        self.assertEqual(totals["free"], 2)
+        row = next(
+            r for r in services.interns_summary()
+            if r["specialization"] == self.back
+        )
+        self.assertEqual(row["free"], 1)
 
     def test_counts_split_by_state(self):
         """Активные, заморозка и выпускники считаются отдельно."""

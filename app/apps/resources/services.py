@@ -34,26 +34,39 @@ def _people_for_summary():
     return people, busy_ids, staff
 
 
+# Кого можно поставить на проект прямо сейчас. Замороженных и тех, кто
+# ещё не начал стажировку, в «свободные» не берём — их нельзя занять.
+AVAILABLE_STATUSES = (
+    InternStatus.ACTIVE, InternStatus.READY, InternStatus.EMPLOYABLE,
+)
+
+
 def _counts(people, busy_ids) -> dict:
     """Разрез по одной группе людей: сколько всего и кто в каком состоянии.
 
-    «Выпускники» — те, у кого стоит статус выпускника (вышли с
-    завершённого проекта и ещё не разобраны), «заморозка» — стажировка
-    приостановлена, «свободные» — без активного проекта.
+    «Выпускники» — те, у кого стоит статус выпускника (вышли с завершённого
+    проекта и ещё не разобраны), «заморозка» — стажировка приостановлена,
+    «ожидают» — ещё не начали стажировку, «свободные» — кого можно занять
+    прямо сейчас: без активного проекта и в рабочем статусе.
     """
     busy = sum(1 for person in people if person.pk in busy_ids)
+    free = sum(
+        1 for p in people
+        if p.pk not in busy_ids and p.status in AVAILABLE_STATUSES
+    )
     return {
         'total': len(people),
         'active': sum(1 for p in people if p.status == InternStatus.ACTIVE),
         'paused': sum(1 for p in people if p.status == InternStatus.PAUSED),
+        'waiting': sum(1 for p in people if p.status == InternStatus.WAITING),
         'graduates': sum(1 for p in people if p.graduate_status),
         'busy': busy,
-        'free': len(people) - busy,
+        'free': free,
     }
 
 
 def interns_summary() -> list[dict]:
-    """По каждому направлению: всего, активные, заморозка, выпускники, свободные.
+    """По направлениям: всего, активные, заморозка, ожидают, выпускники, свободные.
 
     Тимлиды и ПМ сюда не входят — они сотрудники, а не стажёры.
     """
