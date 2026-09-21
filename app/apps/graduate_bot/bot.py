@@ -7,6 +7,7 @@
 командой /start, ничего в БД для этого не хранится.
 """
 import telebot
+import urllib3.util.connection as urllib3_connection
 from django.conf import settings
 from django.urls import reverse
 from telebot import apihelper, types
@@ -21,6 +22,13 @@ PHONE_ATTEMPTS_LIMIT = 3
 # даже когда сеть давно восстановилась. Session на один запрос — чуть
 # дороже, зато без риска застрять на мёртвом соединении.
 apihelper.SESSION_TIME_TO_LIVE = 0
+
+# api.telegram.org отдаёт и IPv4, и IPv6 адрес, а у контейнера рабочего
+# IPv6-маршрута нет — часть попыток соединения выбирает IPv6 и падает
+# мгновенно (ENETUNREACH), вместо того чтобы попробовать IPv4. Отключаем
+# IPv6 на уровне urllib3, а не чиним сеть контейнера — так же safer и не
+# трогает остальные проекты на этом сервере.
+urllib3_connection.HAS_IPV6 = False
 
 bot = telebot.TeleBot(settings.TELEGRAM_BOT_TOKEN)
 
