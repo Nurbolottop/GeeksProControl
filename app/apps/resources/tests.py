@@ -86,9 +86,14 @@ class InternsTotalTests(TestCase):
         self.assertEqual(totals["free"], 2)
         self.assertEqual(totals["without_spec"], 1)
 
-    def test_total_bigger_than_sum_of_rows_when_spec_missing(self):
-        rows_total = sum(row["total"] for row in services.interns_summary())
-        self.assertEqual(rows_total, 2)
+    def test_people_without_direction_get_their_own_row(self):
+        """Строка «Без направления» идёт последней, и сумма строк сходится
+        с «Итого» — человек без направления больше нигде не теряется."""
+        rows = services.interns_summary()
+        last = rows[-1]
+        self.assertIsNone(last["specialization"])
+        self.assertEqual(last["total"], 1)
+        self.assertEqual(sum(row["total"] for row in rows), 3)
         self.assertEqual(services.interns_total()["total"], 3)
 
     def test_page_shows_totals(self):
@@ -99,8 +104,38 @@ class InternsTotalTests(TestCase):
         self.client.force_login(user)
         response = self.client.get(reverse("resources:forecast"))
         self.assertEqual(response.context["totals"]["total"], 3)
-        self.assertContains(response, "Всего стажёров")
+        for label in ("Общее количество", "Активные", "Заморозка", "Выпускники", "Свободные"):
+            self.assertContains(response, label)
+        self.assertContains(response, "Без направления")
         self.assertContains(response, "Итого")
+
+    def test_counts_split_by_state(self):
+        """Активные, заморозка и выпускники считаются отдельно."""
+        from apps.interns.models import GraduateStatus
+
+        Intern.objects.create(
+            full_name="Заморожен", specialization=self.back,
+            status=InternStatus.PAUSED,
+        )
+        Intern.objects.create(
+            full_name="Выпускник", specialization=self.back,
+            status=InternStatus.ACTIVE, graduate_status=GraduateStatus.PENDING,
+        )
+        Intern.objects.create(
+            full_name="Выбывший", specialization=self.back,
+            status=InternStatus.DROPPED,
+        )
+        totals = services.interns_total()
+        self.assertEqual(totals["total"], 5)          # выбывший не считается
+        self.assertEqual(totals["paused"], 1)
+        self.assertEqual(totals["graduates"], 1)
+        row = next(
+            r for r in services.interns_summary()
+            if r["specialization"] == self.back
+        )
+        self.assertEqual(row["paused"], 1)
+        self.assertEqual(row["graduates"], 1)
+        self.assertEqual(row["total"], 4)
 
 
 class LeadsNotCountedAsInternsTests(TestCase):

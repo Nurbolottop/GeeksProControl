@@ -12,73 +12,78 @@ from apps.training.models import Specialization, TrainingGroup
 FORECAST_MONTHS = 3
 
 
-def interns_summary() -> list[dict]:
-    """По каждому направлению: всего стажёров, занято на проектах, свободно.
+def _people_for_summary():
+    """Стажёры, которых считаем: без архивных, выбывших, тимлидов и ПМ.
 
-    Тимлиды и ПМ сюда не входят — они сотрудники, а не стажёры.
+    Тимлиды и ПМ — сотрудники, а не стажёры, и в эти цифры не входят.
     """
     from apps.teams.selectors import staff_intern_ids
 
-    leads = staff_intern_ids()
+    staff = staff_intern_ids()
+    people = list(
+        Intern.objects.active()
+        .exclude(status=InternStatus.DROPPED)
+        .exclude(pk__in=staff)
+        .select_related('specialization'),
+    )
     busy_ids = set(
         TeamMember.objects.filter(
             status=TeamMember.Status.ACTIVE, intern__isnull=False,
         ).values_list('intern_id', flat=True),
     )
+    return people, busy_ids, staff
+
+
+def _counts(people, busy_ids) -> dict:
+    """Разрез по одной группе людей: сколько всего и кто в каком состоянии.
+
+    «Выпускники» — те, у кого стоит статус выпускника (вышли с
+    завершённого проекта и ещё не разобраны), «заморозка» — стажировка
+    приостановлена, «свободные» — без активного проекта.
+    """
+    busy = sum(1 for person in people if person.pk in busy_ids)
+    return {
+        'total': len(people),
+        'active': sum(1 for p in people if p.status == InternStatus.ACTIVE),
+        'paused': sum(1 for p in people if p.status == InternStatus.PAUSED),
+        'graduates': sum(1 for p in people if p.graduate_status),
+        'busy': busy,
+        'free': len(people) - busy,
+    }
+
+
+def interns_summary() -> list[dict]:
+    """По каждому направлению: всего, активные, заморозка, выпускники, свободные.
+
+    Тимлиды и ПМ сюда не входят — они сотрудники, а не стажёры.
+    """
+    people, busy_ids, _ = _people_for_summary()
+    by_spec = {}
+    for person in people:
+        by_spec.setdefault(person.specialization_id, []).append(person)
+
     rows = []
     for spec in Specialization.objects.all():
-        people = list(
-            Intern.objects.active()
-            .filter(specialization=spec)
-            .exclude(status=InternStatus.DROPPED)
-            .exclude(pk__in=leads)
-            .values_list('pk', flat=True),
-        )
-        busy = sum(1 for pk in people if pk in busy_ids)
+        own = by_spec.get(spec.pk, [])
+        rows.append({'specialization': spec, **_counts(own, busy_ids)})
+    without_spec = by_spec.get(None, [])
+    if without_spec:
         rows.append({
-            'specialization': spec,
-            'total': len(people),
-            'busy': busy,
-            'free': len(people) - busy,
+            'specialization': None, 'is_without_spec': True,
+            **_counts(without_spec, busy_ids),
         })
-    rows.sort(key=lambda row: -row['total'])
+    rows.sort(key=lambda row: (row.get('is_without_spec', False), -row['total']))
     return rows
 
 
 def interns_total() -> dict:
-    """Общий итог по стажёрам: всего, занято, свободно.
-
-    Считается по людям, а не сложением направлений: человек без
-    направления тоже попадает в общее число.
-    """
-    from apps.teams.selectors import staff_intern_ids
-
-    leads = staff_intern_ids()
-    busy_ids = set(
-        TeamMember.objects.filter(
-            status=TeamMember.Status.ACTIVE, intern__isnull=False,
-        ).values_list('intern_id', flat=True),
-    )
-    people = list(
-        Intern.objects.active()
-        .exclude(status=InternStatus.DROPPED)
-        .exclude(pk__in=leads)
-        .values_list('pk', flat=True),
-    )
-    busy = sum(1 for pk in people if pk in busy_ids)
-    without_spec = (
-        Intern.objects.active()
-        .exclude(status=InternStatus.DROPPED)
-        .exclude(pk__in=leads)
-        .filter(specialization__isnull=True)
-        .count()
-    )
+    """Общий итог по стажёрам — по людям, а не сложением направлений:
+    человек без направления тоже попадает в общее число."""
+    people, busy_ids, staff = _people_for_summary()
     return {
-        'total': len(people),
-        'busy': busy,
-        'free': len(people) - busy,
-        'without_spec': without_spec,
-        'leads': len(leads),
+        **_counts(people, busy_ids),
+        'without_spec': sum(1 for p in people if p.specialization_id is None),
+        'leads': len(staff),
     }
 
 
