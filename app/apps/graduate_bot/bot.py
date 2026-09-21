@@ -9,11 +9,18 @@
 import telebot
 from django.conf import settings
 from django.urls import reverse
-from telebot import types
+from telebot import apihelper, types
 
 from apps.graduate_bot import services
 
 PHONE_ATTEMPTS_LIMIT = 3
+
+# По умолчанию telebot держит один requests.Session на поток вечно — если
+# сеть на секунду оборвётся (обычное дело на нагруженном хосте), соединение
+# в пуле остаётся битым и все следующие запросы падают той же ошибкой,
+# даже когда сеть давно восстановилась. Session на один запрос — чуть
+# дороже, зато без риска застрять на мёртвом соединении.
+apihelper.SESSION_TIME_TO_LIVE = 0
 
 bot = telebot.TeleBot(settings.TELEGRAM_BOT_TOKEN)
 
