@@ -22,7 +22,8 @@ class ProjectForm(forms.ModelForm):
             'contract_date', 'start_date', 'planned_end_date',
             'status', 'current_stage', 'priority',
             'head_comment',
-            'github_url', 'figma_url', 'staging_url', 'production_url',
+            'github_url', 'frontend_repo_url', 'figma_url', 'staging_url',
+            'production_url',
             'domain', 'is_favorite',
         ]
         widgets = {
@@ -146,13 +147,15 @@ class ProjectLinksForm(forms.ModelForm):
     class Meta:
         model = Project
         fields = [
-            'staging_url', 'production_url', 'github_url', 'figma_url', 'domain',
+            'staging_url', 'production_url', 'github_url', 'frontend_repo_url',
+            'figma_url', 'domain',
         ]
         widgets = {
             # autocomplete=off — иначе браузер подставляет адрес текущей страницы
             'staging_url': forms.URLInput(attrs={'autocomplete': 'off'}),
             'production_url': forms.URLInput(attrs={'autocomplete': 'off'}),
             'github_url': forms.URLInput(attrs={'autocomplete': 'off'}),
+            'frontend_repo_url': forms.URLInput(attrs={'autocomplete': 'off'}),
             'figma_url': forms.URLInput(attrs={'autocomplete': 'off'}),
             'domain': forms.TextInput(attrs={'autocomplete': 'off'}),
         }

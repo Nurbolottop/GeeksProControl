@@ -936,16 +936,43 @@ class PmProjectDetailsTests(TestCase):
         self.assertEqual(str(moved.start_date), "2026-09-12")
 
     def test_pm_fills_links(self):
+        """Репозиториев два — бэкенд и фронтенд: хостинг у нас GitLab,
+        и у проекта обычно отдельные репозитории под каждую часть."""
         self.client.post(self._url("links"), {
             "staging_url": "https://stage.omur.kg",
             "production_url": "",
-            "github_url": "https://github.com/geekspro/omur",
+            "github_url": "https://gitlab.geeks.kg/omur/omur-backend.git",
+            "frontend_repo_url": "https://gitlab.geeks.kg/omur/omur-frontend.git",
             "figma_url": "",
             "domain": "omur.kg",
         })
         self.project.refresh_from_db()
         self.assertEqual(self.project.staging_url, "https://stage.omur.kg")
         self.assertEqual(self.project.domain, "omur.kg")
+        self.assertEqual(
+            self.project.github_url, "https://gitlab.geeks.kg/omur/omur-backend.git",
+        )
+        self.assertEqual(
+            self.project.frontend_repo_url,
+            "https://gitlab.geeks.kg/omur/omur-frontend.git",
+        )
+
+    def test_both_repos_are_shown_in_overview(self):
+        self.project.github_url = "https://gitlab.geeks.kg/omur/omur-backend.git"
+        self.project.frontend_repo_url = "https://gitlab.geeks.kg/omur/omur-frontend.git"
+        self.project.save(update_fields=["github_url", "frontend_repo_url"])
+        response = self.client.get(
+            reverse("pm_portal:project_detail", args=[self.project.pk]),
+        )
+        self.assertContains(response, "Репозиторий бэкенда")
+        self.assertContains(response, "Репозиторий фронтенда")
+        self.assertContains(response, "gitlab.geeks.kg/omur/omur-backend.git")
+        self.assertContains(response, "gitlab.geeks.kg/omur/omur-frontend.git")
+
+    def test_links_form_offers_both_repos(self):
+        response = self.client.get(self._url("links"))
+        self.assertContains(response, "frontend_repo_url")
+        self.assertContains(response, "Репозиторий фронтенда")
 
     def test_pm_cannot_touch_a_foreign_project(self):
         other = Project.objects.create(name="Чужой")

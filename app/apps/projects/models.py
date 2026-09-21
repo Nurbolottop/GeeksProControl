@@ -153,7 +153,10 @@ class Project(TimeStampedModel, ArchivableModel):
 
     head_comment = models.TextField('Комментарий руководителя', blank=True)
 
-    github_url = models.URLField('GitHub', blank=True)
+    # Репозиториев у проекта обычно два — бэкенд и фронтенд (у мобильных —
+    # приложение). Хостинг любой: GitLab, GitHub и т.п.
+    github_url = models.URLField('Репозиторий бэкенда', blank=True)
+    frontend_repo_url = models.URLField('Репозиторий фронтенда', blank=True)
     figma_url = models.URLField('Figma', blank=True)
     staging_url = models.URLField('Staging URL', blank=True)
     production_url = models.URLField('Production URL', blank=True)

@@ -62,7 +62,8 @@
             <div class="def"><dt>Домен</dt><dd>{{ project.domain|default:'—' }}</dd></div>
             <div class="def"><dt>Staging</dt><dd>{% if project.staging_url %}<a href="{{ project.staging_url }}" target="_blank" rel="noopener">{{ project.staging_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
             <div class="def"><dt>Production</dt><dd>{% if project.production_url %}<a href="{{ project.production_url }}" target="_blank" rel="noopener">{{ project.production_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
-            <div class="def"><dt>Репозиторий</dt><dd>{% if project.github_url %}<a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Репозиторий бэкенда</dt><dd>{% if project.github_url %}<a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
+            <div class="def"><dt>Репозиторий фронтенда</dt><dd>{% if project.frontend_repo_url %}<a href="{{ project.frontend_repo_url }}" target="_blank" rel="noopener">{{ project.frontend_repo_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
             <div class="def"><dt>Figma</dt><dd>{% if project.figma_url %}<a href="{{ project.figma_url }}" target="_blank" rel="noopener">{{ project.figma_url|cut:'https://'|cut:'http://'|truncatechars:40 }}</a>{% else %}—{% endif %}</dd></div>
         </dl>
     </div>

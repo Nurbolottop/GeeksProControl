@@ -18,8 +18,12 @@
             <div>{% if project.production_url %}<a href="{{ project.production_url }}" target="_blank" rel="noopener">{{ project.production_url|cut:'https://'|cut:'http://'|truncatechars:38 }}</a>{% else %}—{% endif %}</div>
         </div>
         <div class="meta-row">
-            <span>Репозиторий</span>
+            <span>Репозиторий бэкенда</span>
             <div>{% if project.github_url %}<a href="{{ project.github_url }}" target="_blank" rel="noopener">{{ project.github_url|cut:'https://'|cut:'http://'|truncatechars:38 }}</a>{% else %}—{% endif %}</div>
+        </div>
+        <div class="meta-row">
+            <span>Репозиторий фронтенда</span>
+            <div>{% if project.frontend_repo_url %}<a href="{{ project.frontend_repo_url }}" target="_blank" rel="noopener">{{ project.frontend_repo_url|cut:'https://'|cut:'http://'|truncatechars:38 }}</a>{% else %}—{% endif %}</div>
         </div>
         <div class="meta-row">
             <span>Figma</span>
