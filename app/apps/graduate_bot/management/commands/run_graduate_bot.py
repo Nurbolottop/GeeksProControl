@@ -3,6 +3,15 @@ import time
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+# telebot.infinity_polling() при сбое сама уходит в повтор всего через 3
+# секунды без остановки — на нагруженном хосте с потерей пакетов это
+# вылилось в тысячи попыток за сутки с одного и того же IP подряд, и это
+# подозрительно похоже на то, что сеть/Telegram начали этот IP душить как
+# спамера. Поэтому здесь — свой цикл поверх обычного polling(non_stop=False)
+# с растущей паузой: 10с, 20с, … максимум 2 минуты между попытками.
+RETRY_START_SECONDS = 10
+RETRY_MAX_SECONDS = 120
+
 
 class Command(BaseCommand):
     help = 'Запускает бота-выпускника в Telegram (long polling, блокирующий процесс).'
@@ -15,16 +24,17 @@ class Command(BaseCommand):
         from apps.graduate_bot.bot import bot
 
         self.stdout.write(self.style.SUCCESS('Бот-выпускник запущен, слушаю Telegram…'))
-        # infinity_polling сама переживает обрывы связи внутри основного
-        # цикла, но самый первый запрос к Telegram (например, сразу после
-        # рестарта контейнера, пока сеть ещё не готова) может упасть до
-        # входа в этот цикл — без skip_pending и без обёртки такой сбой
-        # роняет процесс целиком вместо того, чтобы просто попробовать ещё раз.
+        delay = RETRY_START_SECONDS
         while True:
             try:
-                bot.infinity_polling()
+                bot.polling(non_stop=False, skip_pending=True, timeout=20, long_polling_timeout=20)
             except Exception as exc:  # noqa: BLE001 — бот должен пережить любой сбой связи
                 self.stderr.write(self.style.WARNING(
-                    f'Бот-выпускник упал ({exc!r}), перезапуск через 5 секунд…',
+                    f'Бот-выпускник: сбой связи ({exc!r}), новая попытка через {delay} сек…',
                 ))
-                time.sleep(5)
+                time.sleep(delay)
+                delay = min(delay * 2, RETRY_MAX_SECONDS)
+            else:
+                # polling() вышел сам (например, вызвали bot.stop_polling())
+                # — это штатная остановка, не ошибка, пауза не нужна.
+                delay = RETRY_START_SECONDS
