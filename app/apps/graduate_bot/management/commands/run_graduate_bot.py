@@ -13,6 +13,16 @@ RETRY_START_SECONDS = 10
 RETRY_MAX_SECONDS = 120
 
 
+def _hide_token(message: str) -> str:
+    """requests/urllib3 кладут токен прямо в текст ошибки (URL запроса) —
+    прячем его перед тем, как это попадёт в логи контейнера."""
+    token = settings.TELEGRAM_BOT_TOKEN
+    if token and token in message:
+        secret = token.split(':', 1)[-1]
+        message = message.replace(secret, '*' * len(secret))
+    return message
+
+
 class Command(BaseCommand):
     help = 'Запускает бота-выпускника в Telegram (long polling, блокирующий процесс).'
 
@@ -29,8 +39,10 @@ class Command(BaseCommand):
             try:
                 bot.polling(non_stop=False, skip_pending=True, timeout=20, long_polling_timeout=20)
             except Exception as exc:  # noqa: BLE001 — бот должен пережить любой сбой связи
+                message = _hide_token(str(exc))
                 self.stderr.write(self.style.WARNING(
-                    f'Бот-выпускник: сбой связи ({exc!r}), новая попытка через {delay} сек…',
+                    f'Бот-выпускник: сбой связи ({type(exc).__name__}: {message}), '
+                    f'новая попытка через {delay} сек…',
                 ))
                 time.sleep(delay)
                 delay = min(delay * 2, RETRY_MAX_SECONDS)
