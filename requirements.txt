@@ -7,3 +7,4 @@ redis==5.2.1
 django-htmx==1.23.0
 openpyxl==3.1.5
 pyTelegramBotAPI==4.28.0
+PySocks==1.7.1

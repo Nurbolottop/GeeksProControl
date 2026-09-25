@@ -31,6 +31,11 @@ SITE_URL = os.getenv('SITE_URL', 'http://localhost:8000').rstrip('/')
 # Токен бота-выпускника (apps.graduate_bot) — пусто, если бот не настроен.
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 
+# Если с сервера нет прямого маршрута до Telegram (бывает — плохой пиринг
+# дата-центра), сюда кладут адрес SOCKS5/HTTP-релея, например
+# socks5h://host.docker.internal:40001. Пусто — бот ходит напрямую.
+TELEGRAM_PROXY_URL = os.getenv('TELEGRAM_PROXY_URL', '')
+
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True

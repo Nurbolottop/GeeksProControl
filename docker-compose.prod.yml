@@ -85,6 +85,10 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
+    # host.docker.internal — для TELEGRAM_PROXY_URL, если с сервера нет
+    # прямого маршрута до Telegram (см. .env.prod.example).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
