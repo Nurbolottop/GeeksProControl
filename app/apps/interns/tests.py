@@ -7,7 +7,7 @@ from apps.accounts.models import User
 from apps.interns import services
 from apps.interns.models import (
     GraduateStatus, Intern, InternEvaluation, InternStatus, ProfileFormLink,
-    ProfileFormSubmission, TalentReserveCandidate,
+    ProfileFormSubmission, ResumeBankStatus, TalentReserveCandidate,
 )
 from apps.interns.services import add_evaluation
 
@@ -613,6 +613,7 @@ class ResumeBankApplyTests(TestCase):
         intern = Intern.objects.get(phone="0700111222")
         self.assertTrue(intern.in_resume_bank)
         self.assertEqual(intern.full_name, "Новый Человек")
+        self.assertEqual(intern.resume_bank_status, ResumeBankStatus.PENDING)
 
     def test_existing_person_by_phone_is_updated_not_duplicated(self):
         Intern.objects.create(full_name="Старое Имя", phone="0700111222")
@@ -640,6 +641,63 @@ class ResumeBankApplyTests(TestCase):
             "full_name": "Второй", "phone": "0700111444",
         })
         self.assertFalse(Intern.objects.filter(phone="0700111444").exists())
+
+
+class ResumeBankReviewTests(TestCase):
+    """«Принять»/«На доработку» в списке банка резюме — руководитель
+    решает, выпускнику уходит уведомление в Telegram."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head2", password="x")
+        self.client.force_login(self.user)
+        self.intern = Intern.objects.create(
+            full_name="На проверке", in_resume_bank=True,
+            resume_bank_status=ResumeBankStatus.PENDING, telegram_chat_id=555,
+        )
+
+    def test_approve_requires_login(self):
+        from django.test import Client
+
+        anon = Client()
+        response = anon.post(reverse("interns:resume_bank_approve", args=[self.intern.pk]))
+        self.assertNotEqual(response.status_code, 200)
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.resume_bank_status, ResumeBankStatus.PENDING)
+
+    def test_approve_sets_status_and_notifies(self):
+        from unittest import mock
+
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            self.client.post(reverse("interns:resume_bank_approve", args=[self.intern.pk]))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.resume_bank_status, ResumeBankStatus.APPROVED)
+        send.assert_called_once()
+
+    def test_revise_requires_comment(self):
+        from unittest import mock
+
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            self.client.post(
+                reverse("interns:resume_bank_revise", args=[self.intern.pk]), {"comment": ""},
+            )
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.resume_bank_status, ResumeBankStatus.PENDING)
+        send.assert_not_called()
+
+    def test_revise_sets_status_comment_and_notifies(self):
+        from unittest import mock
+
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            self.client.post(
+                reverse("interns:resume_bank_revise", args=[self.intern.pk]),
+                {"comment": "Добавьте фото"},
+            )
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.resume_bank_status, ResumeBankStatus.REVISION)
+        self.assertEqual(self.intern.resume_bank_comment, "Добавьте фото")
+        self.assertIn("Добавьте фото", send.call_args[0][1])
 
 
 class ProfileApplyTests(TestCase):

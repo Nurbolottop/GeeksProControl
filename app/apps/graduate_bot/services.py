@@ -1,16 +1,21 @@
 """Бизнес-логика бота-выпускника — без обращений к Telegram API, чтобы
-можно было полностью протестировать обычными django-тестами.
+можно было полностью протестировать обычными django-тестами
+(исключение — notify_resume_bank_decision: она шлёт сообщение, но сама
+Telegram-логика в ней однострочная и мокается в тестах).
 
 Диалог (реализован в apps/graduate_bot/bot.py): выпускник вводит ФИО,
 подтверждает личность номером телефона, затем выбирает — продолжить
 стажировку (сам выбирает свободный проект и добавляется в команду) или
 уйти в банк резюме.
 """
+import logging
 import re
 
-from apps.interns.models import Intern
+from apps.interns.models import Intern, ResumeBankStatus
 from apps.projects.models import Project, ProjectStageKey, ProjectStatus
 from apps.teams.models import TeamMember, TeamRole
+
+logger = logging.getLogger(__name__)
 
 # Этапы «до разработки включительно» — на этих этапах команда ещё
 # набирается или дорабатывается, есть смысл предлагать проект выпускнику.
@@ -48,6 +53,71 @@ def phone_matches(intern: Intern, raw_phone: str) -> bool:
     if len(entered) < 9 or len(stored) < 9:
         return False
     return entered[-9:] == stored[-9:]
+
+
+def remember_chat_id(intern: Intern, chat_id: int) -> None:
+    """Запоминаем chat_id — нужен, чтобы потом писать выпускнику
+    проактивно (решение по банку резюме), а не только в ответ."""
+    if intern.telegram_chat_id == chat_id:
+        return
+    intern.telegram_chat_id = chat_id
+    intern.save(update_fields=['telegram_chat_id', 'updated_at'])
+
+
+def completed_projects(intern: Intern) -> list[TeamMember]:
+    """Членства в командах завершённых проектов — для поздравительного
+    сообщения («вы завершили проекты: ...»)."""
+    return list(
+        TeamMember.objects.filter(
+            intern=intern, status=TeamMember.Status.LEFT,
+            project__status=ProjectStatus.COMPLETED,
+        )
+        .select_related('project')
+        .order_by('-project__actual_end_date', '-left_at'),
+    )
+
+
+def submit_to_resume_bank(intern: Intern, chat_id: int) -> None:
+    """Выпускник подтвердил регистрацию на geeks.kg через бота — заявка
+    уходит руководителю на проверку (apps.interns.views.resume_bank_approve/
+    resume_bank_revise)."""
+    from apps.audit.services import log as audit_log
+
+    remember_chat_id(intern, chat_id)
+    intern.in_resume_bank = True
+    intern.resume_bank_status = ResumeBankStatus.PENDING
+    intern.resume_bank_comment = ''
+    intern.save(update_fields=[
+        'in_resume_bank', 'resume_bank_status', 'resume_bank_comment', 'updated_at',
+    ])
+    audit_log(intern, 'Заявка в банк резюме отправлена', reason='бот-выпускник')
+
+
+def notify_resume_bank_decision(intern: Intern, *, approved: bool, comment: str = '') -> None:
+    """Сообщаем выпускнику решение руководителя по его заявке в банк
+    резюме. Вызывается из админки (apps.interns.views), в отдельном от
+    поллинга бота процессе — это нормально, отправка сообщения не
+    требует владения long-poll соединением (конфликт 409 бывает только
+    у getUpdates)."""
+    if not intern.telegram_chat_id:
+        return
+    if approved:
+        text = (
+            f'🎉 Поздравляем, {intern.full_name}! Ваше резюме приняли — '
+            'оно опубликовано в банке резюме GeeksPro.'
+        )
+    else:
+        text = (
+            'Ваше резюме нужно доработать.\n\n'
+            f'Комментарий от руководителя:\n{comment}\n\n'
+            'Когда исправите — сообщите руководителю GeeksPro.'
+        )
+    try:
+        from apps.graduate_bot.bot import bot
+
+        bot.send_message(intern.telegram_chat_id, text)
+    except Exception:
+        logger.exception('Не удалось отправить решение по банку резюме в Telegram (intern=%s)', intern.pk)
 
 
 def eligible_projects() -> list[Project]:

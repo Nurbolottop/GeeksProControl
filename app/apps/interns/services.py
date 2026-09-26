@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from apps.interns.models import (
     GraduateStatus, Intern, InternEvaluation, InternStatus, ProfileFormLink,
+    ResumeBankStatus,
 )
 
 
@@ -295,6 +296,32 @@ def unpause_person(intern: Intern, user=None) -> bool:
     intern.save(update_fields=['status', 'updated_at'])
     audit_log(intern, 'Стажировка возобновлена', user=user)
     return True
+
+
+def approve_resume_bank(intern: Intern, user=None) -> None:
+    """Руководитель принял заявку в банк резюме — резюме опубликовано
+    (вручную, на geeks.kg), выпускнику уходит уведомление в Telegram."""
+    from apps.audit.services import log as audit_log
+    from apps.graduate_bot.services import notify_resume_bank_decision
+
+    intern.resume_bank_status = ResumeBankStatus.APPROVED
+    intern.resume_bank_comment = ''
+    intern.save(update_fields=['resume_bank_status', 'resume_bank_comment', 'updated_at'])
+    audit_log(intern, 'Заявка в банк резюме принята', user=user)
+    notify_resume_bank_decision(intern, approved=True)
+
+
+def revise_resume_bank(intern: Intern, comment: str, user=None) -> None:
+    """Руководитель отправил заявку на доработку с комментарием —
+    комментарий уходит выпускнику в Telegram."""
+    from apps.audit.services import log as audit_log
+    from apps.graduate_bot.services import notify_resume_bank_decision
+
+    intern.resume_bank_status = ResumeBankStatus.REVISION
+    intern.resume_bank_comment = comment
+    intern.save(update_fields=['resume_bank_status', 'resume_bank_comment', 'updated_at'])
+    audit_log(intern, 'Заявка в банк резюме отправлена на доработку', reason=comment, user=user)
+    notify_resume_bank_decision(intern, approved=False, comment=comment)
 
 
 

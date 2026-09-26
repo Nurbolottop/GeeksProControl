@@ -30,6 +30,14 @@ urlpatterns = [
         name='reserve_set_priority',
     ),
     path('resume-bank/', views.resume_bank_list, name='resume_bank'),
+    path(
+        'resume-bank/<int:pk>/approve/', views.resume_bank_approve,
+        name='resume_bank_approve',
+    ),
+    path(
+        'resume-bank/<int:pk>/revise/', views.resume_bank_revise,
+        name='resume_bank_revise',
+    ),
     path('graduates/', views.graduates_list, name='graduates'),
     path(
         'graduates/<int:pk>/decline/', views.graduate_decline,

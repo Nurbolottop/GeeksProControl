@@ -1,7 +1,9 @@
+from unittest import mock
+
 from django.test import TestCase
 
 from apps.graduate_bot import services
-from apps.interns.models import GraduateStatus, Intern, InternStatus
+from apps.interns.models import GraduateStatus, Intern, InternStatus, ResumeBankStatus
 from apps.projects.models import Project, ProjectStageKey, ProjectStatus
 from apps.teams.models import TeamMember, TeamRole
 from apps.training.models import Specialization
@@ -122,6 +124,98 @@ class JoinGraduateToProjectTests(TestCase):
         )
         self.assertIn("Новый проект", entry.reason)
         self.assertIn("бот-выпускник", entry.reason)
+
+
+class CompletedProjectsTests(TestCase):
+    def setUp(self):
+        self.intern = Intern.objects.create(full_name="Выпускник Проектов")
+
+    def test_lists_completed_project_memberships(self):
+        project = Project.objects.create(name="Завершённый", status=ProjectStatus.COMPLETED)
+        TeamMember.objects.create(
+            project=project, intern=self.intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        result = services.completed_projects(self.intern)
+        self.assertEqual([m.project for m in result], [project])
+
+    def test_excludes_active_and_non_completed_projects(self):
+        active = Project.objects.create(name="Активный", status=ProjectStatus.ACTIVE)
+        TeamMember.objects.create(
+            project=active, intern=self.intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        cancelled = Project.objects.create(name="Отменённый", status=ProjectStatus.CANCELLED)
+        TeamMember.objects.create(
+            project=cancelled, intern=self.intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        self.assertEqual(services.completed_projects(self.intern), [])
+
+
+class RememberChatIdTests(TestCase):
+    def test_saves_chat_id(self):
+        intern = Intern.objects.create(full_name="Чат Идов")
+        services.remember_chat_id(intern, 12345)
+        intern.refresh_from_db()
+        self.assertEqual(intern.telegram_chat_id, 12345)
+
+    def test_noop_when_unchanged(self):
+        intern = Intern.objects.create(full_name="Чат Идов", telegram_chat_id=12345)
+        with mock.patch.object(Intern, "save") as save:
+            services.remember_chat_id(intern, 12345)
+            save.assert_not_called()
+
+
+class SubmitToResumeBankTests(TestCase):
+    def test_sets_pending_status_and_flag(self):
+        intern = Intern.objects.create(full_name="Выпускник Резюме")
+        services.submit_to_resume_bank(intern, 777)
+        intern.refresh_from_db()
+        self.assertTrue(intern.in_resume_bank)
+        self.assertEqual(intern.resume_bank_status, ResumeBankStatus.PENDING)
+        self.assertEqual(intern.telegram_chat_id, 777)
+
+    def test_logs_to_audit(self):
+        from apps.audit.models import AuditLog
+
+        intern = Intern.objects.create(full_name="Выпускник Резюме")
+        services.submit_to_resume_bank(intern, 777)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_type="Intern", object_id=str(intern.pk),
+                action="Заявка в банк резюме отправлена",
+            ).exists(),
+        )
+
+
+class NotifyResumeBankDecisionTests(TestCase):
+    def test_does_nothing_without_chat_id(self):
+        intern = Intern.objects.create(full_name="Без чата")
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            services.notify_resume_bank_decision(intern, approved=True)
+        send.assert_not_called()
+
+    def test_sends_congrats_when_approved(self):
+        intern = Intern.objects.create(full_name="Принятый", telegram_chat_id=42)
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            services.notify_resume_bank_decision(intern, approved=True)
+        send.assert_called_once()
+        self.assertEqual(send.call_args[0][0], 42)
+        self.assertIn("Поздравляем", send.call_args[0][1])
+
+    def test_sends_comment_when_revision(self):
+        intern = Intern.objects.create(full_name="На доработке", telegram_chat_id=42)
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            services.notify_resume_bank_decision(intern, approved=False, comment="Поправьте фото")
+        self.assertIn("Поправьте фото", send.call_args[0][1])
+
+    def test_swallows_send_errors(self):
+        intern = Intern.objects.create(full_name="Сбой", telegram_chat_id=42)
+        with mock.patch(
+            "apps.graduate_bot.bot.bot.send_message", side_effect=Exception("boom"),
+        ):
+            services.notify_resume_bank_decision(intern, approved=True)
 
 
 class TeamLeadContactTests(TestCase):

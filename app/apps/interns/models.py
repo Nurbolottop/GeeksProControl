@@ -49,6 +49,15 @@ class GraduateStatus(models.TextChoices):
     DECLINED = 'declined', 'Не хочет продолжать'
 
 
+class ResumeBankStatus(models.TextChoices):
+    """Статус проверки заявки в банк резюме — независимо от того, как
+    человек попал в банк (бот-выпускник или старая публичная форма)."""
+
+    PENDING = 'pending', 'Ожидает проверки'
+    APPROVED = 'approved', 'Принят'
+    REVISION = 'revision', 'На доработке'
+
+
 class Intern(TimeStampedModel, ArchivableModel):
     """Карточка стажёра (ТЗ §12)."""
 
@@ -97,9 +106,19 @@ class Intern(TimeStampedModel, ArchivableModel):
         null=True, blank=True,
     )
     in_resume_bank = models.BooleanField('В банке резюме', default=False)
+    resume_bank_status = models.CharField(
+        'Статус банка резюме', max_length=10,
+        choices=ResumeBankStatus.choices, blank=True,
+    )
+    resume_bank_comment = models.TextField(
+        'Комментарий по доработке (банк резюме)', blank=True,
+    )
     graduate_status = models.CharField(
         'Статус выпускника', max_length=10,
         choices=GraduateStatus.choices, blank=True,
+    )
+    telegram_chat_id = models.BigIntegerField(
+        'Telegram chat id', null=True, blank=True, db_index=True,
     )
     rating = models.DecimalField(
         'Рейтинг', max_digits=3, decimal_places=2, null=True, blank=True,

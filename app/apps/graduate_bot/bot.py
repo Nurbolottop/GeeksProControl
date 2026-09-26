@@ -9,7 +9,6 @@
 import telebot
 import urllib3.util.connection as urllib3_connection
 from django.conf import settings
-from django.urls import reverse
 from telebot import apihelper, types
 
 from apps.graduate_bot import services
@@ -64,7 +63,8 @@ def handle_name(message):
     if not candidates:
         bot.send_message(
             message.chat.id,
-            'Не нашли выпускника с таким именем. Проверьте написание '
+            'Такого выпускника не нашли — либо стажировка ещё не '
+            'завершена, либо имя указано неверно. Проверьте написание '
             'или обратитесь к руководителю GeeksPro.\n\nЧтобы попробовать снова — /start.',
         )
         return
@@ -111,10 +111,18 @@ def handle_phone(message, intern_id, attempt):
             message, handle_phone, intern_id=intern_id, attempt=attempt + 1,
         )
         return
+    services.remember_chat_id(intern, message.chat.id)
     show_choice(message.chat.id, intern)
 
 
 def show_choice(chat_id, intern):
+    projects = services.completed_projects(intern)
+    if projects:
+        lines = '\n'.join(f'— {m.project.name}' for m in projects)
+        projects_line = f'\n\nВы завершили проекты:\n{lines}'
+    else:
+        projects_line = ''
+
     markup = types.InlineKeyboardMarkup()
     markup.add(
         types.InlineKeyboardButton(
@@ -125,7 +133,9 @@ def show_choice(chat_id, intern):
         types.InlineKeyboardButton('В банк резюме', callback_data=f'bank:{intern.pk}'),
     )
     bot.send_message(
-        chat_id, f'{intern.full_name}, личность подтверждена. Что дальше?',
+        chat_id,
+        f'🎉 Поздравляем, {intern.full_name}! Вы успешно прошли стажировку '
+        f'в GeeksPro.{projects_line}\n\nЧто дальше?',
         reply_markup=markup,
     )
 
@@ -133,11 +143,38 @@ def show_choice(chat_id, intern):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('bank:'))
 def handle_bank(call):
     bot.answer_callback_query(call.id)
-    url = f'{settings.SITE_URL}{reverse("resume_bank_apply")}'
+    intern_pk = call.data.split(':', 1)[1]
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(
+            'Я подтверждаю, что зарегистрировался(ась)',
+            callback_data=f'bank_confirm:{intern_pk}',
+        ),
+    )
     bot.send_message(
         call.message.chat.id,
-        'Чтобы попасть в банк резюме, заполните короткую анкету по ссылке — '
-        f'мы будем рекомендовать вас работодателям:\n{url}',
+        'Чтобы попасть в банк резюме:\n\n'
+        '1. Перейдите на https://geeks.kg/sign-in\n'
+        '2. Зарегистрируйтесь и заполните свои данные\n'
+        '3. Когда закончите — нажмите кнопку ниже',
+        reply_markup=markup,
+    )
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('bank_confirm:'))
+def handle_bank_confirm(call):
+    from apps.interns.models import Intern
+
+    bot.answer_callback_query(call.id)
+    intern = Intern.objects.filter(pk=int(call.data.split(':', 1)[1])).first()
+    if intern is None:
+        bot.send_message(call.message.chat.id, 'Что-то пошло не так — начните заново: /start.')
+        return
+    services.submit_to_resume_bank(intern, call.message.chat.id)
+    bot.send_message(
+        call.message.chat.id,
+        'Спасибо! Ваши данные отправлены на проверку руководителю '
+        'GeeksPro. Мы сообщим о результате прямо здесь.',
     )
 
 

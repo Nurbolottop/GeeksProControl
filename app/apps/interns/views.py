@@ -14,7 +14,7 @@ from apps.interns.forms import (
 )
 from apps.interns.models import (
     AVAILABLE_STATUSES, GraduateStatus, Intern, InternEvaluation, InternStatus,
-    ProfileFormLink, ProfileFormSubmission, TalentReserveCandidate,
+    ProfileFormLink, ProfileFormSubmission, ResumeBankStatus, TalentReserveCandidate,
 )
 from apps.teams.forms import ROLE_BY_SPECIALIZATION, InternProjectAddForm
 from apps.teams.models import TeamMember, TeamRole
@@ -579,18 +579,6 @@ def grant_lead_access(request, pk):
     )
 
 
-def _flagged_list(request, field, title):
-    """Банк резюме — включая тимлидов, в отличие от общего списка
-    стажёров (там тимлиды — уже «сотрудники»)."""
-    people = (
-        Intern.objects.active().filter(**{field: True})
-        .select_related('specialization').order_by('full_name')
-    )
-    return render(request, 'interns/flagged_list.html', {
-        'people': people, 'title': title,
-    })
-
-
 @login_required
 def reserve_list(request):
     """Резерв кадров — отдельный пул, не привязан к карточкам стажёров."""
@@ -654,7 +642,38 @@ def reserve_set_priority(request, pk):
 
 @login_required
 def resume_bank_list(request):
-    return _flagged_list(request, 'in_resume_bank', 'Банк резюме')
+    """Заявки в банк резюме — со статусом проверки и кнопками
+    «Принять»/«На доработку»."""
+    people = (
+        Intern.objects.active().filter(in_resume_bank=True)
+        .select_related('specialization')
+        .order_by('resume_bank_status', 'full_name')
+    )
+    return render(request, 'interns/resume_bank_list.html', {
+        'people': people, 'title': 'Банк резюме',
+    })
+
+
+@login_required
+def resume_bank_approve(request, pk):
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        services.approve_resume_bank(intern, user=request.user)
+        messages.success(request, f'{intern.full_name}: заявка принята.')
+    return redirect('interns:resume_bank')
+
+
+@login_required
+def resume_bank_revise(request, pk):
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        comment = request.POST.get('comment', '').strip()
+        if not comment:
+            messages.error(request, 'Укажите комментарий — что нужно доработать.')
+        else:
+            services.revise_resume_bank(intern, comment, user=request.user)
+            messages.success(request, f'{intern.full_name}: отправлено на доработку.')
+    return redirect('interns:resume_bank')
 
 
 @login_required
@@ -800,6 +819,7 @@ def resume_bank_apply(request):
             intern.email = form.cleaned_data['email']
             intern.specialization = form.cleaned_data['specialization']
         intern.in_resume_bank = True
+        intern.resume_bank_status = ResumeBankStatus.PENDING
         intern.save()
         request.session['resume_bank_submitted'] = True
         return render(request, 'interns/resume_bank_apply_done.html')
