@@ -452,8 +452,8 @@ def intern_unpause(request, pk, intern_pk):
 def intern_to_reserve(request, pk, intern_pk):
     """Отметить стажёра в резерв кадров.
 
-    Тимлид заодно описывает его навыки — он знает человека по работе
-    лучше всех, а резюме кандидат потом дополнит сам.
+    Тимлид может оставить комментарий — он знает человека по работе лучше
+    всех; навыки и остальное резюме кандидат заполняет сам.
     """
     from apps.reserve.models import ReserveCandidate
     from apps.reserve.services import candidate_from_intern
@@ -467,9 +467,7 @@ def intern_to_reserve(request, pk, intern_pk):
     form = LeadToReserveForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         candidate_from_intern(
-            intern, request.user,
-            skills=form.cleaned_data['skills'],
-            comment_lead=form.cleaned_data['comment'],
+            intern, request.user, comment_lead=form.cleaned_data['comment'],
         )
         messages.success(
             request,

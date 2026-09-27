@@ -1,7 +1,7 @@
 """Выгрузка резерва кадров в общую Google-таблицу вручную.
 
-Без --apply только показывает, что уйдёт в таблицу — удобно проверить
-сортировку по направлениям и доступ сервисного аккаунта.
+Без --apply только показывает, что уйдёт на каждый лист направления —
+удобно проверить распределение и доступ сервисного аккаунта.
 """
 from django.core.management.base import BaseCommand
 
@@ -9,32 +9,41 @@ from apps.reserve import gsheets
 
 
 class Command(BaseCommand):
-    help = 'Переписать общую Google-таблицу резерва кадров (по умолчанию — предпросмотр).'
+    help = 'Переписать листы направлений в Google-таблице резерва (по умолчанию — предпросмотр).'
 
     def add_arguments(self, parser):
         parser.add_argument('--apply', action='store_true', help='Записать в таблицу.')
-        parser.add_argument(
-            '--limit', type=int, default=20,
-            help='Сколько строк показать в предпросмотре (0 — все).',
-        )
 
     def handle(self, *args, **options):
-        rows = gsheets.sheet_rows()
-        self.stdout.write(f'Кандидатов к выгрузке: {len(rows)}')
-        shown = rows if not options['limit'] else rows[:options['limit']]
-        for row in shown:
-            self.stdout.write(' | '.join(row))
-        if len(shown) < len(rows):
-            self.stdout.write(f'… и ещё {len(rows) - len(shown)}')
+        groups = gsheets.rows_by_direction()
+        total = sum(len(rows) for rows in groups.values())
+        self.stdout.write(f'Кандидатов к выгрузке: {total}')
+        for key in sorted(groups):
+            self.stdout.write(f'\n— лист {key}: {len(groups[key])}')
+            for row in groups[key]:
+                name, direction, projects, _, end, phone, telegram = row
+                self.stdout.write(
+                    f'  {name} | {direction} | {projects or "—"} | '
+                    f'{end or "—"} | {phone or "—"} | {telegram or "—"}'
+                )
+
+        skipped = [
+            c.full_name for c in gsheets.candidates_for_sheet()
+            if not gsheets.tab_key(gsheets.direction_of(c))
+        ]
+        if skipped:
+            self.stdout.write(self.style.WARNING(
+                f'\nБез подходящего листа ({len(skipped)}): ' + ', '.join(skipped)
+            ))
 
         if not gsheets.is_configured():
             self.stdout.write(self.style.WARNING(
-                'Google-таблица не настроена: нужны GOOGLE_SHEETS_CREDENTIALS_FILE '
+                '\nGoogle-таблица не настроена: нужны GOOGLE_SHEETS_CREDENTIALS_FILE '
                 '(файл ключа сервисного аккаунта) и RESERVE_SHEET_ID.'
             ))
             return
         if not options['apply']:
-            self.stdout.write('Предпросмотр. Для записи в таблицу: --apply')
+            self.stdout.write('\nПредпросмотр. Для записи в таблицу: --apply')
             return
-        count = gsheets.push(rows)
-        self.stdout.write(self.style.SUCCESS(f'В таблицу записано строк: {count}'))
+        count = gsheets.push(groups)
+        self.stdout.write(self.style.SUCCESS(f'\nВ таблицу записано строк: {count}'))

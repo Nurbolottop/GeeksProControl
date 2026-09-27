@@ -1,32 +1,48 @@
 """Выгрузка резерва кадров в общую Google-таблицу.
 
-Таблицу смотрят те, кто работает с кандидатами вне платформы, поэтому при
-каждом изменении резерва мы переписываем её целиком: строки всегда
-отсортированы по направлениям, а выбывшие кандидаты не остаются висеть.
+В таблице на каждое направление свой лист («Список стажеров Backend» и
+так далее) — так резерв и сортируется по направлениям. Мы заполняем в
+листе только строки людей: шапка, нумерация, выпадающие списки и
+оформление остаются как есть.
 
-Без ключа сервисного аккаунта модуль молча ничего не делает — платформа не
-должна падать из-за внешней таблицы.
+Без ключа сервисного аккаунта модуль молча ничего не делает — платформа
+не должна падать из-за внешней таблицы.
 """
 import logging
+import re
 import threading
 
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Одна выгрузка на запрос: таблица всё равно переписывается целиком.
+# Одна выгрузка на запрос: листы всё равно переписываются целиком.
 _pending = threading.local()
-
-# Колонки таблицы — в том же порядке, что уже заведён в ней руками.
-HEADER = [
-    '№', 'ФИО', 'Направление', 'Конец стажировки',
-    'Номер телефона', 'TG username', 'Статус',
-]
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 API = 'https://sheets.googleapis.com/v4/spreadsheets'
 
-NO_DIRECTION = 'Без направления'
+# Шапка занимает первые две строки листа, люди начинаются с третьей.
+FIRST_DATA_ROW = 3
+# Пишем колонки B–H: номера в A проставлены в таблице заранее.
+DATA_RANGE = 'B{start}:H{end}'
+# Сколько строк чистим перед записью — с запасом, чтобы не оставался хвост.
+CLEAR_ROWS = 500
+
+# Колонки листа: ФИО, Направление, Проекты которые делал (D+E — объединены),
+# Конец стажировки, Номер телефона, TG username.
+COLUMNS = ['ФИО', 'Направление', 'Проекты', '', 'Конец стажировки', 'Телефон', 'TG']
+
+# Направление кандидата → лист. Лист узнаём по его названию, поэтому
+# держим для каждого списка слова, которые в этом названии встречаются.
+TAB_KEYWORDS = [
+    ('backend', ('backend', 'бэкенд', 'бекенд')),
+    ('frontend', ('frontend', 'фронтенд')),
+    ('mobile', ('mobile', 'мобил', 'flutter', 'android', 'ios')),
+    ('uxui', ('uxui', 'ux/ui', 'ux', 'ui', 'дизайн', 'design')),
+    ('qa', ('qa', 'тест', 'test')),
+    ('pm', ('pm', 'менедж', 'project manager')),
+]
 
 
 def is_configured() -> bool:
@@ -46,42 +62,67 @@ def direction_of(candidate) -> str:
         return candidate.direction_other
     if candidate.study_specialization_id and candidate.study_specialization:
         return candidate.study_specialization.name
-    return NO_DIRECTION
+    return ''
+
+
+def tab_key(text: str) -> str:
+    """Ключ направления по названию листа или направления кандидата."""
+    lowered = (text or '').lower()
+    for key, words in TAB_KEYWORDS:
+        if any(word in lowered for word in words):
+            return key
+    return ''
+
+
+def projects_of(candidate) -> str:
+    """Проекты, на которых человек работал у нас — колонка «Проекты которые делал»."""
+    if not candidate.intern_id:
+        return ''
+    names = []
+    for member in candidate.intern.team_memberships.select_related('project').all():
+        name = member.project.name
+        if name not in names:
+            names.append(name)
+    return ', '.join(names)
 
 
 def candidates_for_sheet():
-    """Кого выгружаем: весь живой резерв, отсортированный по направлениям."""
+    """Кого выгружаем: весь живой резерв."""
     from apps.reserve.models import ReserveCandidate
 
-    people = ReserveCandidate.objects.filter(is_archived=False).select_related(
-        'specialization', 'study_specialization',
-    )
-    # Сортируем в Python: «Без направления» должно уезжать в конец, а не
-    # вставать первым из-за пустого specialization.
-    return sorted(
-        people,
-        key=lambda c: (
-            direction_of(c) == NO_DIRECTION, direction_of(c).lower(),
-            -c.priority, c.full_name.lower(),
-        ),
+    return ReserveCandidate.objects.filter(is_archived=False).select_related(
+        'specialization', 'study_specialization', 'intern',
     )
 
 
-def sheet_rows(candidates=None) -> list[list[str]]:
-    """Строки таблицы без заголовка. Нумерация — сквозная, как в таблице."""
-    rows = []
-    for number, candidate in enumerate(candidates or candidates_for_sheet(), start=1):
-        telegram = (candidate.telegram or '').strip()
-        rows.append([
-            str(number),
+def rows_by_direction(candidates=None) -> dict:
+    """Ключ направления → строки листа, отсортированные внутри направления.
+
+    Строка — колонки B–H: ФИО, направление, проекты, пустая (D и E в
+    таблице объединены), конец стажировки, телефон, telegram.
+    """
+    groups: dict[str, list] = {}
+    people = candidates if candidates is not None else candidates_for_sheet()
+    for candidate in people:
+        direction = direction_of(candidate)
+        key = tab_key(direction)
+        if not key:
+            continue
+        groups.setdefault(key, []).append(candidate)
+
+    result = {}
+    for key, people in groups.items():
+        people.sort(key=lambda c: (-c.priority, c.full_name.lower()))
+        result[key] = [[
             candidate.full_name,
             direction_of(candidate),
+            projects_of(candidate),
+            '',
             candidate.study_end.strftime('%d.%m.%Y') if candidate.study_end else '',
             candidate.phone or '',
-            telegram,
-            candidate.get_status_display(),
-        ])
-    return rows
+            (candidate.telegram or '').strip(),
+        ] for candidate in people]
+    return result
 
 
 def _session():
@@ -94,36 +135,63 @@ def _session():
     return AuthorizedSession(creds)
 
 
-def _tab_title(session, sheet_id: str) -> str:
-    """Лист, в который пишем: из настроек или первый в таблице."""
-    configured = getattr(settings, 'RESERVE_SHEET_TAB', '')
-    if configured:
-        return configured
+def _tabs(session, sheet_id: str) -> dict:
+    """Ключ направления → название листа в таблице."""
     response = session.get(f'{API}/{sheet_id}?fields=sheets.properties.title')
     response.raise_for_status()
-    sheets = response.json().get('sheets') or []
-    if not sheets:
-        raise RuntimeError('В таблице нет листов.')
-    return sheets[0]['properties']['title']
+    tabs = {}
+    for sheet in response.json().get('sheets') or []:
+        title = sheet['properties']['title']
+        key = tab_key(title)
+        if key and key not in tabs:
+            tabs[key] = title
+    return tabs
 
 
-def push(rows=None) -> int:
-    """Переписать таблицу целиком. Возвращает число выгруженных строк."""
+def _quote(title: str) -> str:
+    """Название листа в адресе диапазона: с пробелами — в кавычках."""
+    if re.fullmatch(r'[A-Za-zА-Яа-яЁё0-9_]+', title or ''):
+        return title
+    return "'" + (title or '').replace("'", "''") + "'"
+
+
+def push(groups=None) -> int:
+    """Переписать листы направлений. Возвращает число выгруженных строк."""
     sheet_id = settings.RESERVE_SHEET_ID
-    rows = sheet_rows() if rows is None else rows
+    groups = rows_by_direction() if groups is None else groups
     session = _session()
-    tab = _tab_title(session, sheet_id)
-    # Сначала чистим старые данные: иначе от прошлой выгрузки останется
-    # хвост, если кандидатов стало меньше.
-    clear = session.post(f'{API}/{sheet_id}/values/{tab}!A1:Z10000:clear', json={})
-    clear.raise_for_status()
-    update = session.put(
-        f'{API}/{sheet_id}/values/{tab}!A1',
-        params={'valueInputOption': 'USER_ENTERED'},
-        json={'values': [HEADER] + rows},
-    )
-    update.raise_for_status()
-    return len(rows)
+    tabs = _tabs(session, sheet_id)
+
+    written = 0
+    for key, title in tabs.items():
+        rows = groups.get(key, [])
+        tab = _quote(title)
+        last = FIRST_DATA_ROW + CLEAR_ROWS
+        # Сначала чистим строки людей: иначе от прошлой выгрузки останется
+        # хвост, если кандидатов стало меньше. Шапку и нумерацию не трогаем.
+        clear = session.post(
+            f'{API}/{sheet_id}/values/{tab}!'
+            + DATA_RANGE.format(start=FIRST_DATA_ROW, end=last) + ':clear',
+            json={},
+        )
+        clear.raise_for_status()
+        if not rows:
+            continue
+        update = session.put(
+            f'{API}/{sheet_id}/values/{tab}!B{FIRST_DATA_ROW}',
+            params={'valueInputOption': 'USER_ENTERED'},
+            json={'values': rows},
+        )
+        update.raise_for_status()
+        written += len(rows)
+
+    missing = set(groups) - set(tabs)
+    if missing:
+        logger.warning(
+            'Резерв кадров: в таблице нет листов для направлений %s',
+            ', '.join(sorted(missing)),
+        )
+    return written
 
 
 def sync(reason: str = '') -> bool:
@@ -142,7 +210,7 @@ def sync(reason: str = '') -> bool:
 def sync_later(reason: str = '') -> None:
     """Выгрузка после коммита транзакции, чтобы в таблицу попали свежие данные.
 
-    Таблица переписывается целиком, поэтому на пачку изменений (например,
+    Листы переписываются целиком, поэтому на пачку изменений (например,
     перетаскивание порядка) хватает одной выгрузки. Работу отдаём Celery;
     если брокер недоступен, пишем таблицу на месте — медленнее, но данные
     не расходятся.

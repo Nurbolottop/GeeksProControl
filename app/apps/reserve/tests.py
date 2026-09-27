@@ -782,7 +782,7 @@ class ReserveInternLinkTests(TestCase):
 
 
 class ReserveSheetTests(TestCase):
-    """Выгрузка резерва в общую Google-таблицу: что и в каком порядке уходит."""
+    """Выгрузка резерва в Google-таблицу: кто на какой лист и в каком порядке."""
 
     def setUp(self):
         from apps.reserve import gsheets
@@ -796,57 +796,72 @@ class ReserveSheetTests(TestCase):
         data.update(kwargs)
         return ReserveCandidate.objects.create(**data)
 
-    def test_rows_match_sheet_columns(self):
+    def test_row_matches_sheet_columns(self):
         self._candidate(
             full_name="Айбек Осмонов", specialization=self.backend,
             phone="0555123456", telegram="@aibek",
             study_end=timezone.localdate().replace(month=6, day=20),
         )
-        rows = self.gsheets.sheet_rows()
-        self.assertEqual(len(self.gsheets.HEADER), 7)
-        self.assertEqual(len(rows), 1)
-        number, name, direction, end, phone, telegram, status = rows[0]
-        self.assertEqual(number, "1")
+        groups = self.gsheets.rows_by_direction()
+        self.assertEqual(list(groups), ["backend"])
+        name, direction, projects, spacer, end, phone, telegram = groups["backend"][0]
         self.assertEqual(name, "Айбек Осмонов")
         self.assertEqual(direction, "Backend")
+        self.assertEqual(projects, "")
+        self.assertEqual(spacer, "")
         self.assertTrue(end.endswith(str(timezone.localdate().year)))
         self.assertEqual(phone, "0555123456")
         self.assertEqual(telegram, "@aibek")
-        self.assertEqual(status, "В резерве")
 
-    def test_sorted_by_direction_then_name(self):
+    def test_each_direction_goes_to_its_own_tab(self):
         self._candidate(full_name="Ян Дизайнер", specialization=self.design)
         self._candidate(full_name="Борис Бэкенд", specialization=self.backend)
         self._candidate(full_name="Анна Бэкенд", specialization=self.backend)
-        self._candidate(full_name="Без Направления")
-        rows = self.gsheets.sheet_rows()
+        groups = self.gsheets.rows_by_direction()
+        self.assertEqual(sorted(groups), ["backend", "uxui"])
         self.assertEqual(
-            [(row[1], row[2]) for row in rows],
-            [
-                ("Анна Бэкенд", "Backend"),
-                ("Борис Бэкенд", "Backend"),
-                ("Ян Дизайнер", "UX/UI дизайн"),
-                ("Без Направления", "Без направления"),
-            ],
+            [row[0] for row in groups["backend"]], ["Анна Бэкенд", "Борис Бэкенд"],
         )
-        # нумерация сквозная, как в таблице
-        self.assertEqual([row[0] for row in rows], ["1", "2", "3", "4"])
+        self.assertEqual([row[0] for row in groups["uxui"]], ["Ян Дизайнер"])
 
     def test_priority_lifts_person_inside_direction(self):
         self._candidate(full_name="Анна Бэкенд", specialization=self.backend)
         self._candidate(full_name="Борис Бэкенд", specialization=self.backend, priority=5)
-        rows = self.gsheets.sheet_rows()
-        self.assertEqual([row[1] for row in rows], ["Борис Бэкенд", "Анна Бэкенд"])
+        rows = self.gsheets.rows_by_direction()["backend"]
+        self.assertEqual([row[0] for row in rows], ["Борис Бэкенд", "Анна Бэкенд"])
+
+    def test_projects_of_intern_are_listed(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        person = Intern.objects.create(full_name="Айбек Осмонов", specialization=self.backend)
+        for name in ("Балажан", "БилимОрдо"):
+            TeamMember.objects.create(
+                project=Project.objects.create(name=name), intern=person,
+                role=TeamRole.BACKEND,
+            )
+        self._candidate(
+            full_name="Айбек Осмонов", specialization=self.backend, intern=person,
+        )
+        row = self.gsheets.rows_by_direction()["backend"][0]
+        self.assertIn("Балажан", row[2])
+        self.assertIn("БилимОрдо", row[2])
 
     def test_archived_candidate_is_not_exported(self):
         person = self._candidate(full_name="Ушёл Совсем", specialization=self.backend)
         person.is_archived = True
         person.save(update_fields=["is_archived"])
-        self.assertEqual(self.gsheets.sheet_rows(), [])
+        self.assertEqual(self.gsheets.rows_by_direction(), {})
 
-    def test_direction_other_used_when_no_specialization(self):
-        self._candidate(full_name="Свой Путь", direction_other="DevOps")
-        self.assertEqual(self.gsheets.sheet_rows()[0][2], "DevOps")
+    def test_unknown_direction_has_no_tab(self):
+        self._candidate(full_name="Свой Путь", direction_other="Копирайтинг")
+        self.assertEqual(self.gsheets.rows_by_direction(), {})
+
+    def test_tab_key_reads_sheet_titles(self):
+        self.assertEqual(self.gsheets.tab_key("Список стажеров Backend"), "backend")
+        self.assertEqual(self.gsheets.tab_key("Список стажеров UXUI"), "uxui")
+        self.assertEqual(self.gsheets.tab_key("Список стажеров Mobile"), "mobile")
+        self.assertEqual(self.gsheets.tab_key("Прочее"), "")
 
     def test_without_credentials_nothing_happens(self):
         from django.test import override_settings
@@ -880,10 +895,12 @@ class ReserveSheetTests(TestCase):
         from django.test import override_settings
 
         self._candidate(full_name="Айбек Осмонов", specialization=self.backend)
+        self._candidate(full_name="Свой Путь", direction_other="Копирайтинг")
         out = StringIO()
         with override_settings(GOOGLE_SHEETS_CREDENTIALS_FILE=""):
             call_command("sync_reserve_sheet", stdout=out)
         text = out.getvalue()
         self.assertIn("Кандидатов к выгрузке: 1", text)
         self.assertIn("Айбек Осмонов", text)
+        self.assertIn("Без подходящего листа", text)
         self.assertIn("не настроена", text)
