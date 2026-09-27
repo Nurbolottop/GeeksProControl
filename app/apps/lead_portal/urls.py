@@ -12,7 +12,6 @@ urlpatterns = [
         name='notification_close',
     ),
     path('<int:pk>/', views.project_detail, name='project_detail'),
-    path('<int:pk>/team/add/', views.member_add, name='member_add'),
     path(
         '<int:pk>/team/form-link/', views.profile_link_create,
         name='profile_link_create',

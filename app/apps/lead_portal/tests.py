@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from apps.accounts.models import User
 from apps.interns.models import Intern, InternStatus
@@ -98,31 +98,21 @@ class LeadProjectOwnershipTests(TestCase):
 
 
 class LeadTeamManagementTests(LeadProjectOwnershipTests):
-    """Команда: тимлид может добавлять/править/убирать людей своего
-    проекта, ничего на чужом."""
+    """Команда: тимлид правит и убирает людей своего проекта, ничего на
+    чужом. Вручную добавить человека нельзя — новые стажёры приходят
+    только по ссылке на анкету."""
 
-    def test_can_add_member_to_own_project(self):
-        other = Intern.objects.create(
-            full_name="Новый Бэкендер", specialization=self.backend_spec,
-        )
-        self.client.post(
-            reverse("lead_portal:member_add", args=[self.project_a.pk]),
-            {"intern": other.pk},
-        )
-        self.assertTrue(
-            TeamMember.objects.filter(project=self.project_a, intern=other).exists(),
-        )
+    def test_no_manual_add_route(self):
+        with self.assertRaises(NoReverseMatch):
+            reverse("lead_portal:member_add", args=[self.project_a.pk])
 
-    def test_cannot_add_member_to_foreign_project(self):
-        other = Intern.objects.create(full_name="Чужой Бэкендер")
-        response = self.client.post(
-            reverse("lead_portal:member_add", args=[self.project_b.pk]),
-            {"intern": other.pk},
+    def test_team_tab_has_no_add_buttons(self):
+        response = self.client.get(
+            reverse("lead_portal:project_detail", args=[self.project_a.pk]) + "?tab=team",
         )
-        self.assertEqual(response.status_code, 404)
-        self.assertFalse(
-            TeamMember.objects.filter(project=self.project_b, intern=other).exists(),
-        )
+        self.assertNotContains(response, "+ Участник")
+        self.assertNotContains(response, "+ Добавить")
+        self.assertContains(response, "ссылке на анкету")
 
     def test_can_edit_member_on_own_project(self):
         intern = Intern.objects.create(full_name="Правим")
@@ -201,35 +191,6 @@ class LeadTeamManagementTests(LeadProjectOwnershipTests):
         self.assertNotContains(response, "Менеджер Проекта")
         self.assertNotContains(response, "Project Manager")
         self.assertNotContains(response, "Frontend")
-
-    def test_cannot_add_member_of_other_direction(self):
-        """Роль в ссылке игнорируется — форма показывает только людей
-        направления самого тимлида (Backend), Frontend-человека выбрать
-        нельзя, даже подставив его id в ссылку."""
-        from apps.training.models import Specialization
-
-        frontend_spec = Specialization.objects.create(name="Frontend")
-        other = Intern.objects.create(
-            full_name="Новый Фронтендер", specialization=frontend_spec,
-        )
-        self.client.post(
-            reverse("lead_portal:member_add", args=[self.project_a.pk]) + "?role=frontend",
-            {"intern": other.pk},
-        )
-        self.assertFalse(
-            TeamMember.objects.filter(project=self.project_a, intern=other).exists(),
-        )
-
-    def test_can_add_member_of_own_direction_regardless_of_role_param(self):
-        backend_intern = Intern.objects.create(
-            full_name="Новый Бэкендер", specialization=self.backend_spec,
-        )
-        self.client.post(
-            reverse("lead_portal:member_add", args=[self.project_a.pk]) + "?role=frontend",
-            {"intern": backend_intern.pk},
-        )
-        member = TeamMember.objects.get(project=self.project_a, intern=backend_intern)
-        self.assertEqual(member.role, TeamRole.BACKEND)
 
     def test_cannot_edit_or_remove_member_of_other_direction(self):
         intern = Intern.objects.create(full_name="Чужое Направление")
@@ -1250,3 +1211,61 @@ class LeadInternActionsTests(TestCase):
         self.intern.refresh_from_db()
         self.assertEqual(self.intern.status, "active")
         self.assertFalse(ReserveCandidate.objects.filter(intern=self.intern).exists())
+
+
+class LeadFormerInternTests(TestCase):
+    """Карточка того, кто уже вышел из команды: смотреть можно, отметить
+    в резерв тоже — замораживать у вышедшего нечего."""
+
+    def setUp(self):
+        from apps.training.models import Specialization
+
+        backend = Specialization.objects.create(name="Backend")
+        self.lead_user = Model.objects.create_user(
+            username="+996700000071", password="x", role=User.Role.TEAM_LEAD,
+        )
+        self.lead = Intern.objects.create(
+            full_name="Вышедших Тимлид", user=self.lead_user, specialization=backend,
+        )
+        self.project = Project.objects.create(name="Омур")
+        self.foreign = Project.objects.create(name="Чужой")
+        TeamMember.objects.create(
+            project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.intern = Intern.objects.create(
+            full_name="Мой Стажёр", specialization=backend, status="active",
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        self.client.force_login(self.lead_user)
+
+    def _url(self, name, intern=None, project=None):
+        return reverse(name, args=[(project or self.project).pk, (intern or self.intern).pk])
+
+    def test_card_opens_for_former_member(self):
+        response = self.client.get(self._url("lead_portal:intern_detail"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Мой Стажёр")
+        self.assertContains(response, "Вышел(а) из команды")
+        self.assertNotContains(response, "Заморозить стажировку")
+
+    def test_team_tab_links_former_member(self):
+        response = self.client.get(
+            reverse("lead_portal:project_detail", args=[self.project.pk]) + "?tab=team",
+        )
+        self.assertContains(response, self._url("lead_portal:intern_detail"))
+
+    def test_former_member_can_be_marked_to_reserve(self):
+        from apps.reserve.models import ReserveCandidate
+
+        self.client.post(self._url("lead_portal:intern_to_reserve"))
+        self.assertTrue(ReserveCandidate.objects.filter(intern=self.intern).exists())
+
+    def test_foreign_project_still_closed(self):
+        response = self.client.get(
+            self._url("lead_portal:intern_detail", project=self.foreign),
+        )
+        self.assertEqual(response.status_code, 404)

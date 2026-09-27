@@ -12,10 +12,10 @@ from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
 from apps.lead_portal import services
 from apps.projects.services import calculate_deadline_status
 from apps.teams import services as team_services
-from apps.teams.forms import TeamMemberEditForm, TeamMemberForm
+from apps.teams.forms import TeamMemberEditForm
 from apps.teams.models import TeamMember
 from apps.teams.selectors import ROLE_LABELS, ROLE_TONE, group_by_role
-from apps.teams.views import _title_for, _with_new_person, people_options
+from apps.teams.views import people_options
 from apps.training.models import Specialization
 
 
@@ -170,46 +170,6 @@ def project_detail(request, pk):
 
 def _team_url(project):
     return f"{reverse('lead_portal:project_detail', args=[project.pk])}?tab=team"
-
-
-@login_required
-def member_add(request, pk):
-    """Тимлид добавляет только в своё направление — роль из ссылки
-    игнорируется, берём всегда его собственную специализацию."""
-    project = services.lead_project_or_404(request.user, pk)
-    role = services.lead_own_role(request.user)
-    if role is None:
-        messages.error(
-            request,
-            'У вас не заполнено направление (специализация) — обратитесь '
-            'к руководителю, чтобы добавлять участников команды.',
-        )
-        return redirect(_team_url(project))
-    form = TeamMemberForm(request.POST or None, role=role)
-    created_person = None
-    if request.method == 'POST':
-        data, created_person = _with_new_person(request, role=role)
-        form = TeamMemberForm(data, role=role)
-    if request.method == 'POST' and form.is_valid():
-        member = form.save(commit=False)
-        member.project = project
-        member.group = getattr(project, 'group', None)
-        member.save()
-        warning = form.overload_warning()
-        if warning:
-            messages.warning(request, warning)
-        if created_person:
-            messages.success(request, f'{created_person} заведён(а) в базе.')
-        messages.success(request, f'{member.person_name} добавлен(а) в команду.')
-        return redirect(_team_url(project))
-    return render(
-        request, 'lead_portal/member_form.html',
-        {'form': form, 'project': project,
-         'people': people_options(form),
-         'specializations': Specialization.objects.order_by('name'),
-         'role': role,
-         'title': _title_for(role)},
-    )
 
 
 def _own_direction_member_or_404(request, project, member_pk):
@@ -435,15 +395,23 @@ def meeting_score(request, pk, meeting_pk):
     })
 
 
-def _own_member_or_404(user, pk, intern_pk):
+def _own_member_or_404(user, pk, intern_pk, *, active_only=True):
     """Стажёр своей команды и своего направления — одна проверка на все
-    действия тимлида с карточкой."""
+    действия тимлида с карточкой.
+
+    ``active_only=False`` — вместе с теми, кто уже вышел из команды:
+    карточку вышедшего тимлид смотрит и может отметить его в резерв,
+    а замораживать стажировку у вышедшего нечего.
+    """
     project = services.lead_project_or_404(user, pk)
-    member = get_object_or_404(
-        TeamMember.objects.select_related('intern__specialization'),
-        project=project, intern_id=intern_pk, status=TeamMember.Status.ACTIVE,
-        role=services.lead_own_role(user),
+    members = TeamMember.objects.select_related('intern__specialization').filter(
+        project=project, intern_id=intern_pk, role=services.lead_own_role(user),
     )
+    if active_only:
+        members = members.filter(status=TeamMember.Status.ACTIVE)
+    member = members.order_by('-status', '-joined_at').first()
+    if member is None:
+        raise Http404('Стажёр не из вашей команды или не вашего направления.')
     return project, member
 
 
@@ -484,7 +452,7 @@ def intern_to_reserve(request, pk, intern_pk):
     """Отметить стажёра в резерв кадров — карточка заводится из его данных."""
     from apps.reserve.services import candidate_from_intern
 
-    project, member = _own_member_or_404(request.user, pk, intern_pk)
+    project, member = _own_member_or_404(request.user, pk, intern_pk, active_only=False)
     if request.method == 'POST':
         intern = member.intern
         from apps.reserve.models import ReserveCandidate
@@ -511,7 +479,7 @@ def intern_detail(request, pk, intern_pk):
     """
     from apps.reserve.models import ReserveCandidate
 
-    project, member = _own_member_or_404(request.user, pk, intern_pk)
+    project, member = _own_member_or_404(request.user, pk, intern_pk, active_only=False)
     intern = member.intern
     group = getattr(project, 'group', None)
     scores = (
@@ -526,6 +494,7 @@ def intern_detail(request, pk, intern_pk):
         'average_score': round(sum(values) / len(values), 1) if values else None,
         'projects_count': intern.team_memberships.count(),
         'in_reserve': ReserveCandidate.objects.filter(intern=intern).exists(),
+        'in_team': member.status == TeamMember.Status.ACTIVE,
     })
 
 

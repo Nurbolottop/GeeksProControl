@@ -24,7 +24,9 @@
         </div>
     </div>
     <div class="page-actions">
-        {% if intern.status == 'paused' %}
+        {% if not in_team %}
+            <span class="badge badge--gray">Вышел(а) из команды</span>
+        {% elif intern.status == 'paused' %}
             <form method="post" action="{% url 'lead_portal:intern_unpause' project.pk intern.pk %}" style="margin:0"
                   data-confirm="Возобновить стажировку {{ intern.full_name|escapejs }}? Его снова будут отмечать в табеле."
                   data-confirm-ok="Возобновить">
