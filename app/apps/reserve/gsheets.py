@@ -28,6 +28,9 @@ FIRST_DATA_ROW = 3
 DATA_RANGE = 'B{start}:H{end}'
 # Сколько строк чистим перед записью — с запасом, чтобы не оставался хвост.
 CLEAR_ROWS = 500
+# Пишем значения как есть: иначе Google Sheets считает «+996 …» формулой
+# и показывает #ERROR!, а у «0999…» съедает ведущий ноль.
+VALUE_INPUT = 'RAW'
 
 # Колонки листа: ФИО, Направление, Проекты которые делал (D+E — объединены),
 # Конец стажировки, Номер телефона, TG username.
@@ -182,7 +185,7 @@ def push(groups=None) -> int:
             continue
         update = session.put(
             f'{API}/{sheet_id}/values/{tab}!B{FIRST_DATA_ROW}',
-            params={'valueInputOption': 'USER_ENTERED'},
+            params={'valueInputOption': VALUE_INPUT},
             json={'values': rows},
         )
         update.raise_for_status()

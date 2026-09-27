@@ -867,6 +867,21 @@ class ReserveSheetTests(TestCase):
         self._candidate(full_name="Свой Путь", direction_other="Копирайтинг")
         self.assertEqual(self.gsheets.rows_by_direction(), {})
 
+    def test_values_go_to_sheet_as_text(self):
+        # «+996 …» Google Sheets примет за формулу, если писать USER_ENTERED
+        self.assertEqual(self.gsheets.VALUE_INPUT, "RAW")
+
+    def test_phone_keeps_plus_and_leading_zero(self):
+        self._candidate(
+            full_name="Айбек Осмонов", specialization=self.backend, phone="+996 990 757 610",
+        )
+        self._candidate(
+            full_name="Бек Осмонов", specialization=self.backend, phone="0999990677",
+        )
+        phones = [row[5] for row in self.gsheets.rows_by_direction()["backend"]]
+        self.assertIn("+996 990 757 610", phones)
+        self.assertIn("0999990677", phones)
+
     def test_tab_key_reads_sheet_titles(self):
         self.assertEqual(self.gsheets.tab_key("Список стажеров Backend"), "backend")
         self.assertEqual(self.gsheets.tab_key("Список стажеров UXUI"), "uxui")
