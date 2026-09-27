@@ -847,6 +847,16 @@ class ReserveSheetTests(TestCase):
         self.assertIn("Балажан", row[2])
         self.assertIn("БилимОрдо", row[2])
 
+    def test_membership_without_project_is_skipped(self):
+        from apps.teams.models import TeamMember, TeamRole
+
+        person = Intern.objects.create(full_name="Айбек Осмонов", specialization=self.backend)
+        TeamMember.objects.create(project=None, intern=person, role=TeamRole.BACKEND)
+        self._candidate(
+            full_name="Айбек Осмонов", specialization=self.backend, intern=person,
+        )
+        self.assertEqual(self.gsheets.rows_by_direction()["backend"][0][2], "")
+
     def test_archived_candidate_is_not_exported(self):
         person = self._candidate(full_name="Ушёл Совсем", specialization=self.backend)
         person.is_archived = True

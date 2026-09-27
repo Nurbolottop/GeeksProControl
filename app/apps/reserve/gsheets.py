@@ -80,6 +80,9 @@ def projects_of(candidate) -> str:
         return ''
     names = []
     for member in candidate.intern.team_memberships.select_related('project').all():
+        # Участник может висеть без проекта — такие записи пропускаем.
+        if member.project_id is None:
+            continue
         name = member.project.name
         if name not in names:
             names.append(name)
