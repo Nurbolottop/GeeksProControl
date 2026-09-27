@@ -52,6 +52,25 @@ class PhoneMatchesTests(TestCase):
     def test_too_short_does_not_match(self):
         self.assertFalse(services.phone_matches(self.intern, "1234"))
 
+    def test_matches_with_parentheses_and_dots(self):
+        self.assertTrue(services.phone_matches(self.intern, "+996 (501) 644.171"))
+
+    def test_incomplete_stored_phone_still_matches_on_available_digits(self):
+        """Если телефон в карточке когда-то занесли не полностью (меньше
+        9 цифр), это не должно значить «никакой формат не подходит» —
+        сверяем по тому, что реально есть."""
+        intern = Intern.objects.create(full_name="Неполный Телефон", phone="644171")
+        self.assertTrue(services.phone_matches(intern, "0501644171"))
+        self.assertTrue(services.phone_matches(intern, "+996 501 644 171"))
+
+    def test_very_short_stored_phone_does_not_match(self):
+        intern = Intern.objects.create(full_name="Совсем Короткий", phone="171")
+        self.assertFalse(services.phone_matches(intern, "0501644171"))
+
+    def test_blank_stored_phone_never_matches(self):
+        intern = Intern.objects.create(full_name="Без Телефона", phone="")
+        self.assertFalse(services.phone_matches(intern, "0501644171"))
+
 
 class EligibleProjectsTests(TestCase):
     def _project(self, name, stage, team_size, status=ProjectStatus.ACTIVE):
@@ -165,6 +184,40 @@ class RememberChatIdTests(TestCase):
         with mock.patch.object(Intern, "save") as save:
             services.remember_chat_id(intern, 12345)
             save.assert_not_called()
+
+
+class FindByChatIdTests(TestCase):
+    def test_finds_by_chat_id(self):
+        intern = Intern.objects.create(full_name="Найденный", telegram_chat_id=999)
+        self.assertEqual(services.find_by_chat_id(999), intern)
+
+    def test_none_when_not_found(self):
+        self.assertIsNone(services.find_by_chat_id(999))
+
+
+class ResolvedStatusMessageTests(TestCase):
+    def test_approved_message(self):
+        intern = Intern.objects.create(
+            full_name="Принятый", resume_bank_status=ResumeBankStatus.APPROVED,
+        )
+        self.assertIn("принято", services.resolved_status_message(intern))
+
+    def test_revision_message_includes_comment(self):
+        intern = Intern.objects.create(
+            full_name="На доработке", resume_bank_status=ResumeBankStatus.REVISION,
+            resume_bank_comment="Поправьте фото",
+        )
+        self.assertIn("Поправьте фото", services.resolved_status_message(intern))
+
+    def test_pending_message(self):
+        intern = Intern.objects.create(
+            full_name="Ожидающий", resume_bank_status=ResumeBankStatus.PENDING,
+        )
+        self.assertIn("на проверке", services.resolved_status_message(intern))
+
+    def test_fallback_message_for_project_join(self):
+        intern = Intern.objects.create(full_name="В проекте")
+        self.assertIn("продолжаете стажировку", services.resolved_status_message(intern))
 
 
 class SubmitToResumeBankTests(TestCase):

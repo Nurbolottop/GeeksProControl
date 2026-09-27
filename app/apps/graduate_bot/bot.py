@@ -60,6 +60,18 @@ def _clear_markup(call):
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
+    intern = services.find_by_chat_id(message.chat.id)
+    if intern is not None:
+        if intern.graduate_status:
+            # Уже проверяли телефон в этом чате, но выбор («Продолжить»/
+            # «В банк резюме») ещё не сделал — не переспрашиваем ФИО и
+            # телефон заново, сразу показываем тот же выбор.
+            show_choice(message.chat.id, intern)
+        else:
+            # Уже сделал выбор раньше (заявка в банк резюме или проект) —
+            # показываем текущий статус вместо повторной аутентификации.
+            bot.send_message(message.chat.id, services.resolved_status_message(intern))
+        return
     bot.send_message(
         message.chat.id,
         'Здравствуйте! Это бот для выпускников GeeksPro.\n\n'

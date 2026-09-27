@@ -55,14 +55,28 @@ def _digits(value: str) -> str:
     return re.sub(r'\D', '', value or '')
 
 
+PHONE_MATCH_MIN_DIGITS = 6
+
+
 def phone_matches(intern: Intern, raw_phone: str) -> bool:
-    """Сверка по последним 9 цифрам — не важно, как записан код страны
-    (+996, 996, 0 или вообще без него)."""
+    """Сверка по последним цифрам — формат неважен (+996, 996, 0 или
+    вообще без него, с пробелами/тире/скобками — всё, кроме цифр,
+    отбрасывается).
+
+    Длина сравнения — по короткой из двух записей, но не больше 9: если
+    в карточке телефон когда-то занесли не полностью (меньше 9 цифр),
+    человека всё равно можно проверить по тому, что есть, а не отказывать
+    ему независимо от формата ввода. Ниже PHONE_MATCH_MIN_DIGITS не
+    опускаемся — иначе проверка станет слишком легко угадываемой (уже
+    есть отдельная блокировка после нескольких неверных попыток, см.
+    lock_phone_verification, но короткий хвост дополнительно ослаблял бы
+    её)."""
     entered = _digits(raw_phone)
     stored = _digits(intern.phone)
-    if len(entered) < 9 or len(stored) < 9:
+    tail = min(len(entered), len(stored), 9)
+    if tail < PHONE_MATCH_MIN_DIGITS:
         return False
-    return entered[-9:] == stored[-9:]
+    return entered[-tail:] == stored[-tail:]
 
 
 def is_phone_locked(intern: Intern) -> bool:
@@ -101,6 +115,34 @@ def remember_chat_id(intern: Intern, chat_id: int) -> None:
         return
     intern.telegram_chat_id = chat_id
     intern.save(update_fields=['telegram_chat_id', 'updated_at'])
+
+
+def find_by_chat_id(chat_id: int) -> Intern | None:
+    """Кого уже проверяли по телефону в этом чате — чтобы повторный
+    /start не переспрашивал ФИО и телефон заново."""
+    return Intern.objects.filter(telegram_chat_id=chat_id).order_by('-updated_at').first()
+
+
+def resolved_status_message(intern: Intern) -> str:
+    """Текст для /start, когда человек уже проходил проверку раньше и
+    уже сделал выбор (заявка в банк резюме или проект) — вместо того,
+    чтобы заново гонять его через ФИО и телефон."""
+    if intern.resume_bank_status == ResumeBankStatus.APPROVED:
+        return (
+            f'Здравствуйте, {intern.full_name}! Ваше резюме уже принято и '
+            'опубликовано в банке резюме GeeksPro.'
+        )
+    if intern.resume_bank_status == ResumeBankStatus.REVISION:
+        return (
+            f'Здравствуйте, {intern.full_name}! Ваша заявка в банк резюме '
+            f'отправлена на доработку.\n\nКомментарий: {intern.resume_bank_comment}'
+        )
+    if intern.resume_bank_status == ResumeBankStatus.PENDING:
+        return (
+            f'Здравствуйте, {intern.full_name}! Ваша заявка в банк резюме ещё '
+            'на проверке у руководителя GeeksPro. Мы сообщим о результате здесь.'
+        )
+    return f'Здравствуйте, {intern.full_name}! Вы уже продолжаете стажировку в GeeksPro.'
 
 
 def completed_projects(intern: Intern) -> list[TeamMember]:
