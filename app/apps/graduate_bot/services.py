@@ -170,7 +170,11 @@ def submit_to_resume_bank(intern: Intern, chat_id: int) -> bool:
     (APPROVED) — ничего не меняем и возвращаем False, чтобы даже повторный
     вызов (второй клик по той же кнопке) не смог сбросить это решение.
     """
+    from django.urls import reverse
+
     from apps.audit.services import log as audit_log
+    from apps.notifications.models import NotificationLevel
+    from apps.notifications.services import notify
 
     remember_chat_id(intern, chat_id)
     if intern.resume_bank_status == ResumeBankStatus.APPROVED:
@@ -184,6 +188,15 @@ def submit_to_resume_bank(intern: Intern, chat_id: int) -> bool:
         'graduate_status', 'updated_at',
     ])
     audit_log(intern, 'Заявка в банк резюме отправлена', reason='бот-выпускник')
+    # intern=None — в общую ленту руководителя (apps.notifications), не в
+    # чей-то личный портал: заявки в банк резюме проверяет только он сам.
+    notify(
+        f'Заявка в банк резюме: {intern.full_name}',
+        level=NotificationLevel.INFO,
+        description='Выпускник подтвердил регистрацию через бота — ждёт проверки.',
+        url=reverse('interns:resume_bank'),
+        dedup_key=f'resume-bank-submitted:{intern.pk}',
+    )
     return True
 
 

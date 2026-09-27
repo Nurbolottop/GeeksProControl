@@ -197,6 +197,17 @@ def handle_choice(message, intern_id):
 
 
 def send_bank_instructions(message, intern):
+    if intern.resume_bank_status:
+        # Уже подавал заявку раньше (submit_to_resume_bank снимает
+        # graduate_status, так что обычно досюда просто не доходят — это
+        # подстраховка на случай повторного/устаревшего нажатия кнопки):
+        # не предлагаем инструкцию и кнопку подтверждения заново, просто
+        # говорим текущий статус.
+        bot.send_message(
+            message.chat.id, services.resolved_status_message(intern),
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        return
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     markup.add(types.KeyboardButton(BANK_CONFIRM_BUTTON))
     bot.send_message(

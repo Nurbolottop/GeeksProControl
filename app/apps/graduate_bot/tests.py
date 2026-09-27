@@ -252,6 +252,30 @@ class SubmitToResumeBankTests(TestCase):
             ).exists(),
         )
 
+    def test_creates_notification_for_head_feed(self):
+        from apps.notifications.models import Notification
+
+        intern = Intern.objects.create(full_name="Выпускник Резюме")
+        services.submit_to_resume_bank(intern, 777)
+        notification = Notification.objects.get(dedup_key=f"resume-bank-submitted:{intern.pk}")
+        self.assertIsNone(notification.intern)
+        self.assertIn("Выпускник Резюме", notification.title)
+
+    def test_second_submission_does_not_duplicate_open_notification(self):
+        from apps.notifications.models import Notification
+
+        intern = Intern.objects.create(
+            full_name="Выпускник Резюме", resume_bank_status=ResumeBankStatus.REVISION,
+        )
+        services.submit_to_resume_bank(intern, 777)
+        services.submit_to_resume_bank(intern, 777)
+        self.assertEqual(
+            Notification.objects.filter(
+                dedup_key=f"resume-bank-submitted:{intern.pk}",
+            ).count(),
+            1,
+        )
+
     def test_does_not_downgrade_already_approved(self):
         intern = Intern.objects.create(
             full_name="Уже принят", resume_bank_status=ResumeBankStatus.APPROVED,
