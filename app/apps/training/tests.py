@@ -1,6 +1,7 @@
 import datetime
 
 from django.test import TestCase
+from django.utils import timezone
 from django.urls import reverse
 
 from apps.accounts.models import User
@@ -459,17 +460,29 @@ class AcademyViewsTests(TestCase):
         self.assertNotContains(response, '39 группа')
 
     def test_groups_appear_after_choosing_direction(self):
-        importer.apply(importer.parse(ACADEMY_MESSAGE, 'Бишкек'))
+        """Страница показывает группы, которые учатся прямо сейчас, поэтому
+        группу для проверки заводим от сегодняшнего дня, а не из фикстуры —
+        иначе тест ломается, как только её выпуск остаётся позади."""
+        today = timezone.localdate()
+        TrainingGroup.objects.create(
+            number='77', specialization=self.specs['Backend'], branch='Бишкек',
+            start_date=today - datetime.timedelta(days=30),
+            end_date=today + datetime.timedelta(days=60), students_count=8,
+        )
+        TrainingGroup.objects.create(
+            number='78', specialization=self.specs['UX/UI'], branch='Бишкек',
+            start_date=today - datetime.timedelta(days=10),
+            end_date=today + datetime.timedelta(days=90), students_count=5,
+        )
         response = self.client.get(reverse('training:plan'), {
             'branch': 'Бишкек', 'specialization': self.specs['Backend'].pk,
         })
         self.assertEqual(len(response.context['directions']), 1)
-        self.assertContains(response, '39 группа')       # Backend 39
-        self.assertContains(response, '25.03.2026')      # её старт
+        self.assertContains(response, '77 группа')
         self.assertContains(response, '8 студентов')
-        self.assertNotContains(response, '09.06.2026')   # это дата группы Design
+        self.assertNotContains(response, '78 группа')    # это группа UX/UI
         # другие направления остаются в выборе, чтобы переключаться
-        self.assertEqual(len(response.context['all_directions']), 4)
+        self.assertEqual(len(response.context['all_directions']), 2)
         self.assertNotContains(response, 'Выберите направление')
 
     def test_empty_academy_page_opens(self):

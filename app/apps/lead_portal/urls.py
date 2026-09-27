@@ -50,4 +50,16 @@ urlpatterns = [
         '<int:pk>/interns/<int:intern_pk>/', views.intern_detail,
         name='intern_detail',
     ),
+    path(
+        '<int:pk>/interns/<int:intern_pk>/pause/', views.intern_pause,
+        name='intern_pause',
+    ),
+    path(
+        '<int:pk>/interns/<int:intern_pk>/unpause/', views.intern_unpause,
+        name='intern_unpause',
+    ),
+    path(
+        '<int:pk>/interns/<int:intern_pk>/to-reserve/', views.intern_to_reserve,
+        name='intern_to_reserve',
+    ),
 ]

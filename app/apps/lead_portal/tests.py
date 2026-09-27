@@ -1143,3 +1143,110 @@ class LeadOverviewTests(TestCase):
         labels = [tile["label"] for tile in response.context["lead_tiles"]]
         self.assertIn("завершён", labels)
         self.assertNotIn("до дедлайна", labels)
+
+
+class LeadInternActionsTests(TestCase):
+    """Тимлид у своего стажёра: заморозка стажировки и отметка в резерв."""
+
+    def setUp(self):
+        from apps.training.models import Specialization
+
+        backend = Specialization.objects.create(name="Backend")
+        frontend = Specialization.objects.create(name="Frontend")
+        self.lead_user = Model.objects.create_user(
+            username="+996700000070", password="x", role=User.Role.TEAM_LEAD,
+        )
+        self.lead = Intern.objects.create(
+            full_name="Действий Тимлид", user=self.lead_user, specialization=backend,
+        )
+        self.project = Project.objects.create(name="Омур")
+        self.foreign = Project.objects.create(name="Чужой")
+        TeamMember.objects.create(
+            project=self.project, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.intern = Intern.objects.create(
+            full_name="Мой Стажёр", specialization=backend, status="active",
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.other_direction = Intern.objects.create(
+            full_name="Чужое Направление", specialization=frontend, status="active",
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.other_direction, role=TeamRole.FRONTEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.client.force_login(self.lead_user)
+
+    def _url(self, name, intern=None, project=None):
+        return reverse(name, args=[(project or self.project).pk, (intern or self.intern).pk])
+
+    def test_detail_opens_with_actions(self):
+        response = self.client.get(self._url("lead_portal:intern_detail"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Мой Стажёр")
+        self.assertContains(response, self._url("lead_portal:intern_pause"))
+        self.assertContains(response, self._url("lead_portal:intern_to_reserve"))
+
+    def test_pause_and_resume(self):
+        from apps.audit.models import AuditLog
+
+        self.client.post(self._url("lead_portal:intern_pause"))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, "paused")
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_id=str(self.intern.pk), action="Стажировка заморожена",
+            ).exists()
+        )
+        # из команды не убираем
+        self.assertTrue(
+            TeamMember.objects.filter(
+                project=self.project, intern=self.intern, status=TeamMember.Status.ACTIVE,
+            ).exists()
+        )
+        page = self.client.get(self._url("lead_portal:intern_detail"))
+        self.assertContains(page, "Стажировка заморожена")
+        self.client.post(self._url("lead_portal:intern_unpause"))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, "active")
+
+    def test_mark_to_reserve(self):
+        from apps.reserve.models import ReserveCandidate
+
+        self.client.post(self._url("lead_portal:intern_to_reserve"))
+        card = ReserveCandidate.objects.get(intern=self.intern)
+        self.assertEqual(card.full_name, "Мой Стажёр")
+        # повторное нажатие не плодит вторую карточку
+        self.client.post(self._url("lead_portal:intern_to_reserve"))
+        self.assertEqual(ReserveCandidate.objects.filter(intern=self.intern).count(), 1)
+        page = self.client.get(self._url("lead_portal:intern_detail"))
+        self.assertContains(page, "В резерве кадров")
+
+    def test_cannot_touch_other_direction(self):
+        response = self.client.post(
+            self._url("lead_portal:intern_pause", intern=self.other_direction),
+        )
+        self.assertEqual(response.status_code, 404)
+        self.other_direction.refresh_from_db()
+        self.assertEqual(self.other_direction.status, "active")
+
+    def test_cannot_touch_foreign_project(self):
+        response = self.client.post(
+            self._url("lead_portal:intern_pause", project=self.foreign),
+        )
+        self.assertEqual(response.status_code, 404)
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, "active")
+
+    def test_get_does_not_change_anything(self):
+        from apps.reserve.models import ReserveCandidate
+
+        self.client.get(self._url("lead_portal:intern_pause"))
+        self.client.get(self._url("lead_portal:intern_to_reserve"))
+        self.intern.refresh_from_db()
+        self.assertEqual(self.intern.status, "active")
+        self.assertFalse(ReserveCandidate.objects.filter(intern=self.intern).exists())

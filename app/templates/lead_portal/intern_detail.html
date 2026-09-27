@@ -10,12 +10,43 @@
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
             <span class="badge badge--blue">{{ intern.specialization|default:'Без направления' }}</span>
             <span class="badge badge--gray">{{ member.get_role_display }}</span>
+            {% if intern.status == 'paused' %}
+                <span class="badge badge--yellow">Стажировка заморожена</span>
+            {% else %}
+                <span class="badge badge--green">{{ intern.get_status_display }}</span>
+            {% endif %}
+            {% if in_reserve %}<span class="badge badge--blue">В резерве кадров</span>{% endif %}
             {% if average_score is not None %}
                 <span class="badge badge--{% if average_score >= 8 %}green{% elif average_score >= 5 %}yellow{% else %}red{% endif %}">
                     Активность: {{ average_score }}
                 </span>
             {% endif %}
         </div>
+    </div>
+    <div class="page-actions">
+        {% if intern.status == 'paused' %}
+            <form method="post" action="{% url 'lead_portal:intern_unpause' project.pk intern.pk %}" style="margin:0"
+                  data-confirm="Возобновить стажировку {{ intern.full_name|escapejs }}? Его снова будут отмечать в табеле."
+                  data-confirm-ok="Возобновить">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--secondary">Возобновить стажировку</button>
+            </form>
+        {% else %}
+            <form method="post" action="{% url 'lead_portal:intern_pause' project.pk intern.pk %}" style="margin:0"
+                  data-confirm="Заморозить стажировку {{ intern.full_name|escapejs }}? Из команды он(а) не выходит, но в табеле его больше не отмечают."
+                  data-confirm-ok="Заморозить">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--secondary">Заморозить стажировку</button>
+            </form>
+        {% endif %}
+        {% if not in_reserve %}
+            <form method="post" action="{% url 'lead_portal:intern_to_reserve' project.pk intern.pk %}" style="margin:0"
+                  data-confirm="Отметить {{ intern.full_name|escapejs }} в резерв кадров? Карточка заведётся из его данных, резюме он(а) дополнит сам(а)."
+                  data-confirm-ok="В резерв">
+                {% csrf_token %}
+                <button type="submit" class="btn">В резерв кадров</button>
+            </form>
+        {% endif %}
     </div>
 </div>
 

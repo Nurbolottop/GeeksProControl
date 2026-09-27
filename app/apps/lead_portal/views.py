@@ -435,17 +435,83 @@ def meeting_score(request, pk, meeting_pk):
     })
 
 
-@login_required
-def intern_detail(request, pk, intern_pk):
-    """Детальная карточка стажёра — только по своей команде и своему
-    направлению, только чтение."""
-    project = services.lead_project_or_404(request.user, pk)
-    own_role = services.lead_own_role(request.user)
+def _own_member_or_404(user, pk, intern_pk):
+    """Стажёр своей команды и своего направления — одна проверка на все
+    действия тимлида с карточкой."""
+    project = services.lead_project_or_404(user, pk)
     member = get_object_or_404(
         TeamMember.objects.select_related('intern__specialization'),
         project=project, intern_id=intern_pk, status=TeamMember.Status.ACTIVE,
-        role=own_role,
+        role=services.lead_own_role(user),
     )
+    return project, member
+
+
+def _intern_url(project, intern):
+    return reverse('lead_portal:intern_detail', args=[project.pk, intern.pk])
+
+
+@login_required
+def intern_pause(request, pk, intern_pk):
+    """Заморозить стажировку: в табеле его больше не отмечают, из команды
+    не убираем — заморозка не то же самое, что выход."""
+    from apps.interns.services import pause_person
+
+    project, member = _own_member_or_404(request.user, pk, intern_pk)
+    if request.method == 'POST':
+        if pause_person(member.intern, user=request.user):
+            messages.success(request, f'Стажировка {member.intern.full_name} заморожена.')
+        else:
+            messages.info(request, 'Заморозить можно только активную стажировку.')
+    return redirect(_intern_url(project, member.intern))
+
+
+@login_required
+def intern_unpause(request, pk, intern_pk):
+    from apps.interns.services import unpause_person
+
+    project, member = _own_member_or_404(request.user, pk, intern_pk)
+    if request.method == 'POST':
+        if unpause_person(member.intern, user=request.user):
+            messages.success(request, f'Стажировка {member.intern.full_name} возобновлена.')
+        else:
+            messages.info(request, 'Возобновить можно только замороженную стажировку.')
+    return redirect(_intern_url(project, member.intern))
+
+
+@login_required
+def intern_to_reserve(request, pk, intern_pk):
+    """Отметить стажёра в резерв кадров — карточка заводится из его данных."""
+    from apps.reserve.services import candidate_from_intern
+
+    project, member = _own_member_or_404(request.user, pk, intern_pk)
+    if request.method == 'POST':
+        intern = member.intern
+        from apps.reserve.models import ReserveCandidate
+
+        existed = ReserveCandidate.objects.filter(intern=intern).exists()
+        candidate_from_intern(intern, request.user)
+        if existed:
+            messages.info(request, f'{intern.full_name} уже в резерве кадров.')
+        else:
+            messages.success(
+                request,
+                f'{intern.full_name} в резерве кадров — резюме он(а) дополняет сам(а).',
+            )
+    return redirect(_intern_url(project, member.intern))
+
+
+@login_required
+@login_required
+def intern_detail(request, pk, intern_pk):
+    """Детальная карточка стажёра своей команды и своего направления.
+
+    Тимлид может заморозить стажировку и отметить человека в резерв
+    кадров; остальное — только чтение.
+    """
+    from apps.reserve.models import ReserveCandidate
+
+    project, member = _own_member_or_404(request.user, pk, intern_pk)
     intern = member.intern
     group = getattr(project, 'group', None)
     scores = (
@@ -459,6 +525,7 @@ def intern_detail(request, pk, intern_pk):
         'scores': scores,
         'average_score': round(sum(values) / len(values), 1) if values else None,
         'projects_count': intern.team_memberships.count(),
+        'in_reserve': ReserveCandidate.objects.filter(intern=intern).exists(),
     })
 
 
