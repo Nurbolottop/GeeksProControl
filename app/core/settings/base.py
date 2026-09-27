@@ -36,6 +36,17 @@ TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 # socks5h://host.docker.internal:40001. Пусто — бот ходит напрямую.
 TELEGRAM_PROXY_URL = os.getenv('TELEGRAM_PROXY_URL', '')
 
+# Общая Google-таблица резерва кадров: кандидаты попадают в неё сами,
+# отсортированные по направлениям (apps.reserve.gsheets). Нужен ключ
+# сервисного аккаунта, которому таблица открыта на редактирование; без
+# ключа выгрузка просто не работает, платформа этого не замечает.
+GOOGLE_SHEETS_CREDENTIALS_FILE = os.getenv('GOOGLE_SHEETS_CREDENTIALS_FILE', '')
+RESERVE_SHEET_ID = os.getenv(
+    'RESERVE_SHEET_ID', '191yzysuwfWER5JmkTRU4kj7MI0Z792Rl19NPiMvSV8Q',
+)
+# Пусто — пишем в первый лист таблицы.
+RESERVE_SHEET_TAB = os.getenv('RESERVE_SHEET_TAB', '')
+
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_HTTPONLY = True

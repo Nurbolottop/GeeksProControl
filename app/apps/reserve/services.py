@@ -298,13 +298,21 @@ def update_recommendation_status(recommendation, status: str, *, comment='', use
     return recommendation
 
 
-def candidate_from_intern(intern, user=None) -> ReserveCandidate:
-    """Завести кандидата из карточки стажёра, не перепечатывая данные."""
+def candidate_from_intern(
+    intern, user=None, *, skills='', comment_lead='',
+) -> ReserveCandidate:
+    """Завести кандидата из карточки стажёра, не перепечатывая данные.
+
+    Навыки и комментарий приходят от того, кто отправляет человека в
+    резерв (обычно тимлида) — остальное кандидат дополняет сам.
+    """
     existing = ReserveCandidate.objects.filter(intern=intern).first()
     if existing is not None:
         return existing
     candidate = ReserveCandidate(
         intern=intern,
+        skills=skills,
+        comment_lead=comment_lead,
         full_name=intern.full_name,
         phone=intern.phone,
         email=intern.email,

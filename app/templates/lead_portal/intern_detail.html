@@ -42,12 +42,7 @@
             </form>
         {% endif %}
         {% if not in_reserve %}
-            <form method="post" action="{% url 'lead_portal:intern_to_reserve' project.pk intern.pk %}" style="margin:0"
-                  data-confirm="Отметить {{ intern.full_name|escapejs }} в резерв кадров? Карточка заведётся из его данных, резюме он(а) дополнит сам(а)."
-                  data-confirm-ok="В резерв">
-                {% csrf_token %}
-                <button type="submit" class="btn">В резерв кадров</button>
-            </form>
+            <a href="{% url 'lead_portal:intern_to_reserve' project.pk intern.pk %}" class="btn">В резерв кадров</a>
         {% endif %}
     </div>
 </div>

@@ -1,0 +1,29 @@
+{% extends 'lead_portal/base.html' %}
+
+{% block title %}{{ intern.full_name }} в резерв — Портал тимлида{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'lead_portal:intern_detail' project.pk intern.pk %}">← {{ intern.full_name }}</a></p>
+<div class="page-head">
+    <div>
+        <h1>{{ intern.full_name }} — в резерв кадров</h1>
+        <div class="sub">
+            Опишите навыки: по ним мы подбираем кандидатов работодателям.
+            Остальное — опыт, ссылки, пожелания по работе — кандидат дополнит сам.
+        </div>
+    </div>
+</div>
+
+<div class="panel" style="max-width: 640px;">
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-grid">
+            {% include 'partials/form_fields.html' %}
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn">Добавить в резерв</button>
+            <a href="{% url 'lead_portal:intern_detail' project.pk intern.pk %}" class="btn btn--secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

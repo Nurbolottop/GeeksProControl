@@ -779,3 +779,111 @@ class ReserveInternLinkTests(TestCase):
         call_command('link_reserve_candidates', apply=True, stdout=StringIO())
         candidate.refresh_from_db()
         self.assertEqual(candidate.intern, self.person)
+
+
+class ReserveSheetTests(TestCase):
+    """Выгрузка резерва в общую Google-таблицу: что и в каком порядке уходит."""
+
+    def setUp(self):
+        from apps.reserve import gsheets
+
+        self.gsheets = gsheets
+        self.backend = Specialization.objects.create(name="Backend")
+        self.design = Specialization.objects.create(name="UX/UI дизайн")
+
+    def _candidate(self, **kwargs):
+        data = {"full_name": "Кандидат", "status": CandidateStatus.RESERVE}
+        data.update(kwargs)
+        return ReserveCandidate.objects.create(**data)
+
+    def test_rows_match_sheet_columns(self):
+        self._candidate(
+            full_name="Айбек Осмонов", specialization=self.backend,
+            phone="0555123456", telegram="@aibek",
+            study_end=timezone.localdate().replace(month=6, day=20),
+        )
+        rows = self.gsheets.sheet_rows()
+        self.assertEqual(len(self.gsheets.HEADER), 7)
+        self.assertEqual(len(rows), 1)
+        number, name, direction, end, phone, telegram, status = rows[0]
+        self.assertEqual(number, "1")
+        self.assertEqual(name, "Айбек Осмонов")
+        self.assertEqual(direction, "Backend")
+        self.assertTrue(end.endswith(str(timezone.localdate().year)))
+        self.assertEqual(phone, "0555123456")
+        self.assertEqual(telegram, "@aibek")
+        self.assertEqual(status, "В резерве")
+
+    def test_sorted_by_direction_then_name(self):
+        self._candidate(full_name="Ян Дизайнер", specialization=self.design)
+        self._candidate(full_name="Борис Бэкенд", specialization=self.backend)
+        self._candidate(full_name="Анна Бэкенд", specialization=self.backend)
+        self._candidate(full_name="Без Направления")
+        rows = self.gsheets.sheet_rows()
+        self.assertEqual(
+            [(row[1], row[2]) for row in rows],
+            [
+                ("Анна Бэкенд", "Backend"),
+                ("Борис Бэкенд", "Backend"),
+                ("Ян Дизайнер", "UX/UI дизайн"),
+                ("Без Направления", "Без направления"),
+            ],
+        )
+        # нумерация сквозная, как в таблице
+        self.assertEqual([row[0] for row in rows], ["1", "2", "3", "4"])
+
+    def test_priority_lifts_person_inside_direction(self):
+        self._candidate(full_name="Анна Бэкенд", specialization=self.backend)
+        self._candidate(full_name="Борис Бэкенд", specialization=self.backend, priority=5)
+        rows = self.gsheets.sheet_rows()
+        self.assertEqual([row[1] for row in rows], ["Борис Бэкенд", "Анна Бэкенд"])
+
+    def test_archived_candidate_is_not_exported(self):
+        person = self._candidate(full_name="Ушёл Совсем", specialization=self.backend)
+        person.is_archived = True
+        person.save(update_fields=["is_archived"])
+        self.assertEqual(self.gsheets.sheet_rows(), [])
+
+    def test_direction_other_used_when_no_specialization(self):
+        self._candidate(full_name="Свой Путь", direction_other="DevOps")
+        self.assertEqual(self.gsheets.sheet_rows()[0][2], "DevOps")
+
+    def test_without_credentials_nothing_happens(self):
+        from django.test import override_settings
+
+        with override_settings(GOOGLE_SHEETS_CREDENTIALS_FILE=""):
+            self.assertFalse(self.gsheets.is_configured())
+            self.assertFalse(self.gsheets.sync("тест"))
+            # сохранение кандидата не должно ничего требовать от таблицы
+            self._candidate(full_name="Тихий Кандидат")
+
+    def test_save_schedules_sync_when_configured(self):
+        calls = []
+        original = self.gsheets.is_configured
+        self.gsheets.is_configured = lambda: True
+        from apps.reserve import tasks
+
+        original_delay = tasks.sync_reserve_sheet.delay
+        tasks.sync_reserve_sheet.delay = lambda reason='': calls.append(reason)
+        try:
+            with self.captureOnCommitCallbacks(execute=True):
+                self._candidate(full_name="Новый Кандидат")
+        finally:
+            self.gsheets.is_configured = original
+            tasks.sync_reserve_sheet.delay = original_delay
+        self.assertEqual(len(calls), 1, calls)
+
+    def test_command_previews_without_credentials(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        from django.test import override_settings
+
+        self._candidate(full_name="Айбек Осмонов", specialization=self.backend)
+        out = StringIO()
+        with override_settings(GOOGLE_SHEETS_CREDENTIALS_FILE=""):
+            call_command("sync_reserve_sheet", stdout=out)
+        text = out.getvalue()
+        self.assertIn("Кандидатов к выгрузке: 1", text)
+        self.assertIn("Айбек Осмонов", text)
+        self.assertIn("не настроена", text)

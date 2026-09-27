@@ -1178,14 +1178,45 @@ class LeadInternActionsTests(TestCase):
     def test_mark_to_reserve(self):
         from apps.reserve.models import ReserveCandidate
 
-        self.client.post(self._url("lead_portal:intern_to_reserve"))
+        self.client.post(self._url("lead_portal:intern_to_reserve"), {
+            "skills": "Python, Django, PostgreSQL",
+            "comment": "Тянет задачи сам, не боится ревью.",
+        })
         card = ReserveCandidate.objects.get(intern=self.intern)
         self.assertEqual(card.full_name, "Мой Стажёр")
+        self.assertEqual(card.skills, "Python, Django, PostgreSQL")
+        self.assertEqual(card.comment_lead, "Тянет задачи сам, не боится ревью.")
         # повторное нажатие не плодит вторую карточку
-        self.client.post(self._url("lead_portal:intern_to_reserve"))
+        self.client.post(self._url("lead_portal:intern_to_reserve"), {
+            "skills": "Другое",
+        })
         self.assertEqual(ReserveCandidate.objects.filter(intern=self.intern).count(), 1)
         page = self.client.get(self._url("lead_portal:intern_detail"))
         self.assertContains(page, "В резерве кадров")
+
+    def test_to_reserve_asks_for_skills_first(self):
+        response = self.client.get(self._url("lead_portal:intern_to_reserve"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Навыки и технологии")
+
+    def test_to_reserve_without_skills_not_saved(self):
+        from apps.reserve.models import ReserveCandidate
+
+        response = self.client.post(
+            self._url("lead_portal:intern_to_reserve"), {"skills": ""},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ReserveCandidate.objects.filter(intern=self.intern).exists())
+
+    def test_comment_is_optional(self):
+        from apps.reserve.models import ReserveCandidate
+
+        self.client.post(
+            self._url("lead_portal:intern_to_reserve"), {"skills": "Figma"},
+        )
+        card = ReserveCandidate.objects.get(intern=self.intern)
+        self.assertEqual(card.skills, "Figma")
+        self.assertEqual(card.comment_lead, "")
 
     def test_cannot_touch_other_direction(self):
         response = self.client.post(
@@ -1261,8 +1292,11 @@ class LeadFormerInternTests(TestCase):
     def test_former_member_can_be_marked_to_reserve(self):
         from apps.reserve.models import ReserveCandidate
 
-        self.client.post(self._url("lead_portal:intern_to_reserve"))
-        self.assertTrue(ReserveCandidate.objects.filter(intern=self.intern).exists())
+        self.client.post(
+            self._url("lead_portal:intern_to_reserve"), {"skills": "Go, gRPC"},
+        )
+        card = ReserveCandidate.objects.get(intern=self.intern)
+        self.assertEqual(card.skills, "Go, gRPC")
 
     def test_foreign_project_still_closed(self):
         response = self.client.get(

@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.attendance import services as attendance_services
 from apps.attendance.models import GroupMeeting, MeetingKind, WorkScore
 from apps.lead_portal import services
+from apps.lead_portal.forms import LeadToReserveForm
 from apps.projects.services import calculate_deadline_status
 from apps.teams import services as team_services
 from apps.teams.forms import TeamMemberEditForm
@@ -449,24 +450,35 @@ def intern_unpause(request, pk, intern_pk):
 
 @login_required
 def intern_to_reserve(request, pk, intern_pk):
-    """Отметить стажёра в резерв кадров — карточка заводится из его данных."""
+    """Отметить стажёра в резерв кадров.
+
+    Тимлид заодно описывает его навыки — он знает человека по работе
+    лучше всех, а резюме кандидат потом дополнит сам.
+    """
+    from apps.reserve.models import ReserveCandidate
     from apps.reserve.services import candidate_from_intern
 
     project, member = _own_member_or_404(request.user, pk, intern_pk, active_only=False)
-    if request.method == 'POST':
-        intern = member.intern
-        from apps.reserve.models import ReserveCandidate
+    intern = member.intern
+    if ReserveCandidate.objects.filter(intern=intern).exists():
+        messages.info(request, f'{intern.full_name} уже в резерве кадров.')
+        return redirect(_intern_url(project, intern))
 
-        existed = ReserveCandidate.objects.filter(intern=intern).exists()
-        candidate_from_intern(intern, request.user)
-        if existed:
-            messages.info(request, f'{intern.full_name} уже в резерве кадров.')
-        else:
-            messages.success(
-                request,
-                f'{intern.full_name} в резерве кадров — резюме он(а) дополняет сам(а).',
-            )
-    return redirect(_intern_url(project, member.intern))
+    form = LeadToReserveForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        candidate_from_intern(
+            intern, request.user,
+            skills=form.cleaned_data['skills'],
+            comment_lead=form.cleaned_data['comment'],
+        )
+        messages.success(
+            request,
+            f'{intern.full_name} в резерве кадров — резюме он(а) дополнит сам(а).',
+        )
+        return redirect(_intern_url(project, intern))
+    return render(request, 'lead_portal/to_reserve_form.html', {
+        'project': project, 'intern': intern, 'form': form,
+    })
 
 
 @login_required
