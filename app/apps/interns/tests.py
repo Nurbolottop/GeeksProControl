@@ -1070,6 +1070,61 @@ class GraduateWorkflowTests(TestCase):
         intern.refresh_from_db()
         self.assertEqual(intern.status, InternStatus.PAUSED)
 
+    def test_completing_project_does_not_mark_team_lead_pending(self):
+        """Тимлид — уже полноценный сотрудник, а не стажёр: завершение
+        проекта не должно превращать его в «выпускника на проверке» и
+        сбрасывать его «Статус» на «Готов к распределению»."""
+        from apps.projects.models import Project, ProjectStatus
+        from apps.projects.services import release_team
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Проект", status=ProjectStatus.COMPLETED)
+        lead = Intern.objects.create(full_name="Тимлид", status=InternStatus.ACTIVE)
+        TeamMember.objects.create(
+            project=project, intern=lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        release_team(project)
+
+        lead.refresh_from_db()
+        self.assertEqual(lead.graduate_status, "")
+        self.assertEqual(lead.status, InternStatus.ACTIVE)
+
+    def test_completing_project_does_not_mark_pm_pending(self):
+        from apps.projects.models import Project, ProjectStatus
+        from apps.projects.services import release_team
+        from apps.teams.models import TeamMember, TeamRole
+
+        project = Project.objects.create(name="Проект", status=ProjectStatus.COMPLETED)
+        pm = Intern.objects.create(full_name="ПМ", status=InternStatus.ACTIVE)
+        TeamMember.objects.create(
+            project=project, intern=pm, role=TeamRole.PROJECT_MANAGER,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+        release_team(project)
+
+        pm.refresh_from_db()
+        self.assertEqual(pm.graduate_status, "")
+
+    def test_team_lead_with_stale_graduate_status_excluded_from_list(self):
+        """Подстраховка на случай уже испорченных старых данных (до этого
+        исправления) — даже если graduate_status кем-то выставлен, тимлид
+        не должен показываться в «Выпускниках»."""
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        lead = Intern.objects.create(
+            full_name="Тимлид Со Статусом", graduate_status=GraduateStatus.PENDING,
+        )
+        project = Project.objects.create(name="Другой проект")
+        TeamMember.objects.create(
+            project=project, intern=lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.assertNotIn(lead, services.graduated_interns())
+
     def test_cancelling_project_does_not_mark_interns_pending(self):
         """Проект отменён/отказ клиента — это не «успешный выпуск»."""
         from apps.projects.models import Project, ProjectStatus

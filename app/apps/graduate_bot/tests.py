@@ -34,6 +34,18 @@ class FindGraduatesTests(TestCase):
     def test_blank_name_returns_empty(self):
         self.assertEqual(services.find_graduates("   "), [])
 
+    def test_team_lead_not_found_even_with_pending_status(self):
+        """Тимлид — уже сотрудник, а не выпускник: бот не должен вести его
+        через сценарий стажёра, даже если graduate_status как-то выставлен."""
+        lead = Intern.objects.create(
+            full_name="Тимлидов Тимур", graduate_status=GraduateStatus.PENDING,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.assertEqual(services.find_graduates("Тимлидов"), [])
+
 
 class PhoneMatchesTests(TestCase):
     def setUp(self):
