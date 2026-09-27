@@ -186,3 +186,6 @@ app/staticfiles/
 *.docx
 *.xlsx
 !app/data/*.xlsx
+
+# Ключи сервисных аккаунтов (Google Sheets и прочее)
+app/secrets/
