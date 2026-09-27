@@ -35,11 +35,11 @@ def graduated_interns() -> list[Intern]:
     """
     from apps.projects.models import ProjectStatus
     from apps.teams.models import TeamMember
-    from apps.teams.selectors import staff_intern_ids
+    from apps.teams.selectors import lead_intern_ids
 
     interns = list(
         Intern.objects.filter(graduate_status__in=GraduateStatus.values)
-        .exclude(pk__in=staff_intern_ids())
+        .exclude(pk__in=lead_intern_ids())
         .select_related('specialization'),
     )
     if not interns:

@@ -55,16 +55,17 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
     """
     from apps.interns.models import GraduateStatus, Intern, InternStatus
     from apps.teams.models import TeamMember, TeamRole
-    from apps.teams.selectors import staff_intern_ids
+    from apps.teams.selectors import lead_intern_ids
 
     members = project.team_members.filter(status=TeamMember.Status.ACTIVE)
-    # Тимлиды и ПМ — уже полноценные сотрудники, а не стажёры: закрытие
-    # проекта не должно превращать их в «выпускника на проверке» и не
-    # должно сбрасывать им «Статус» на «Готов к распределению» — они
-    # продолжают работать, просто не на этом проекте.
+    # Тимлид — уже полноценный сотрудник, а не стажёр: закрытие проекта
+    # не должно превращать его в «выпускника на проверке» и не должно
+    # сбрасывать ему «Статус» на «Готов к распределению» — он продолжает
+    # работать, просто не на этом проекте. ПМ в этом смысле — такой же
+    # стажёр, как остальные, исключать его не нужно.
     intern_ids = list(
         members.filter(intern__isnull=False)
-        .exclude(intern_id__in=staff_intern_ids())
+        .exclude(intern_id__in=lead_intern_ids())
         .values_list('intern_id', flat=True),
     )
     lead_ids = set(

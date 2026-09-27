@@ -1091,7 +1091,9 @@ class GraduateWorkflowTests(TestCase):
         self.assertEqual(lead.graduate_status, "")
         self.assertEqual(lead.status, InternStatus.ACTIVE)
 
-    def test_completing_project_does_not_mark_pm_pending(self):
+    def test_completing_project_marks_pm_pending_like_regular_intern(self):
+        """ПМ — такой же стажёр-выпускник, как остальные (в отличие от
+        тимлида): исключать его из «Выпускников» не нужно."""
         from apps.projects.models import Project, ProjectStatus
         from apps.projects.services import release_team
         from apps.teams.models import TeamMember, TeamRole
@@ -1106,7 +1108,8 @@ class GraduateWorkflowTests(TestCase):
         release_team(project)
 
         pm.refresh_from_db()
-        self.assertEqual(pm.graduate_status, "")
+        self.assertEqual(pm.graduate_status, GraduateStatus.PENDING)
+        self.assertEqual(pm.status, InternStatus.READY)
 
     def test_team_lead_with_stale_graduate_status_excluded_from_list(self):
         """Подстраховка на случай уже испорченных старых данных (до этого
