@@ -5,6 +5,12 @@
 только в памяти процесса (кто уже назвал ФИО, сколько раз ошибся с
 телефоном): бот упал/перезапустился — человек просто начинает заново
 командой /start, ничего в БД для этого не хранится.
+
+Кнопки — обычная reply-клавиатура (types.ReplyKeyboardMarkup), не
+инлайн: нажатие присылает текст кнопки обычным сообщением, а не
+callback_query, поэтому весь выбор разбирается через
+register_next_step_handler (как ФИО/телефон), а не через
+callback_query_handler.
 """
 import telebot
 import urllib3.util.connection as urllib3_connection
@@ -45,17 +51,16 @@ urllib3_connection.HAS_IPV6 = False
 
 bot = telebot.TeleBot(settings.TELEGRAM_BOT_TOKEN)
 
+CONTINUE_BUTTON = 'Продолжить стажировку'
+BANK_BUTTON = 'В банк резюме'
+BANK_CONFIRM_BUTTON = 'Я подтверждаю, что зарегистрировался(ась)'
 
-def _clear_markup(call):
-    """Убираем кнопки под уже обработанным сообщением — иначе по ним
-    можно нажать повторно (дубли записей, а для «bank_confirm» — способ
-    откатить уже принятое решение руководителя, см. submit_to_resume_bank)."""
-    try:
-        bot.edit_message_reply_markup(
-            call.message.chat.id, call.message.message_id, reply_markup=None,
-        )
-    except Exception:
-        pass
+
+def _choice_markup():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(types.KeyboardButton(CONTINUE_BUTTON))
+    markup.add(types.KeyboardButton(BANK_BUTTON))
+    return markup
 
 
 @bot.message_handler(commands=['start'])
@@ -66,16 +71,20 @@ def handle_start(message):
             # Уже проверяли телефон в этом чате, но выбор («Продолжить»/
             # «В банк резюме») ещё не сделал — не переспрашиваем ФИО и
             # телефон заново, сразу показываем тот же выбор.
-            show_choice(message.chat.id, intern)
+            show_choice(message, intern)
         else:
             # Уже сделал выбор раньше (заявка в банк резюме или проект) —
             # показываем текущий статус вместо повторной аутентификации.
-            bot.send_message(message.chat.id, services.resolved_status_message(intern))
+            bot.send_message(
+                message.chat.id, services.resolved_status_message(intern),
+                reply_markup=types.ReplyKeyboardRemove(),
+            )
         return
     bot.send_message(
         message.chat.id,
         'Здравствуйте! Это бот для выпускников GeeksPro.\n\n'
         'Введите ваше ФИО, как в анкете стажёра, — я найду вас в базе.',
+        reply_markup=types.ReplyKeyboardRemove(),
     )
     bot.register_next_step_handler(message, handle_name)
 
@@ -144,10 +153,10 @@ def handle_phone(message, intern_id, attempt):
         )
         return
     services.remember_chat_id(intern, message.chat.id)
-    show_choice(message.chat.id, intern)
+    show_choice(message, intern)
 
 
-def show_choice(chat_id, intern):
+def show_choice(message, intern):
     projects = services.completed_projects(intern)
     if projects:
         lines = '\n'.join(f'— {m.project.name}' for m in projects)
@@ -155,56 +164,67 @@ def show_choice(chat_id, intern):
     else:
         projects_line = ''
 
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton(
-            'Продолжить стажировку', callback_data=f'continue:{intern.pk}',
-        ),
-    )
-    markup.add(
-        types.InlineKeyboardButton('В банк резюме', callback_data=f'bank:{intern.pk}'),
-    )
     bot.send_message(
-        chat_id,
+        message.chat.id,
         f'🎉 Поздравляем, {intern.full_name}! Вы успешно прошли стажировку '
         f'в GeeksPro.{projects_line}\n\nЧто дальше?',
-        reply_markup=markup,
+        reply_markup=_choice_markup(),
     )
+    bot.register_next_step_handler(message, handle_choice, intern_id=intern.pk)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('bank:'))
-def handle_bank(call):
-    bot.answer_callback_query(call.id)
-    _clear_markup(call)
-    intern_pk = call.data.split(':', 1)[1]
-    markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton(
-            'Я подтверждаю, что зарегистрировался(ась)',
-            callback_data=f'bank_confirm:{intern_pk}',
-        ),
-    )
+def handle_choice(message, intern_id):
+    from apps.interns.models import Intern
+
+    intern = Intern.objects.filter(pk=intern_id).first()
+    if intern is None:
+        bot.send_message(
+            message.chat.id, 'Что-то пошло не так — начните заново: /start.',
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        return
+    choice = (message.text or '').strip()
+    if choice == BANK_BUTTON:
+        send_bank_instructions(message, intern)
+    elif choice == CONTINUE_BUTTON:
+        send_project_list(message, intern)
+    else:
+        bot.send_message(
+            message.chat.id, 'Пожалуйста, воспользуйтесь кнопками ниже.',
+            reply_markup=_choice_markup(),
+        )
+        bot.register_next_step_handler(message, handle_choice, intern_id=intern_id)
+
+
+def send_bank_instructions(message, intern):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(types.KeyboardButton(BANK_CONFIRM_BUTTON))
     bot.send_message(
-        call.message.chat.id,
+        message.chat.id,
         'Чтобы попасть в банк резюме:\n\n'
         '1. Перейдите на https://geeks.kg/sign-in\n'
         '2. Зарегистрируйтесь и заполните свои данные\n'
         '3. Когда закончите — нажмите кнопку ниже',
         reply_markup=markup,
     )
+    bot.register_next_step_handler(message, handle_bank_confirm, intern_id=intern.pk)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('bank_confirm:'))
-def handle_bank_confirm(call):
+def handle_bank_confirm(message, intern_id):
     from apps.interns.models import Intern
 
-    bot.answer_callback_query(call.id)
-    _clear_markup(call)
-    intern = Intern.objects.filter(pk=int(call.data.split(':', 1)[1])).first()
+    intern = Intern.objects.filter(pk=intern_id).first()
     if intern is None:
-        bot.send_message(call.message.chat.id, 'Что-то пошло не так — начните заново: /start.')
+        bot.send_message(
+            message.chat.id, 'Что-то пошло не так — начните заново: /start.',
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
         return
-    submitted = services.submit_to_resume_bank(intern, call.message.chat.id)
+    if (message.text or '').strip() != BANK_CONFIRM_BUTTON:
+        bot.send_message(message.chat.id, 'Пожалуйста, воспользуйтесь кнопкой ниже.')
+        send_bank_instructions(message, intern)
+        return
+    submitted = services.submit_to_resume_bank(intern, message.chat.id)
     if submitted:
         text = (
             'Спасибо! Ваши данные отправлены на проверку руководителю '
@@ -212,47 +232,43 @@ def handle_bank_confirm(call):
         )
     else:
         text = 'Ваше резюме уже приняли ранее — всё в порядке, менять ничего не нужно.'
-    bot.send_message(call.message.chat.id, text)
+    bot.send_message(message.chat.id, text, reply_markup=types.ReplyKeyboardRemove())
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('continue:'))
-def handle_continue(call):
-    from apps.interns.models import Intern
-
-    bot.answer_callback_query(call.id)
-    _clear_markup(call)
-    intern = Intern.objects.filter(pk=int(call.data.split(':', 1)[1])).first()
-    if intern is None:
-        bot.send_message(call.message.chat.id, 'Что-то пошло не так — начните заново: /start.')
-        return
+def send_project_list(message, intern):
     projects = services.eligible_projects()
     if not projects:
         bot.send_message(
-            call.message.chat.id,
+            message.chat.id,
             'Сейчас нет проектов со свободным местом. Обратитесь к '
             'руководителю GeeksPro — он подскажет, что делать дальше.',
+            reply_markup=types.ReplyKeyboardRemove(),
         )
         return
-    markup = types.InlineKeyboardMarkup()
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     for project in projects:
-        markup.add(types.InlineKeyboardButton(
-            project.name, callback_data=f'project:{intern.pk}:{project.pk}',
-        ))
-    bot.send_message(call.message.chat.id, 'Выберите проект:', reply_markup=markup)
+        markup.add(types.KeyboardButton(project.name))
+    bot.send_message(message.chat.id, 'Выберите проект:', reply_markup=markup)
+    bot.register_next_step_handler(message, handle_project_choice, intern_id=intern.pk)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('project:'))
-def handle_project_choice(call):
+def handle_project_choice(message, intern_id):
     from apps.interns.models import Intern
-    from apps.projects.models import Project
 
-    bot.answer_callback_query(call.id)
-    _clear_markup(call)
-    _, intern_id, project_id = call.data.split(':')
-    intern = Intern.objects.filter(pk=int(intern_id)).first()
-    project = Project.objects.filter(pk=int(project_id)).first()
-    if intern is None or project is None:
-        bot.send_message(call.message.chat.id, 'Что-то пошло не так — начните заново: /start.')
+    intern = Intern.objects.filter(pk=intern_id).first()
+    if intern is None:
+        bot.send_message(
+            message.chat.id, 'Что-то пошло не так — начните заново: /start.',
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        return
+    chosen_name = (message.text or '').strip()
+    project = next(
+        (p for p in services.eligible_projects() if p.name == chosen_name), None,
+    )
+    if project is None:
+        bot.send_message(message.chat.id, 'Выберите проект из списка кнопок ниже.')
+        send_project_list(message, intern)
         return
     services.join_graduate_to_project(intern, project)
     lead = services.team_lead_contact(project, intern)
@@ -262,8 +278,9 @@ def handle_project_choice(call):
     else:
         lead_line = 'Тимлид проекта пока не назначен — обратитесь к руководителю GeeksPro.'
     bot.send_message(
-        call.message.chat.id,
+        message.chat.id,
         f'Вы успешно добавлены в проект «{project.name}»! {lead_line}',
+        reply_markup=types.ReplyKeyboardRemove(),
     )
 
 
