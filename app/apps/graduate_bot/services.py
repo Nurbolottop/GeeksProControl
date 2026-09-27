@@ -9,7 +9,11 @@ Telegram-логика в ней однострочная и мокается в 
 уйти в банк резюме.
 """
 import logging
+import math
 import re
+from datetime import timedelta
+
+from django.utils import timezone
 
 from apps.interns.models import Intern, ResumeBankStatus
 from apps.projects.models import Project, ProjectStageKey, ProjectStatus
@@ -26,6 +30,12 @@ ROOM_STAGES = [
     ProjectStageKey.BACKEND, ProjectStageKey.FRONTEND, ProjectStageKey.MOBILE_DEV,
 ]
 MAX_TEAM_SIZE_WITH_ROOM = 4
+
+# Сколько попыток подряд неверного телефона допускаем, прежде чем
+# заблокировать проверку для этого человека (защита от подбора телефона
+# по известному ФИО — см. lock_phone_verification).
+PHONE_ATTEMPTS_LIMIT = 3
+PHONE_LOCK_MINUTES = 30
 
 
 def find_graduates(name: str, limit: int = 5) -> list[Intern]:
@@ -55,6 +65,35 @@ def phone_matches(intern: Intern, raw_phone: str) -> bool:
     return entered[-9:] == stored[-9:]
 
 
+def is_phone_locked(intern: Intern) -> bool:
+    """Проверку телефона для этого человека временно заблокировали —
+    было слишком много неверных попыток подряд (см. lock_phone_verification)."""
+    return bool(intern.phone_lock_until and intern.phone_lock_until > timezone.now())
+
+
+def phone_lock_minutes_left(intern: Intern) -> int:
+    if not intern.phone_lock_until:
+        return 0
+    remaining = intern.phone_lock_until - timezone.now()
+    return max(0, math.ceil(remaining.total_seconds() / 60))
+
+
+def lock_phone_verification(intern: Intern) -> None:
+    """Слишком много неверных попыток телефона подряд — блокируем на
+    PHONE_LOCK_MINUTES. Без этого перезапуск /start сбрасывал счётчик
+    попыток (он живёт только в памяти процесса, а не в БД) — то есть
+    ограничение в 3 попытки ничего не мешало обойти, просто начав диалог
+    заново сколько угодно раз, подбирая телефон известного человека."""
+    from apps.audit.services import log as audit_log
+
+    intern.phone_lock_until = timezone.now() + timedelta(minutes=PHONE_LOCK_MINUTES)
+    intern.save(update_fields=['phone_lock_until', 'updated_at'])
+    audit_log(
+        intern, 'Бот-выпускник: проверка телефона заблокирована',
+        reason=f'{PHONE_ATTEMPTS_LIMIT} неверных попыток подряд, блокировка на {PHONE_LOCK_MINUTES} мин',
+    )
+
+
 def remember_chat_id(intern: Intern, chat_id: int) -> None:
     """Запоминаем chat_id — нужен, чтобы потом писать выпускнику
     проактивно (решение по банку резюме), а не только в ответ."""
@@ -77,20 +116,33 @@ def completed_projects(intern: Intern) -> list[TeamMember]:
     )
 
 
-def submit_to_resume_bank(intern: Intern, chat_id: int) -> None:
+def submit_to_resume_bank(intern: Intern, chat_id: int) -> bool:
     """Выпускник подтвердил регистрацию на geeks.kg через бота — заявка
     уходит руководителю на проверку (apps.interns.views.resume_bank_approve/
-    resume_bank_revise)."""
+    resume_bank_revise).
+
+    Также снимаем ``graduate_status`` (как и join_graduate_to_project) —
+    без этого человек оставался бы в find_graduates() и мог заново пройти
+    /start и повторно нажать подтверждение, откатив уже принятое решение
+    руководителя обратно на «Ожидает проверки». Если резюме уже приняли
+    (APPROVED) — ничего не меняем и возвращаем False, чтобы даже повторный
+    вызов (второй клик по той же кнопке) не смог сбросить это решение.
+    """
     from apps.audit.services import log as audit_log
 
     remember_chat_id(intern, chat_id)
+    if intern.resume_bank_status == ResumeBankStatus.APPROVED:
+        return False
     intern.in_resume_bank = True
     intern.resume_bank_status = ResumeBankStatus.PENDING
     intern.resume_bank_comment = ''
+    intern.graduate_status = ''
     intern.save(update_fields=[
-        'in_resume_bank', 'resume_bank_status', 'resume_bank_comment', 'updated_at',
+        'in_resume_bank', 'resume_bank_status', 'resume_bank_comment',
+        'graduate_status', 'updated_at',
     ])
     audit_log(intern, 'Заявка в банк резюме отправлена', reason='бот-выпускник')
+    return True
 
 
 def notify_resume_bank_decision(intern: Intern, *, approved: bool, comment: str = '') -> None:

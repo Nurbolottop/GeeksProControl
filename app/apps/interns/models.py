@@ -120,6 +120,9 @@ class Intern(TimeStampedModel, ArchivableModel):
     telegram_chat_id = models.BigIntegerField(
         'Telegram chat id', null=True, blank=True, db_index=True,
     )
+    phone_lock_until = models.DateTimeField(
+        'Бот-выпускник: блокировка проверки телефона до', null=True, blank=True,
+    )
     rating = models.DecimalField(
         'Рейтинг', max_digits=3, decimal_places=2, null=True, blank=True,
     )

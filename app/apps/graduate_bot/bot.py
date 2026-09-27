@@ -13,8 +13,6 @@ from telebot import apihelper, types
 
 from apps.graduate_bot import services
 
-PHONE_ATTEMPTS_LIMIT = 3
-
 # С этого сервера до конкретного IP api.telegram.org (149.154.166.110)
 # стабильно нет маршрута — похоже на проблему пиринга дата-центра, не
 # лечится ни ретраями, ни пересозданием контейнера. У другого проекта на
@@ -48,6 +46,18 @@ urllib3_connection.HAS_IPV6 = False
 bot = telebot.TeleBot(settings.TELEGRAM_BOT_TOKEN)
 
 
+def _clear_markup(call):
+    """Убираем кнопки под уже обработанным сообщением — иначе по ним
+    можно нажать повторно (дубли записей, а для «bank_confirm» — способ
+    откатить уже принятое решение руководителя, см. submit_to_resume_bank)."""
+    try:
+        bot.edit_message_reply_markup(
+            call.message.chat.id, call.message.message_id, reply_markup=None,
+        )
+    except Exception:
+        pass
+
+
 @bot.message_handler(commands=['start'])
 def handle_start(message):
     bot.send_message(
@@ -78,6 +88,14 @@ def handle_name(message):
         bot.register_next_step_handler(message, handle_name)
         return
     intern = candidates[0]
+    if services.is_phone_locked(intern):
+        minutes = services.phone_lock_minutes_left(intern)
+        bot.send_message(
+            message.chat.id,
+            f'Слишком много неверных попыток подряд. Попробуйте снова через '
+            f'{minutes} мин или обратитесь к руководителю GeeksPro.',
+        )
+        return
     bot.send_message(
         message.chat.id,
         f'{intern.full_name}, для проверки личности введите ваш номер телефона '
@@ -94,14 +112,16 @@ def handle_phone(message, intern_id, attempt):
         bot.send_message(message.chat.id, 'Что-то пошло не так — начните заново: /start.')
         return
     if not services.phone_matches(intern, message.text or ''):
-        if attempt >= PHONE_ATTEMPTS_LIMIT:
+        if attempt >= services.PHONE_ATTEMPTS_LIMIT:
+            services.lock_phone_verification(intern)
             bot.send_message(
                 message.chat.id,
-                'Номер не подошёл несколько раз подряд. Обратитесь к '
-                'руководителю GeeksPro.\n\nНачать заново — /start.',
+                'Номер не подошёл несколько раз подряд. Проверка временно '
+                f'заблокирована на {services.PHONE_LOCK_MINUTES} мин. Обратитесь к '
+                'руководителю GeeksPro, если это ошибка.',
             )
             return
-        left = PHONE_ATTEMPTS_LIMIT - attempt
+        left = services.PHONE_ATTEMPTS_LIMIT - attempt
         bot.send_message(
             message.chat.id,
             f'Номер не совпадает с тем, что в анкете. Попробуйте ещё раз '
@@ -143,6 +163,7 @@ def show_choice(chat_id, intern):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('bank:'))
 def handle_bank(call):
     bot.answer_callback_query(call.id)
+    _clear_markup(call)
     intern_pk = call.data.split(':', 1)[1]
     markup = types.InlineKeyboardMarkup()
     markup.add(
@@ -166,16 +187,20 @@ def handle_bank_confirm(call):
     from apps.interns.models import Intern
 
     bot.answer_callback_query(call.id)
+    _clear_markup(call)
     intern = Intern.objects.filter(pk=int(call.data.split(':', 1)[1])).first()
     if intern is None:
         bot.send_message(call.message.chat.id, 'Что-то пошло не так — начните заново: /start.')
         return
-    services.submit_to_resume_bank(intern, call.message.chat.id)
-    bot.send_message(
-        call.message.chat.id,
-        'Спасибо! Ваши данные отправлены на проверку руководителю '
-        'GeeksPro. Мы сообщим о результате прямо здесь.',
-    )
+    submitted = services.submit_to_resume_bank(intern, call.message.chat.id)
+    if submitted:
+        text = (
+            'Спасибо! Ваши данные отправлены на проверку руководителю '
+            'GeeksPro. Мы сообщим о результате прямо здесь.'
+        )
+    else:
+        text = 'Ваше резюме уже приняли ранее — всё в порядке, менять ничего не нужно.'
+    bot.send_message(call.message.chat.id, text)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('continue:'))
@@ -183,6 +208,7 @@ def handle_continue(call):
     from apps.interns.models import Intern
 
     bot.answer_callback_query(call.id)
+    _clear_markup(call)
     intern = Intern.objects.filter(pk=int(call.data.split(':', 1)[1])).first()
     if intern is None:
         bot.send_message(call.message.chat.id, 'Что-то пошло не так — начните заново: /start.')
@@ -209,6 +235,7 @@ def handle_project_choice(call):
     from apps.projects.models import Project
 
     bot.answer_callback_query(call.id)
+    _clear_markup(call)
     _, intern_id, project_id = call.data.split(':')
     intern = Intern.objects.filter(pk=int(intern_id)).first()
     project = Project.objects.filter(pk=int(project_id)).first()
@@ -225,4 +252,16 @@ def handle_project_choice(call):
     bot.send_message(
         call.message.chat.id,
         f'Вы успешно добавлены в проект «{project.name}»! {lead_line}',
+    )
+
+
+@bot.message_handler(func=lambda message: True, content_types=['text'])
+def handle_fallback(message):
+    """Сообщение вне сценария (потерялся, написал не в ответ на вопрос
+    бота) — раньше бот в этом случае просто молчал. register_next_step_handler
+    перехватывает следующее сообщение раньше этого хендлера, так что сюда
+    попадают только действительно «случайные» сообщения."""
+    bot.send_message(
+        message.chat.id,
+        'Не понял сообщение. Чтобы начать сначала — наберите /start.',
     )

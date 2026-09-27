@@ -170,11 +170,22 @@ class RememberChatIdTests(TestCase):
 class SubmitToResumeBankTests(TestCase):
     def test_sets_pending_status_and_flag(self):
         intern = Intern.objects.create(full_name="Выпускник Резюме")
-        services.submit_to_resume_bank(intern, 777)
+        result = services.submit_to_resume_bank(intern, 777)
         intern.refresh_from_db()
+        self.assertTrue(result)
         self.assertTrue(intern.in_resume_bank)
         self.assertEqual(intern.resume_bank_status, ResumeBankStatus.PENDING)
         self.assertEqual(intern.telegram_chat_id, 777)
+
+    def test_clears_graduate_status(self):
+        """Иначе find_graduates() снова находит человека после /start, и
+        заявку можно переотправить бесконечно (см. test_does_not_downgrade)."""
+        intern = Intern.objects.create(
+            full_name="Выпускник Резюме", graduate_status=GraduateStatus.PENDING,
+        )
+        services.submit_to_resume_bank(intern, 777)
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, "")
 
     def test_logs_to_audit(self):
         from apps.audit.models import AuditLog
@@ -185,6 +196,63 @@ class SubmitToResumeBankTests(TestCase):
             AuditLog.objects.filter(
                 object_type="Intern", object_id=str(intern.pk),
                 action="Заявка в банк резюме отправлена",
+            ).exists(),
+        )
+
+    def test_does_not_downgrade_already_approved(self):
+        intern = Intern.objects.create(
+            full_name="Уже принят", resume_bank_status=ResumeBankStatus.APPROVED,
+        )
+        result = services.submit_to_resume_bank(intern, 777)
+        intern.refresh_from_db()
+        self.assertFalse(result)
+        self.assertEqual(intern.resume_bank_status, ResumeBankStatus.APPROVED)
+
+    def test_allows_resubmit_from_revision(self):
+        intern = Intern.objects.create(
+            full_name="На доработке", resume_bank_status=ResumeBankStatus.REVISION,
+            resume_bank_comment="Поправьте фото",
+        )
+        result = services.submit_to_resume_bank(intern, 777)
+        intern.refresh_from_db()
+        self.assertTrue(result)
+        self.assertEqual(intern.resume_bank_status, ResumeBankStatus.PENDING)
+        self.assertEqual(intern.resume_bank_comment, "")
+
+
+class PhoneLockTests(TestCase):
+    def test_not_locked_by_default(self):
+        intern = Intern.objects.create(full_name="Незаблокированный")
+        self.assertFalse(services.is_phone_locked(intern))
+        self.assertEqual(services.phone_lock_minutes_left(intern), 0)
+
+    def test_lock_sets_future_timestamp_and_blocks(self):
+        intern = Intern.objects.create(full_name="Подбирающий Телефон")
+        services.lock_phone_verification(intern)
+        intern.refresh_from_db()
+        self.assertTrue(services.is_phone_locked(intern))
+        self.assertGreater(services.phone_lock_minutes_left(intern), 0)
+
+    def test_lock_expires_in_the_past_does_not_block(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        intern = Intern.objects.create(
+            full_name="Старая Блокировка",
+            phone_lock_until=timezone.now() - timedelta(minutes=1),
+        )
+        self.assertFalse(services.is_phone_locked(intern))
+
+    def test_logs_to_audit(self):
+        from apps.audit.models import AuditLog
+
+        intern = Intern.objects.create(full_name="Подбирающий Телефон")
+        services.lock_phone_verification(intern)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_type="Intern", object_id=str(intern.pk),
+                action="Бот-выпускник: проверка телефона заблокирована",
             ).exists(),
         )
 
