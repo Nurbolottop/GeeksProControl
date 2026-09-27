@@ -44,8 +44,12 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if person.in_resume_bank %}
-                            <span class="badge badge--blue">✓ В банке резюме</span>
+                        {% if person.resume_bank_status == ResumeBankStatus.APPROVED %}
+                            <a href="{% url 'interns:resume_bank' %}" class="badge badge--green">Принят</a>
+                        {% elif person.resume_bank_status == ResumeBankStatus.REVISION %}
+                            <a href="{% url 'interns:resume_bank' %}" class="badge badge--red">На доработке</a>
+                        {% elif person.resume_bank_status == ResumeBankStatus.PENDING %}
+                            <a href="{% url 'interns:resume_bank' %}" class="badge badge--yellow">Ожидает проверки</a>
                         {% else %}
                             <span class="badge badge--gray">Не заполнял анкету</span>
                         {% endif %}

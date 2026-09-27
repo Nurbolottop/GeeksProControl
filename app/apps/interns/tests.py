@@ -898,6 +898,7 @@ class GraduatesListTests(TestCase):
         )
         graduate = Intern.objects.create(
             full_name="Выпускник Два", in_resume_bank=True,
+            resume_bank_status=ResumeBankStatus.PENDING,
             graduate_status=GraduateStatus.DECLINED,
         )
         TeamMember.objects.create(
@@ -906,7 +907,7 @@ class GraduatesListTests(TestCase):
         )
 
         response = self.client.get(reverse("interns:graduates"), {"all": "1"})
-        self.assertContains(response, "В банке резюме")
+        self.assertContains(response, "Ожидает проверки")
         self.assertNotContains(response, reverse("interns:reserve_create"))
 
 

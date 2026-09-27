@@ -697,6 +697,7 @@ def graduates_list(request):
     return render(request, 'interns/graduates_list.html', {
         'people': selected, 'title': 'Выпускники',
         'GraduateStatus': GraduateStatus,
+        'ResumeBankStatus': ResumeBankStatus,
         'filter_label': _graduate_filter_label(filters, people),
         'total_count': len(people),
     })
