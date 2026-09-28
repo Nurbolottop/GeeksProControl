@@ -70,6 +70,79 @@ class WorkloadTests(TestCase):
         self.assertIn('intern', form.errors)
 
 
+class ActivateInternMembershipTests(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Проект")
+
+    def test_clears_graduate_status_and_activates(self):
+        from apps.interns.models import GraduateStatus
+
+        intern = Intern.objects.create(
+            full_name="Выпускник", graduate_status=GraduateStatus.PENDING,
+            status=InternStatus.READY,
+        )
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.activate_intern_membership(member)
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, "")
+        self.assertEqual(intern.status, InternStatus.ACTIVE)
+
+    def test_noop_for_left_membership(self):
+        from apps.interns.models import GraduateStatus
+
+        intern = Intern.objects.create(
+            full_name="Выпускник", graduate_status=GraduateStatus.PENDING,
+        )
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        services.activate_intern_membership(member)
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, GraduateStatus.PENDING)
+
+    def test_noop_for_slot_without_intern(self):
+        member = TeamMember.objects.create(
+            project=self.project, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.activate_intern_membership(member)  # не должно упасть
+
+    def test_does_not_unpause_frozen_intern(self):
+        """Замороженного стажёра статус не трогает — заморозка не то же
+        самое, что «ожидает»/«готов»."""
+        intern = Intern.objects.create(full_name="Заморожен", status=InternStatus.PAUSED)
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.activate_intern_membership(member)
+        intern.refresh_from_db()
+        self.assertEqual(intern.status, InternStatus.PAUSED)
+
+    def test_logs_to_audit(self):
+        from apps.audit.models import AuditLog
+        from apps.interns.models import GraduateStatus
+
+        intern = Intern.objects.create(
+            full_name="Выпускник", graduate_status=GraduateStatus.PENDING,
+        )
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.activate_intern_membership(member)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_type="Intern", object_id=str(intern.pk),
+                action="Статус выпускника снят",
+            ).exists(),
+        )
+
+
 class AddNewPersonTests(TestCase):
     """Человека, которого нет в базе, можно завести прямо из формы команды."""
 
@@ -110,6 +183,54 @@ class AddNewPersonTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Backend")
         self.assertContains(response, "new_person")
+
+
+class MemberAddActivatesGraduateTests(TestCase):
+    """Добавление уже существующего стажёра-выпускника в команду должно
+    снимать ему статус выпускника и активировать — как и при добавлении
+    новой карточки (см. AddNewPersonTests), а не только когда это делает
+    ПМ через карточку самого стажёра (interns:project_add)."""
+
+    def setUp(self):
+        from apps.interns.models import GraduateStatus
+        from apps.projects.services import create_project
+        from apps.training.models import Specialization
+
+        self.GraduateStatus = GraduateStatus
+        self.backend_spec = Specialization.objects.create(name="Backend")
+        self.user = User.objects.create_user(username="head3", password="x")
+        self.client.force_login(self.user)
+        self.project = create_project(Project(name="Вистайл"))
+
+    def test_member_add_clears_graduate_status(self):
+        graduate = Intern.objects.create(
+            full_name="Выпускник Общий",
+            graduate_status=self.GraduateStatus.PENDING, status=InternStatus.READY,
+        )
+        self.client.post(
+            reverse("teams:member_add", args=[self.project.pk]),
+            {"intern": graduate.pk, "workload": 50},
+        )
+        graduate.refresh_from_db()
+        self.assertEqual(graduate.graduate_status, "")
+        self.assertEqual(graduate.status, InternStatus.ACTIVE)
+
+    def test_member_edit_reassignment_clears_graduate_status(self):
+        graduate = Intern.objects.create(
+            full_name="Выпускник На Замену", specialization=self.backend_spec,
+            graduate_status=self.GraduateStatus.PENDING, status=InternStatus.READY,
+        )
+        member = TeamMember.objects.create(
+            project=self.project, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.client.post(
+            reverse("teams:member_edit", args=[member.pk]),
+            {"intern": graduate.pk, "status": "active"},
+        )
+        graduate.refresh_from_db()
+        self.assertEqual(graduate.graduate_status, "")
+        self.assertEqual(graduate.status, InternStatus.ACTIVE)
 
 
 class RoleSectionAddTests(TestCase):

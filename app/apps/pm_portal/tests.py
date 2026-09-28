@@ -142,6 +142,21 @@ class PmTeamManagementTests(PmProjectOwnershipTests):
             TeamMember.objects.filter(project=self.project_a, intern=other).exists(),
         )
 
+    def test_adding_graduate_to_project_clears_graduate_status(self):
+        from apps.interns.models import GraduateStatus
+
+        graduate = Intern.objects.create(
+            full_name="Выпускник К ПМ", graduate_status=GraduateStatus.PENDING,
+            status=InternStatus.READY,
+        )
+        self.client.post(
+            reverse("pm_portal:member_add", args=[self.project_a.pk]),
+            {"intern": graduate.pk},
+        )
+        graduate.refresh_from_db()
+        self.assertEqual(graduate.graduate_status, "")
+        self.assertEqual(graduate.status, InternStatus.ACTIVE)
+
     def test_cannot_add_member_to_foreign_project(self):
         other = Intern.objects.create(full_name="Чужой Бэкендер")
         response = self.client.post(

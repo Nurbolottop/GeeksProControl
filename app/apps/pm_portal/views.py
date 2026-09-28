@@ -278,6 +278,9 @@ def member_add(request, pk):
         member.project = project
         member.group = getattr(project, 'group', None)
         member.save()
+        from apps.teams.services import activate_intern_membership
+
+        activate_intern_membership(member, user=request.user)
         warning = form.overload_warning()
         if warning:
             messages.warning(request, warning)
@@ -301,7 +304,10 @@ def member_edit(request, pk, member_pk):
     member = get_object_or_404(TeamMember, pk=member_pk, project=project)
     form = TeamMemberEditForm(request.POST or None, instance=member)
     if request.method == 'POST' and form.is_valid():
-        form.save()
+        member = form.save()
+        from apps.teams.services import activate_intern_membership
+
+        activate_intern_membership(member, user=request.user)
         warning = form.overload_warning()
         if warning:
             messages.warning(request, warning)

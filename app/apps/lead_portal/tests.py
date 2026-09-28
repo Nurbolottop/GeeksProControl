@@ -192,6 +192,29 @@ class LeadTeamManagementTests(LeadProjectOwnershipTests):
         self.assertNotContains(response, "Project Manager")
         self.assertNotContains(response, "Frontend")
 
+    def test_reassigning_graduate_to_active_slot_clears_graduate_status(self):
+        """Тимлид меняет участника слота на выпускника, который «на
+        проверке», — раньше это не снимало ему статус выпускника и не
+        активировало его: он оставался «Готов к распределению» с уже
+        реальным активным проектом в команде."""
+        from apps.interns.models import GraduateStatus
+
+        graduate = Intern.objects.create(
+            full_name="Выпускник На Слоте", specialization=self.backend_spec,
+            graduate_status=GraduateStatus.PENDING, status=InternStatus.READY,
+        )
+        member = TeamMember.objects.create(
+            project=self.project_a, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        self.client.post(
+            reverse("lead_portal:member_edit", args=[self.project_a.pk, member.pk]),
+            {"intern": graduate.pk, "status": "active", "comment": ""},
+        )
+        graduate.refresh_from_db()
+        self.assertEqual(graduate.graduate_status, "")
+        self.assertEqual(graduate.status, InternStatus.ACTIVE)
+
     def test_cannot_edit_or_remove_member_of_other_direction(self):
         intern = Intern.objects.create(full_name="Чужое Направление")
         member = TeamMember.objects.create(
@@ -1184,6 +1207,8 @@ class LeadInternActionsTests(TestCase):
         card = ReserveCandidate.objects.get(intern=self.intern)
         self.assertEqual(card.full_name, "Мой Стажёр")
         self.assertEqual(card.comment_lead, "Тянет задачи сам, не боится ревью.")
+        # стажёр, а не сотрудник — попадёт в таблицу стажёров
+        self.assertEqual(card.pool, "intern")
         # повторное нажатие не плодит вторую карточку
         self.client.post(self._url("lead_portal:intern_to_reserve"), {"comment": "Ещё"})
         self.assertEqual(ReserveCandidate.objects.filter(intern=self.intern).count(), 1)
