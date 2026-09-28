@@ -77,6 +77,15 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
         left_reason=TeamMember.LeftReason.PROJECT_ENDED,
     )
     if project.status == ProjectStatus.COMPLETED and intern_ids:
+        # Выпускник — тот, кому больше некуда идти: если человек занят
+        # на другом идущем проекте, он продолжает работать, а не выпустился
+        from apps.teams.services import still_on_a_live_project
+
+        intern_ids = [
+            intern_id for intern_id in intern_ids
+            if not still_on_a_live_project(intern_id)
+        ]
+    if project.status == ProjectStatus.COMPLETED and intern_ids:
         Intern.objects.filter(pk__in=intern_ids).update(
             graduate_status=GraduateStatus.PENDING,
         )

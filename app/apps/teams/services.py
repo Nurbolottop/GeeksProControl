@@ -79,12 +79,31 @@ def leave_team(member: TeamMember, reason: str = '') -> None:
         _graduate_after_leaving(member)
 
 
+def still_on_a_live_project(intern_id: int, exclude_member_id: int | None = None) -> bool:
+    """Человек продолжает работать: есть активное участие в идущем проекте.
+
+    Завершение одного проекта не делает выпускником того, кто занят на
+    других: у людей бывает два-три проекта сразу.
+    """
+    from apps.projects.models import ProjectStatus
+
+    memberships = TeamMember.objects.filter(
+        intern_id=intern_id, status=TeamMember.Status.ACTIVE,
+        project__status=ProjectStatus.ACTIVE,
+    )
+    if exclude_member_id:
+        memberships = memberships.exclude(pk=exclude_member_id)
+    return memberships.exists()
+
+
 def _graduate_after_leaving(member: TeamMember) -> None:
     from apps.interns.models import GraduateStatus, InternStatus
     from apps.teams.selectors import lead_intern_ids
 
     intern = member.intern
     if intern.pk in lead_intern_ids():
+        return
+    if still_on_a_live_project(intern.pk, exclude_member_id=member.pk):
         return
     update_fields = []
     if intern.status == InternStatus.ACTIVE:

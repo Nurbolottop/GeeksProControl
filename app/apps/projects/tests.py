@@ -1024,3 +1024,92 @@ class StagesFollowProjectTypeTests(TestCase):
         self.assertIn("frontend", self._keys())      # предпросмотр ничего не менял
         call_command("sync_project_stages", apply=True, stdout=StringIO())
         self.assertIn("mobile_dev", self._keys())
+
+
+class GraduateOnlyWhenFreeTests(TestCase):
+    """Завершение одного проекта не делает выпускником того, кто занят
+    на других: у людей бывает два-три проекта сразу."""
+
+    def setUp(self):
+        from apps.projects.services import create_project
+
+        self.user = User.objects.create_user(username="head-grad", password="x")
+        self.client.force_login(self.user)
+        self.done = create_project(Project(name="Закрываемый"))
+        self.live = create_project(Project(name="Идущий"))
+
+    def _member(self, intern, project):
+        from apps.teams.models import TeamMember, TeamRole
+
+        return TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+
+    def test_person_on_another_live_project_is_not_a_graduate(self):
+        from apps.interns.models import Intern
+        from apps.projects.models import ProjectStatus
+        from apps.projects.services import release_team
+
+        busy = Intern.objects.create(full_name="Ещё Работает")
+        self._member(busy, self.done)
+        self._member(busy, self.live)
+
+        self.done.status = ProjectStatus.COMPLETED
+        self.done.save(update_fields=["status"])
+        release_team(self.done)
+
+        busy.refresh_from_db()
+        self.assertEqual(busy.graduate_status, "")
+
+    def test_person_with_nothing_left_becomes_a_graduate(self):
+        from apps.interns.models import GraduateStatus, Intern
+        from apps.projects.models import ProjectStatus
+        from apps.projects.services import release_team
+
+        free = Intern.objects.create(full_name="Освободился")
+        self._member(free, self.done)
+
+        self.done.status = ProjectStatus.COMPLETED
+        self.done.save(update_fields=["status"])
+        release_team(self.done)
+
+        free.refresh_from_db()
+        self.assertEqual(free.graduate_status, GraduateStatus.PENDING)
+
+    def test_removing_one_by_one_follows_the_same_rule(self):
+        from apps.interns.models import GraduateStatus, Intern
+        from apps.teams.models import TeamMember
+        from apps.teams.services import leave_team
+
+        busy = Intern.objects.create(full_name="Снятый Но Занятый")
+        member = self._member(busy, self.done)
+        self._member(busy, self.live)
+        leave_team(member, reason=TeamMember.LeftReason.PROJECT_ENDED)
+        busy.refresh_from_db()
+        self.assertEqual(busy.graduate_status, "")
+
+        alone = Intern.objects.create(full_name="Снятый И Свободный")
+        member = self._member(alone, self.done)
+        leave_team(member, reason=TeamMember.LeftReason.PROJECT_ENDED)
+        alone.refresh_from_db()
+        self.assertEqual(alone.graduate_status, GraduateStatus.PENDING)
+
+    def test_finished_project_does_not_count_as_live(self):
+        """Второй проект тоже завершён — значит человек всё-таки выпускник."""
+        from apps.interns.models import GraduateStatus, Intern
+        from apps.projects.models import ProjectStatus
+        from apps.projects.services import release_team
+
+        person = Intern.objects.create(full_name="Оба Закрылись")
+        self._member(person, self.done)
+        self._member(person, self.live)
+        self.live.status = ProjectStatus.COMPLETED
+        self.live.save(update_fields=["status"])
+
+        self.done.status = ProjectStatus.COMPLETED
+        self.done.save(update_fields=["status"])
+        release_team(self.done)
+
+        person.refresh_from_db()
+        self.assertEqual(person.graduate_status, GraduateStatus.PENDING)
