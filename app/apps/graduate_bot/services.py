@@ -275,6 +275,19 @@ def join_graduate_to_project(intern: Intern, project: Project, *, source: str = 
         update_fields.append('graduate_status')
     if update_fields:
         intern.save(update_fields=[*update_fields, 'updated_at'])
+    # intern=None — в общую ленту руководителя, как и уведомление о
+    # заявке в банк резюме: он должен узнавать о решении выпускника,
+    # не заходя специально проверять список «Выпускники».
+    from apps.notifications.models import NotificationLevel
+    from apps.notifications.services import notify
+
+    notify(
+        f'{intern.full_name} продолжает стажировку: «{project.name}»',
+        level=NotificationLevel.SUCCESS,
+        description='Выпускник сам выбрал проект через бота и уже добавлен в команду.',
+        url=intern.get_absolute_url(),
+        dedup_key=f'graduate-continued:{intern.pk}:{project.pk}',
+    )
     return member
 
 

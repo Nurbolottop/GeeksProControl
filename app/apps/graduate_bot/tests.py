@@ -156,6 +156,17 @@ class JoinGraduateToProjectTests(TestCase):
         self.assertIn("Новый проект", entry.reason)
         self.assertIn("бот-выпускник", entry.reason)
 
+    def test_creates_notification_for_head_feed(self):
+        from apps.notifications.models import Notification
+
+        services.join_graduate_to_project(self.intern, self.project)
+        notification = Notification.objects.get(
+            dedup_key=f"graduate-continued:{self.intern.pk}:{self.project.pk}",
+        )
+        self.assertIsNone(notification.intern)
+        self.assertIn("Выпускник Тестов", notification.title)
+        self.assertIn("Новый проект", notification.title)
+
 
 class CompletedProjectsTests(TestCase):
     def setUp(self):
