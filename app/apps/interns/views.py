@@ -47,7 +47,10 @@ def _availability_of(intern):
 
 
 def lead_ids() -> set:
-    """Тимлиды и ПМ — сотрудники на зарплате, в списке стажёров их нет."""
+    """Тимлиды — сотрудники на зарплате, в списке стажёров их нет.
+
+    ПМ в списке есть: они такие же стажёры, как остальные.
+    """
     from apps.teams.selectors import staff_intern_ids
 
     return staff_intern_ids()

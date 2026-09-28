@@ -77,10 +77,9 @@ class LeadsHiddenFromInternListTests(TestCase):
         self.assertEqual(response.context["kind"], "Тимлид направления")
 
 
-class PMsHiddenFromInternListTests(TestCase):
-    """ПМ, как и тимлиды, — сотрудники на зарплате, в общем списке
-    стажёров их быть не должно (карточка и бейдж «Стажёр» остаются —
-    см. InternKindBadgeTests, это только про список)."""
+class PMsStayInInternListTests(TestCase):
+    """ПМ — тоже стажёр: он есть и в общем списке, и в цифрах. Сотрудник
+    у нас только тимлид."""
 
     def setUp(self):
         from django.contrib.auth import get_user_model
@@ -103,11 +102,11 @@ class PMsHiddenFromInternListTests(TestCase):
             status=TeamMember.Status.ACTIVE,
         )
 
-    def test_pm_not_in_list(self):
+    def test_pm_is_in_list(self):
         response = self.client.get(reverse("interns:list"))
         names = [p.full_name for p in response.context["page"].object_list]
         self.assertIn("Капаров Улар", names)
-        self.assertNotIn("Болотбекова Умутай", names)
+        self.assertIn("Болотбекова Умутай", names)
 
     def test_pm_card_still_opens(self):
         response = self.client.get(self.pm.get_absolute_url())

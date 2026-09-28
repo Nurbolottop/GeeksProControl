@@ -211,6 +211,48 @@ class LeadsNotCountedAsInternsTests(TestCase):
         self.assertEqual(data["interns"]["active"], 1)
 
 
+class PMCountedAsInternTests(TestCase):
+    """ПМ — тоже стажёр: в направлениях и в общем счёте он есть."""
+
+    def setUp(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.spec = Specialization.objects.create(name="PM")
+        project = Project.objects.create(name="Омур")
+        self.pm = Intern.objects.create(
+            full_name="Проект Менеджер", specialization=self.spec,
+            status=InternStatus.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=project, intern=self.pm, role=TeamRole.PROJECT_MANAGER,
+        )
+
+    def test_direction_row_counts_pm(self):
+        row = next(
+            r for r in services.interns_summary()
+            if r["specialization"] == self.spec
+        )
+        self.assertEqual(row["total"], 1)
+        self.assertEqual(row["active"], 1)
+        self.assertEqual(row["busy"], 1)
+
+    def test_totals_count_pm(self):
+        totals = services.interns_total()
+        self.assertEqual(totals["total"], 1)
+        self.assertEqual(totals["active"], 1)
+
+    def test_pm_is_in_intern_list(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(user)
+        response = self.client.get(reverse("interns:list"))
+        self.assertContains(response, "Проект Менеджер")
+
+
 class StaffingRequestTests(TestCase):
     """Запрос на стажёров: сколько нужно, на какой проект, к какой дате."""
 

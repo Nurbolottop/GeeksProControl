@@ -74,7 +74,7 @@ def build(week_start: datetime.date) -> dict:
     stopped_by_client = _status_changes(first, last, REFUSED_LABEL)
     problematic_projects = projects.filter(is_problematic=True).count()
 
-    # --- Стажёры (тимлиды и ПМ — сотрудники, в счёт не идут) ---
+    # --- Стажёры (тимлиды — сотрудники, в счёт не идут; ПМ идут) ---
     from apps.teams.selectors import staff_intern_ids
 
     leads = staff_intern_ids()

@@ -95,7 +95,7 @@ def lead_intern_ids() -> set:
 
 
 def pm_intern_ids() -> set:
-    """Кто из людей — ПМ. Как и тимлиды, ПМ сотрудники, а не стажёры."""
+    """Кто из людей — ПМ на проекте."""
     return set(
         TeamMember.objects.filter(role=TeamRole.PROJECT_MANAGER)
         .exclude(intern__isnull=True)
@@ -104,6 +104,9 @@ def pm_intern_ids() -> set:
 
 
 def staff_intern_ids() -> set:
-    """Тимлиды и ПМ вместе — все, кого не нужно показывать/считать в
-    списках и цифрах по стажёрам."""
-    return lead_intern_ids() | pm_intern_ids()
+    """Кого не считаем стажёром — только тимлидов.
+
+    ПМ у нас тоже стажёры: они растут из той же академии и должны
+    попадать в списки и цифры по стажёрам наравне с остальными.
+    """
+    return lead_intern_ids()
