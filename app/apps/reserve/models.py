@@ -19,6 +19,18 @@ from apps.common.models import ArchivableModel, TimeStampedModel
 from apps.training.models import Specialization, TrainingGroup
 
 
+class CandidatePool(models.TextChoices):
+    """Для кого карточка.
+
+    Старый резерв — сотрудники: тимлиды и те, кто сам заполнил анкету.
+    Стажёров туда не мешаем: их отдельно отправляют в резерв тимлиды, и
+    только они уходят в общую Google-таблицу «Резерв Кадров Стажеры».
+    """
+
+    STAFF = 'staff', 'Сотрудники'
+    INTERN = 'intern', 'Стажёры'
+
+
 class CandidateStatus(models.TextChoices):
     """Путь кандидата от анкеты до трудоустройства."""
 
@@ -255,6 +267,11 @@ class ReserveCandidate(TimeStampedModel, ArchivableModel):
     decision_comment = models.TextField('Причина / комментарий', blank=True)
 
     # --- статус и служебное ---
+    pool = models.CharField(
+        'Кто это', max_length=10, choices=CandidatePool.choices,
+        default=CandidatePool.STAFF, db_index=True,
+        help_text='Стажёров отправляют в резерв тимлиды — они уходят в общую таблицу.',
+    )
     status = models.CharField(
         'Статус', max_length=20, choices=CandidateStatus.choices,
         default=CandidateStatus.NEW, db_index=True,

@@ -11,8 +11,8 @@ from django.db import models
 from django.utils import timezone
 
 from apps.reserve.models import (
-    CandidateStatus, EventKind, RecommendationStatus, ReserveCandidate,
-    ReserveEvent, ReserveInvite, ReserveShareLink,
+    CandidatePool, CandidateStatus, EventKind, RecommendationStatus,
+    ReserveCandidate, ReserveEvent, ReserveInvite, ReserveShareLink,
 )
 
 # Результат по рекомендации двигает и статус самого кандидата
@@ -299,18 +299,20 @@ def update_recommendation_status(recommendation, status: str, *, comment='', use
 
 
 def candidate_from_intern(
-    intern, user=None, *, comment_lead='',
+    intern, user=None, *, comment_lead='', pool=CandidatePool.INTERN,
 ) -> ReserveCandidate:
     """Завести кандидата из карточки стажёра, не перепечатывая данные.
 
     Комментарий приходит от того, кто отправляет человека в резерв
-    (обычно тимлида) — остальное кандидат заполняет сам.
+    (обычно тимлида) — остальное кандидат заполняет сам. По умолчанию
+    это стажёр: карточку заводят из его стажёрской карточки.
     """
     existing = ReserveCandidate.objects.filter(intern=intern).first()
     if existing is not None:
         return existing
     candidate = ReserveCandidate(
         intern=intern,
+        pool=pool,
         comment_lead=comment_lead,
         full_name=intern.full_name,
         phone=intern.phone,
@@ -491,7 +493,8 @@ def ensure_lead_in_reserve(intern, user=None) -> ReserveCandidate:
             user=user,
         )
         return candidate
-    candidate = candidate_from_intern(intern, user)
+    # Тимлид — сотрудник, а не стажёр: в таблицу стажёров он не идёт.
+    candidate = candidate_from_intern(intern, user, pool=CandidatePool.STAFF)
     log_event(
         candidate, EventKind.UPDATED, 'Тимлид GeeksPro — добавлен в резерв автоматически',
         detail='Резюме тимлид дополняет сам в своём портале', user=user,

@@ -792,9 +792,34 @@ class ReserveSheetTests(TestCase):
         self.design = Specialization.objects.create(name="UX/UI дизайн")
 
     def _candidate(self, **kwargs):
-        data = {"full_name": "Кандидат", "status": CandidateStatus.RESERVE}
+        from apps.reserve.models import CandidatePool
+
+        data = {
+            "full_name": "Кандидат", "status": CandidateStatus.RESERVE,
+            "pool": CandidatePool.INTERN,
+        }
         data.update(kwargs)
         return ReserveCandidate.objects.create(**data)
+
+    def test_only_interns_go_to_the_sheet(self):
+        from apps.reserve.models import CandidatePool
+
+        self._candidate(full_name="Стажёр Бэкенд", specialization=self.backend)
+        self._candidate(
+            full_name="Тимлид Бэкенд", specialization=self.backend,
+            pool=CandidatePool.STAFF,
+        )
+        rows = self.gsheets.rows_by_direction()["backend"]
+        self.assertEqual([row[0] for row in rows], ["Стажёр Бэкенд"])
+
+    def test_lead_in_reserve_is_staff_and_stays_out(self):
+        from apps.reserve import services
+        from apps.reserve.models import CandidatePool
+
+        lead = Intern.objects.create(full_name="Тимлид Наш", specialization=self.backend)
+        card = services.ensure_lead_in_reserve(lead)
+        self.assertEqual(card.pool, CandidatePool.STAFF)
+        self.assertEqual(self.gsheets.rows_by_direction(), {})
 
     def test_row_matches_sheet_columns(self):
         self._candidate(

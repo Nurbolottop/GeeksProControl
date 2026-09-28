@@ -93,12 +93,15 @@ def projects_of(candidate) -> str:
 
 
 def candidates_for_sheet():
-    """Кого выгружаем: весь живой резерв."""
-    from apps.reserve.models import ReserveCandidate
+    """Кого выгружаем: только стажёров.
 
-    return ReserveCandidate.objects.filter(is_archived=False).select_related(
-        'specialization', 'study_specialization', 'intern',
-    )
+    Старый резерв — это сотрудники (тимлиды, анкеты), таблица не про них.
+    """
+    from apps.reserve.models import CandidatePool, ReserveCandidate
+
+    return ReserveCandidate.objects.filter(
+        is_archived=False, pool=CandidatePool.INTERN,
+    ).select_related('specialization', 'study_specialization', 'intern')
 
 
 def rows_by_direction(candidates=None) -> dict:
