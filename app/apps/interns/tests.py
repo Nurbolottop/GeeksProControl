@@ -959,8 +959,8 @@ class GraduatesSummaryTests(TestCase):
         self.assertNotContains(response, "Бэк Один")
         total = response.context["total"]
         self.assertEqual(
-            (total["total"], total["pending"], total["declined"], total["in_bank"], total["no_bank"]),
-            (5, 3, 2, 1, 4),
+            (total["total"], total["pending"], total["in_bank"], total["no_bank"]),
+            (5, 3, 1, 4),
         )
 
     def test_numbers_by_direction(self):
@@ -968,14 +968,12 @@ class GraduatesSummaryTests(TestCase):
         self.assertEqual(rows["Backend"]["total"], 3)
         self.assertEqual(rows["Backend"]["pending"], 2)
         self.assertEqual(rows["Backend"]["in_bank"], 1)
-        self.assertEqual(rows["UX/UI"]["declined"], 1)
         self.assertEqual(rows["Без направления"]["total"], 1)
 
     def test_numbers_by_project(self):
         rows = {row["label"].split(" ", 1)[-1]: row for row in self.client.get(self.url).context["by_project"]}
         self.assertEqual(rows["Балажан"]["total"], 3)
         self.assertEqual(rows["БилимОрдо"]["total"], 2)
-        self.assertEqual(rows["БилимОрдо"]["declined"], 1)
 
     def test_direction_number_opens_those_people(self):
         response = self.client.get(self.url, {"specialization": self.backend.pk, "status": "pending"})
