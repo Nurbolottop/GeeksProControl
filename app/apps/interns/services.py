@@ -68,18 +68,6 @@ def graduated_interns() -> list[Intern]:
     return interns
 
 
-def decline_graduate(intern: Intern) -> None:
-    """Стажёр не хочет продолжать стажировку — остаётся выпускником.
-
-    Именно здесь ``in_resume_bank`` НЕ трогаем: попасть в банк резюме
-    можно только самостоятельно, через публичную форму (ТЗ — банк резюме
-    заполняется человеком сам, а не ставится ПМ галочкой). ПМ лишь
-    получает готовый текст-инструкцию, которую отправляет стажёру.
-    """
-    intern.graduate_status = GraduateStatus.DECLINED
-    intern.save(update_fields=['graduate_status', 'updated_at'])
-
-
 def issue_profile_form_link(
     user=None, ttl_days: int | None = None, project=None,
 ) -> ProfileFormLink:

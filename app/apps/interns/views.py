@@ -783,27 +783,6 @@ def _graduate_filter_label(filters, people) -> str:
     return ' · '.join(parts)
 
 
-@login_required
-def graduate_decline(request, pk):
-    """ПМ отметил, что выпускник не хочет продолжать стажировку.
-
-    В банк резюме это НЕ добавляет — только меняет статус выпускника.
-    Дальше на странице «Выпускники» появляется готовый текст-инструкция
-    для самого стажёра: попасть в банк резюме можно только его же руками,
-    через публичную анкету.
-    """
-    intern = get_object_or_404(Intern, pk=pk)
-    if request.method == 'POST':
-        services.decline_graduate(intern)
-        messages.success(
-            request,
-            f'{intern.full_name}: отмечен(а) как не продолжающий(ая) '
-            'стажировку. Ниже — текст для отправки, чтобы попасть в банк резюме.',
-        )
-    # в сводке текста нет — ведём прямо в список, где он раскрывается
-    return redirect(f"{reverse('interns:graduates')}?status={GraduateStatus.DECLINED}")
-
-
 def resume_bank_apply(request):
     """Публичная анкета «Банк резюме» — без входа в систему.
 

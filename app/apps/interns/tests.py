@@ -1216,20 +1216,6 @@ class GraduateWorkflowTests(TestCase):
         )
         self.assertIn("Проект по ссылке", entry.reason)
 
-    def test_decline_sets_status_without_touching_resume_bank(self):
-        graduate = Intern.objects.create(
-            full_name="Не продолжает", graduate_status=GraduateStatus.PENDING,
-        )
-
-        response = self.client.post(
-            reverse("interns:graduate_decline", args=[graduate.pk]),
-        )
-        self.assertRedirects(response, reverse("interns:graduates") + "?status=declined")
-
-        graduate.refresh_from_db()
-        self.assertEqual(graduate.graduate_status, GraduateStatus.DECLINED)
-        self.assertFalse(graduate.in_resume_bank)
-
     def test_decline_view_shows_copyable_instructions(self):
         graduate = Intern.objects.create(
             full_name="Копия Инструкции", graduate_status=GraduateStatus.DECLINED,
