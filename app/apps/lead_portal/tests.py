@@ -1314,3 +1314,69 @@ class LeadFormerInternTests(TestCase):
             self._url("lead_portal:intern_detail", project=self.foreign),
         )
         self.assertEqual(response.status_code, 404)
+
+
+class LeadFinishedProjectsTests(TestCase):
+    """Сданный проект распускает команду — но у тимлида он остаётся
+    в портале, иначе вкладка «Завершён» всегда пустая."""
+
+    def setUp(self):
+        from apps.projects.models import ProjectStatus
+        from apps.training.models import Specialization
+
+        backend = Specialization.objects.create(name="Backend")
+        self.lead_user = Model.objects.create_user(
+            username="+996700000080", password="x", role=User.Role.TEAM_LEAD,
+        )
+        self.lead = Intern.objects.create(
+            full_name="Сдавший Тимлид", user=self.lead_user, specialization=backend,
+        )
+        self.done = Project.objects.create(
+            name="Сданный", status=ProjectStatus.COMPLETED,
+        )
+        self.running = Project.objects.create(name="В работе")
+        self.taken_away = Project.objects.create(name="Забрали")
+        TeamMember.objects.create(
+            project=self.done, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.LEFT,
+        )
+        TeamMember.objects.create(
+            project=self.running, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        TeamMember.objects.create(
+            project=self.taken_away, intern=self.lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.LEFT,
+        )
+        self.client.force_login(self.lead_user)
+
+    def test_dashboard_lists_finished_project(self):
+        response = self.client.get(reverse("lead_portal:dashboard"))
+        names = [p.name for p in response.context["projects"]]
+        self.assertIn("Сданный", names)
+        self.assertIn("В работе", names)
+
+    def test_completed_tab_is_not_empty(self):
+        response = self.client.get(
+            reverse("lead_portal:dashboard") + "?status=completed",
+        )
+        self.assertEqual([p.name for p in response.context["projects"]], ["Сданный"])
+
+    def test_finished_project_card_opens(self):
+        response = self.client.get(
+            reverse("lead_portal:project_detail", args=[self.done.pk]),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Сданный")
+
+    def test_project_taken_away_stays_closed(self):
+        """Сняли с активного проекта — доступ теряется, как и раньше."""
+        response = self.client.get(reverse("lead_portal:dashboard"))
+        names = [p.name for p in response.context["projects"]]
+        self.assertNotIn("Забрали", names)
+        self.assertEqual(
+            self.client.get(
+                reverse("lead_portal:project_detail", args=[self.taken_away.pk]),
+            ).status_code,
+            404,
+        )

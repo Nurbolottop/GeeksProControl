@@ -1,31 +1,44 @@
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
-from apps.projects.models import Project
+from apps.projects.models import Project, ProjectStatus
 from apps.teams.models import TeamMember, TeamRole
 
 
+# Сданные и закрытые проекты: команду там распускают, поэтому тимлид
+# числится в них уже как вышедший — но свои проекты он должен видеть.
+FINISHED_STATUSES = (
+    ProjectStatus.COMPLETED, ProjectStatus.CANCELLED, ProjectStatus.REFUSED,
+)
+
+
+def _own_projects(user):
+    """Проекты тимлида: где он в команде сейчас или был к моменту сдачи.
+
+    Условия стоят в одном filter() — значит, относятся к одной и той же
+    записи в команде: снятый с активного проекта тимлид доступ теряет, а
+    сданный проект остаётся у того, кто его вёл.
+    """
+    return Project.objects.filter(
+        Q(team_members__status=TeamMember.Status.ACTIVE)
+        | Q(team_members__status=TeamMember.Status.LEFT, status__in=FINISHED_STATUSES),
+        team_members__intern__user=user,
+        team_members__role=TeamRole.TEAM_LEAD,
+    )
+
+
 def lead_project_or_404(user, project_pk) -> Project:
-    """Единственная точка проверки: проект, где user — активный тимлид.
+    """Единственная точка проверки: проект, который ведёт или вёл user.
 
     Логин тимлида, как и у ПМ, лежит в intern.user — сам тимлид на
     проекте это TeamMember с role='team_lead', привязанный через intern.
     """
-    return get_object_or_404(
-        Project,
-        pk=project_pk,
-        team_members__intern__user=user,
-        team_members__role=TeamRole.TEAM_LEAD,
-        team_members__status=TeamMember.Status.ACTIVE,
-    )
+    return get_object_or_404(_own_projects(user).distinct(), pk=project_pk)
 
 
 def lead_projects(user):
-    """Проекты, где user — активный тимлид (для дашборда)."""
-    return Project.objects.filter(
-        team_members__intern__user=user,
-        team_members__role=TeamRole.TEAM_LEAD,
-        team_members__status=TeamMember.Status.ACTIVE,
-    ).distinct()
+    """Проекты тимлида для дашборда — вместе со сданными и закрытыми."""
+    return _own_projects(user).distinct()
 
 
 def lead_own_role(user):
