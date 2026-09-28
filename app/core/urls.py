@@ -44,7 +44,6 @@ urlpatterns = [
     path('notifications/', include('apps.notifications.urls')),
     path('risks/', include('apps.risks.urls')),
     path('resources/', include('apps.resources.urls')),
-    path('reports/', include('apps.reports.urls')),
     path('pm/', include('apps.pm_portal.urls')),
     path('lead/', include('apps.lead_portal.urls')),
     path('academy/', include('apps.training.urls')),

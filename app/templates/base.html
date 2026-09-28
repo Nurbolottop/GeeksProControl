@@ -141,13 +141,6 @@
             </a>
 
             <div class="nav-label">Контроль</div>
-            <a href="{% url 'reports:weekly_list' %}"
-               class="nav-item {% if request.resolver_match.namespace == 'reports' %}is-active{% endif %}">
-                <span class="nav-item__label">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-                    Отчёты
-                </span>
-            </a>
             <a href="{% url 'scripts:list' %}"
                class="nav-item {% if request.resolver_match.namespace == 'scripts' %}is-active{% endif %}">
                 <span class="nav-item__label">
