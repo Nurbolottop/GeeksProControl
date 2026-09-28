@@ -48,6 +48,7 @@ urlpatterns = [
     path('lead/', include('apps.lead_portal.urls')),
     path('academy/', include('apps.training.urls')),
     path('scripts/', include('apps.scripts.urls')),
+    path('graduate-bot/', include('apps.graduate_bot.urls')),
 ]
 
 if settings.DEBUG:

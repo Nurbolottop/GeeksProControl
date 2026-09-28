@@ -420,3 +420,68 @@ class TeamLeadContactTests(TestCase):
     def test_none_when_no_lead(self):
         empty_project = Project.objects.create(name="Без тимлида")
         self.assertIsNone(services.team_lead_contact(empty_project, self.graduate))
+
+
+class BotActivityTests(TestCase):
+    def test_excludes_people_who_never_used_the_bot(self):
+        Intern.objects.create(full_name="Не писал боту")
+        self.assertEqual(services.bot_activity(), [])
+
+    def test_pending_outcome_for_unresolved_graduate(self):
+        intern = Intern.objects.create(
+            full_name="Ещё выбирает", telegram_chat_id=111,
+            graduate_status=GraduateStatus.PENDING,
+        )
+        result = services.bot_activity()
+        self.assertEqual([i.pk for i in result], [intern.pk])
+        self.assertEqual(result[0].bot_outcome, "pending")
+
+    def test_resume_bank_outcome(self):
+        Intern.objects.create(
+            full_name="В банк резюме", telegram_chat_id=222,
+            resume_bank_status=ResumeBankStatus.PENDING,
+        )
+        result = services.bot_activity()
+        self.assertEqual(result[0].bot_outcome, "resume_bank")
+
+    def test_continued_outcome_with_current_project(self):
+        project = Project.objects.create(name="Проект Продолжения")
+        intern = Intern.objects.create(full_name="Продолжил", telegram_chat_id=333)
+        TeamMember.objects.create(
+            project=project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        result = services.bot_activity()
+        self.assertEqual(result[0].bot_outcome, "continued")
+        self.assertEqual(result[0].bot_project, project)
+
+    def test_continued_outcome_without_current_team(self):
+        """Например, потом сам ушёл с проекта — не должно падать."""
+        intern = Intern.objects.create(full_name="Продолжил И Ушёл", telegram_chat_id=444)
+        result = services.bot_activity()
+        self.assertEqual(result[0].bot_outcome, "continued")
+        self.assertIsNone(result[0].bot_project)
+
+
+class ActivityListViewTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.user = get_user_model().objects.create_user(username="head4", password="x")
+
+    def test_requires_login(self):
+        from django.urls import reverse
+
+        response = self.client.get(reverse("graduate_bot:activity"))
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_shows_bot_users(self):
+        from django.urls import reverse
+
+        Intern.objects.create(
+            full_name="Виден В Списке", telegram_chat_id=555,
+            graduate_status=GraduateStatus.PENDING,
+        )
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("graduate_bot:activity"))
+        self.assertContains(response, "Виден В Списке")

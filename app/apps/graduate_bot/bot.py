@@ -109,6 +109,19 @@ def handle_name(message):
         bot.register_next_step_handler(message, handle_name)
         return
     intern = candidates[0]
+    if not intern.phone:
+        # Иначе phone_matches() будет всегда возвращать False (сравнивать
+        # не с чем) — человек бесконечно «не проходит» проверку и в итоге
+        # получает блокировку, хотя дело не в неверном номере, а в том,
+        # что номера в базе просто нет.
+        bot.send_message(
+            message.chat.id,
+            f'{intern.full_name}, в базе не указан ваш номер телефона — '
+            'автоматически проверить личность не получится. Обратитесь к '
+            'руководителю GeeksPro, чтобы добавили номер, и попробуйте '
+            'снова: /start.',
+        )
+        return
     if services.is_phone_locked(intern):
         minutes = services.phone_lock_minutes_left(intern)
         bot.send_message(

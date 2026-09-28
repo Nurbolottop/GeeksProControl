@@ -316,3 +316,36 @@ def team_lead_contact(project: Project, intern: Intern) -> Intern | None:
                 return member.intern
     first = leads.first()
     return first.intern if first else None
+
+
+def bot_activity() -> list[Intern]:
+    """Все, кто хоть раз подтвердил телефон в боте (успешно прошёл
+    аутентификацию) — с их текущим выбором. Для админ-страницы
+    «Бот-выпускник»: без неё не было видно, кто вообще пользовался
+    ботом и чем это закончилось — после выбора человек просто пропадал
+    из «Выпускников»."""
+    interns = list(
+        Intern.objects.exclude(telegram_chat_id__isnull=True)
+        .select_related('specialization')
+        .order_by('-updated_at'),
+    )
+    intern_ids = [i.pk for i in interns]
+    latest_membership = {}
+    for member in (
+        TeamMember.objects.filter(
+            intern_id__in=intern_ids, status=TeamMember.Status.ACTIVE,
+        )
+        .select_related('project').order_by('intern_id', '-joined_at')
+    ):
+        latest_membership.setdefault(member.intern_id, member)
+
+    for intern in interns:
+        if intern.graduate_status:
+            intern.bot_outcome = 'pending'
+        elif intern.resume_bank_status:
+            intern.bot_outcome = 'resume_bank'
+        else:
+            intern.bot_outcome = 'continued'
+            member = latest_membership.get(intern.pk)
+            intern.bot_project = member.project if member else None
+    return interns
