@@ -22,6 +22,10 @@
         <div class="kpi-card__value">{{ total.pending }}</div>
         <div class="kpi-card__label">На проверке</div>
     </a>
+    <a href="?status=waiting" class="kpi-card kpi-card--info" style="text-decoration: none;">
+        <div class="kpi-card__value">{{ total.waiting }}</div>
+        <div class="kpi-card__label">Ждут проект</div>
+    </a>
     <a href="?status=declined" class="kpi-card" style="text-decoration: none;">
         <div class="kpi-card__value">{{ total.declined }}</div>
         <div class="kpi-card__label">Не хотят продолжать</div>
@@ -45,6 +49,7 @@
                 <th>Направление</th>
                 <th>Всего</th>
                 <th>На проверке</th>
+                <th>Ждут проект</th>
                 <th>Не хотят продолжать</th>
                 <th>В банке резюме</th>
                 <th>Не заполнили анкету</th>
@@ -56,12 +61,13 @@
                     <td><a href="?specialization={{ row.value }}"><strong>{{ row.label }}</strong></a></td>
                     <td><a href="?specialization={{ row.value }}"><strong style="font-size: 15px;">{{ row.total }}</strong></a></td>
                     <td>{% if row.pending %}<a href="?specialization={{ row.value }}&status=pending" class="badge badge--yellow">{{ row.pending }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                    <td>{% if row.waiting %}<a href="?specialization={{ row.value }}&status=waiting" class="badge badge--blue">{{ row.waiting }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
                     <td>{% if row.declined %}<a href="?specialization={{ row.value }}&status=declined" class="badge badge--gray">{{ row.declined }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
                     <td>{% if row.in_bank %}<a href="?specialization={{ row.value }}&bank=yes" class="badge badge--green">{{ row.in_bank }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
                     <td>{% if row.no_bank %}<a href="?specialization={{ row.value }}&bank=no" class="badge badge--gray">{{ row.no_bank }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
                 </tr>
             {% empty %}
-                <tr><td colspan="6" class="empty" style="text-align:center; padding: 24px;">Выпускников пока нет.</td></tr>
+                <tr><td colspan="7" class="empty" style="text-align:center; padding: 24px;">Выпускников пока нет.</td></tr>
             {% endfor %}
             </tbody>
             {% if by_direction %}
@@ -70,6 +76,7 @@
                     <td><strong>Итого</strong></td>
                     <td><strong>{{ total.total }}</strong></td>
                     <td>{{ total.pending }}</td>
+                    <td>{{ total.waiting }}</td>
                     <td>{{ total.declined }}</td>
                     <td>{{ total.in_bank }}</td>
                     <td>{{ total.no_bank }}</td>
@@ -91,6 +98,7 @@
                     <th>Дата выпуска</th>
                     <th>Всего</th>
                     <th>На проверке</th>
+                    <th>Ждут проект</th>
                     <th>Не хотят продолжать</th>
                     <th>В банке резюме</th>
                 </tr>
@@ -102,6 +110,7 @@
                         <td>{{ row.graduated_at|date:'d.m.Y'|default:'—' }}</td>
                         <td><a href="?project={{ row.value }}"><strong style="font-size: 15px;">{{ row.total }}</strong></a></td>
                         <td>{% if row.pending %}<a href="?project={{ row.value }}&status=pending" class="badge badge--yellow">{{ row.pending }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
+                        <td>{% if row.waiting %}<a href="?project={{ row.value }}&status=waiting" class="badge badge--blue">{{ row.waiting }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
                         <td>{% if row.declined %}<a href="?project={{ row.value }}&status=declined" class="badge badge--gray">{{ row.declined }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
                         <td>{% if row.in_bank %}<a href="?project={{ row.value }}&bank=yes" class="badge badge--green">{{ row.in_bank }}</a>{% else %}<span class="badge badge--gray">0</span>{% endif %}</td>
                     </tr>

@@ -723,6 +723,7 @@ def _graduate_counts(people) -> dict:
     return {
         'total': len(people),
         'pending': sum(1 for p in people if p.graduate_status == GraduateStatus.PENDING),
+        'waiting': sum(1 for p in people if p.graduate_status == GraduateStatus.WAITING),
         'declined': sum(1 for p in people if p.graduate_status == GraduateStatus.DECLINED),
         'in_bank': sum(1 for p in people if p.in_resume_bank),
         'no_bank': sum(1 for p in people if not p.in_resume_bank),

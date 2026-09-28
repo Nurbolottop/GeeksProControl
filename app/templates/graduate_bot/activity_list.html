@@ -28,6 +28,8 @@
                     <td>
                         {% if person.bot_outcome == 'pending' %}
                             <span class="badge badge--yellow">Прошёл(ла) проверку, ещё не выбрал(а)</span>
+                        {% elif person.bot_outcome == 'waiting' %}
+                            <a href="{% url 'interns:graduates' %}?status=waiting" class="badge badge--blue">Продолжает — ждёт свободный проект</a>
                         {% elif person.bot_outcome == 'resume_bank' %}
                             {% if person.resume_bank_status == 'approved' %}
                                 <a href="{% url 'interns:resume_bank' %}" class="badge badge--green">В банк резюме — принят</a>

@@ -15,7 +15,7 @@ from datetime import timedelta
 
 from django.utils import timezone
 
-from apps.interns.models import Intern, ResumeBankStatus
+from apps.interns.models import GraduateStatus, Intern, ResumeBankStatus
 from apps.projects.models import Project, ProjectStageKey, ProjectStatus
 from apps.teams.models import TeamMember, TeamRole
 
@@ -142,6 +142,11 @@ def resolved_status_message(intern: Intern) -> str:
             f'Здравствуйте, {intern.full_name}! Ваша заявка в банк резюме ещё '
             'на проверке у руководителя GeeksPro. Мы сообщим о результате здесь.'
         )
+    if intern.graduate_status == GraduateStatus.WAITING:
+        return (
+            f'Здравствуйте, {intern.full_name}! Вы записаны на ближайшую '
+            'стажировку — напишем здесь, как появится место на проекте.'
+        )
     return f'Здравствуйте, {intern.full_name}! Вы уже продолжаете стажировку в GeeksPro.'
 
 
@@ -156,6 +161,38 @@ def completed_projects(intern: Intern) -> list[TeamMember]:
         .select_related('project')
         .order_by('-project__actual_end_date', '-left_at'),
     )
+
+
+def request_next_internship(intern: Intern, chat_id: int) -> bool:
+    """Выпускник хочет продолжить, но свободных мест сейчас нет.
+
+    Ставим его в очередь на ближайшую стажировку и говорим руководителю:
+    иначе человек просто уходит из чата и теряется. Возвращаем False,
+    если он уже в очереди, — повторное нажатие ничего не меняет.
+    """
+    from django.urls import reverse
+
+    from apps.audit.services import log as audit_log
+    from apps.notifications.models import NotificationLevel
+    from apps.notifications.services import notify
+
+    remember_chat_id(intern, chat_id)
+    if intern.graduate_status == GraduateStatus.WAITING:
+        return False
+    intern.graduate_status = GraduateStatus.WAITING
+    intern.save(update_fields=['graduate_status', 'updated_at'])
+    audit_log(
+        intern, 'Ждёт ближайшую стажировку',
+        reason='бот-выпускник: свободных проектов не было',
+    )
+    notify(
+        f'Ждёт стажировку: {intern.full_name}',
+        level=NotificationLevel.INFO,
+        description='Выпускник готов продолжать, но свободных проектов не было.',
+        url=f"{reverse('interns:graduates')}?status={GraduateStatus.WAITING}",
+        dedup_key=f'graduate-waiting:{intern.pk}',
+    )
+    return True
 
 
 def submit_to_resume_bank(intern: Intern, chat_id: int) -> bool:
@@ -340,7 +377,9 @@ def bot_activity() -> list[Intern]:
         latest_membership.setdefault(member.intern_id, member)
 
     for intern in interns:
-        if intern.graduate_status:
+        if intern.graduate_status == GraduateStatus.WAITING:
+            intern.bot_outcome = 'waiting'
+        elif intern.graduate_status:
             intern.bot_outcome = 'pending'
         elif intern.resume_bank_status:
             intern.bot_outcome = 'resume_bank'

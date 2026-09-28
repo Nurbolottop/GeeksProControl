@@ -39,6 +39,8 @@
                     <td>
                         {% if person.graduate_status == GraduateStatus.PENDING %}
                             <span class="badge badge--yellow">На проверке</span>
+                        {% elif person.graduate_status == GraduateStatus.WAITING %}
+                            <span class="badge badge--blue">Ждёт проект</span>
                         {% else %}
                             <span class="badge badge--gray">Не хочет продолжать</span>
                         {% endif %}
@@ -55,7 +57,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if person.graduate_status == GraduateStatus.PENDING %}
+                        {% if person.graduate_status == GraduateStatus.PENDING or person.graduate_status == GraduateStatus.WAITING %}
                             <button type="button" class="btn btn--secondary btn--sm" @click="open[{{ person.pk }}] = !open[{{ person.pk }}]">Проверить</button>
                         {% else %}
                             <button type="button" class="btn btn--secondary btn--sm" @click="open[{{ person.pk }}] = !open[{{ person.pk }}]">Инструкция</button>
@@ -64,9 +66,13 @@
                 </tr>
                 <tr x-show="open[{{ person.pk }}]" x-cloak style="display:none;">
                     <td colspan="7" style="background: var(--bg-muted, #f7f7f8);">
-                        {% if person.graduate_status == GraduateStatus.PENDING %}
+                        {% if person.graduate_status == GraduateStatus.PENDING or person.graduate_status == GraduateStatus.WAITING %}
                             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding: 8px 0;">
-                                <span>{{ person.full_name }} продолжает стажировку?</span>
+                                {% if person.graduate_status == GraduateStatus.WAITING %}
+                                    <span>{{ person.full_name }} сам(а) записался(ась) через бота и ждёт свободное место.</span>
+                                {% else %}
+                                    <span>{{ person.full_name }} продолжает стажировку?</span>
+                                {% endif %}
                                 <a href="{% url 'interns:project_add' person.pk %}" class="btn btn--sm">Продолжит — назначить проект</a>
                                 <form method="post" action="{% url 'interns:graduate_decline' person.pk %}"
                                       data-confirm="Отметить, что {{ person.full_name }} не хочет продолжать стажировку?"

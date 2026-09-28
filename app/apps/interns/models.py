@@ -47,6 +47,9 @@ class GraduateStatus(models.TextChoices):
 
     PENDING = 'pending', 'На проверке'
     DECLINED = 'declined', 'Не хочет продолжать'
+    # Хочет продолжить, но свободных проектов сейчас нет — ждёт, пока
+    # появится место (отмечает себя сам через бота-выпускника).
+    WAITING = 'waiting', 'Ждёт проект'
 
 
 class ResumeBankStatus(models.TextChoices):

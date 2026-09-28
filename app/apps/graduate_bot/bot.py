@@ -54,6 +54,7 @@ bot = telebot.TeleBot(settings.TELEGRAM_BOT_TOKEN)
 CONTINUE_BUTTON = 'Продолжить стажировку'
 BANK_BUTTON = 'В банк резюме'
 BANK_CONFIRM_BUTTON = 'Я подтверждаю, что зарегистрировался(ась)'
+WAIT_BUTTON = 'Сообщить о ближайшей стажировке'
 
 
 def _choice_markup():
@@ -65,9 +66,20 @@ def _choice_markup():
 
 @bot.message_handler(commands=['start'])
 def handle_start(message):
+    from apps.interns.models import GraduateStatus
+
     intern = services.find_by_chat_id(message.chat.id)
     if intern is not None:
-        if intern.graduate_status:
+        if intern.graduate_status == GraduateStatus.WAITING:
+            # Уже в очереди на ближайшую стажировку: заново не поздравляем,
+            # но выбор оставляем — вдруг появились проекты или человек
+            # передумает и уйдёт в банк резюме.
+            bot.send_message(
+                message.chat.id, services.resolved_status_message(intern),
+                reply_markup=_choice_markup(),
+            )
+            bot.register_next_step_handler(message, handle_choice, intern_id=intern.pk)
+        elif intern.graduate_status:
             # Уже проверяли телефон в этом чате, но выбор («Продолжить»/
             # «В банк резюме») ещё не сделал — не переспрашиваем ФИО и
             # телефон заново, сразу показываем тот же выбор.
@@ -262,11 +274,19 @@ def handle_bank_confirm(message, intern_id):
 def send_project_list(message, intern):
     projects = services.eligible_projects()
     if not projects:
+        # Свободных мест нет — не отпускаем человека «обратитесь к
+        # руководителю», а записываем в очередь по кнопке.
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        markup.add(types.KeyboardButton(WAIT_BUTTON))
         bot.send_message(
             message.chat.id,
-            'Сейчас нет проектов со свободным местом. Обратитесь к '
-            'руководителю GeeksPro — он подскажет, что делать дальше.',
-            reply_markup=types.ReplyKeyboardRemove(),
+            'Сейчас нет проектов со свободным местом.\n\n'
+            'Нажмите кнопку ниже — мы запишем вас на ближайшую стажировку '
+            'и напишем сюда, как появится место.',
+            reply_markup=markup,
+        )
+        bot.register_next_step_handler(
+            message, handle_wait_request, intern_id=intern.pk,
         )
         return
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -274,6 +294,33 @@ def send_project_list(message, intern):
         markup.add(types.KeyboardButton(project.name))
     bot.send_message(message.chat.id, 'Выберите проект:', reply_markup=markup)
     bot.register_next_step_handler(message, handle_project_choice, intern_id=intern.pk)
+
+
+def handle_wait_request(message, intern_id):
+    """Выпускник нажал «Сообщить о ближайшей стажировке» — фиксируем, что
+    он продолжает стажировку и ждёт место."""
+    from apps.interns.models import Intern
+
+    intern = Intern.objects.filter(pk=intern_id).first()
+    if intern is None:
+        bot.send_message(
+            message.chat.id, 'Что-то пошло не так — начните заново: /start.',
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        return
+    if (message.text or '').strip() != WAIT_BUTTON:
+        bot.send_message(message.chat.id, 'Пожалуйста, воспользуйтесь кнопкой ниже.')
+        send_project_list(message, intern)
+        return
+    added = services.request_next_internship(intern, message.chat.id)
+    if added:
+        text = (
+            'Записали вас на ближайшую стажировку. Руководитель GeeksPro '
+            'уже знает — напишем сюда, как появится место на проекте.'
+        )
+    else:
+        text = 'Вы уже в очереди на ближайшую стажировку — ждите сообщения здесь.'
+    bot.send_message(message.chat.id, text, reply_markup=types.ReplyKeyboardRemove())
 
 
 def handle_project_choice(message, intern_id):

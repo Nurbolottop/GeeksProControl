@@ -485,3 +485,94 @@ class ActivityListViewTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(reverse("graduate_bot:activity"))
         self.assertContains(response, "Виден В Списке")
+
+
+class WaitingForNextInternshipTests(TestCase):
+    """Свободных проектов нет — выпускник записывается в очередь кнопкой,
+    и мы фиксируем, что он продолжает стажировку."""
+
+    def setUp(self):
+        self.grad = Intern.objects.create(
+            full_name="Эркинбаев Нурболот", telegram_chat_id=777,
+            graduate_status=GraduateStatus.PENDING,
+        )
+
+    def test_request_marks_person_as_waiting(self):
+        self.assertTrue(services.request_next_internship(self.grad, 777))
+        self.grad.refresh_from_db()
+        self.assertEqual(self.grad.graduate_status, GraduateStatus.WAITING)
+
+    def test_second_press_changes_nothing(self):
+        services.request_next_internship(self.grad, 777)
+        self.assertFalse(services.request_next_internship(self.grad, 777))
+
+    def test_head_gets_notification(self):
+        from apps.notifications.models import Notification
+
+        services.request_next_internship(self.grad, 777)
+        self.assertTrue(
+            Notification.objects.filter(title__contains="Ждёт стажировку").exists()
+        )
+
+    def test_event_written_to_history(self):
+        from apps.audit.models import AuditLog
+
+        services.request_next_internship(self.grad, 777)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_id=str(self.grad.pk), action="Ждёт ближайшую стажировку",
+            ).exists()
+        )
+
+    def test_chat_id_remembered(self):
+        person = Intern.objects.create(
+            full_name="Без чата", graduate_status=GraduateStatus.PENDING,
+        )
+        services.request_next_internship(person, 999)
+        person.refresh_from_db()
+        self.assertEqual(person.telegram_chat_id, 999)
+
+    def test_start_message_tells_about_the_queue(self):
+        services.request_next_internship(self.grad, 777)
+        self.grad.refresh_from_db()
+        text = services.resolved_status_message(self.grad)
+        self.assertIn("ближайшую стажировку", text)
+
+    def test_activity_page_shows_waiting(self):
+        services.request_next_internship(self.grad, 777)
+        self.grad.refresh_from_db()
+        result = services.bot_activity()
+        self.assertEqual(result[0].bot_outcome, "waiting")
+
+
+class WaitingGraduatesPageTests(TestCase):
+    """Ждущих видно в «Выпускниках»: отдельная карточка и свой статус."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(user)
+        self.project = Project.objects.create(name="Балажан", status=ProjectStatus.COMPLETED)
+        self.grad = Intern.objects.create(
+            full_name="Эркинбаев Нурболот", graduate_status=GraduateStatus.WAITING,
+            status=InternStatus.EMPLOYABLE,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=self.grad, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+
+    def test_summary_counts_waiting(self):
+        from django.urls import reverse
+
+        response = self.client.get(reverse("interns:graduates"))
+        self.assertEqual(response.context["total"]["waiting"], 1)
+        self.assertContains(response, "Ждут проект")
+
+    def test_list_shows_status(self):
+        from django.urls import reverse
+
+        response = self.client.get(reverse("interns:graduates") + "?status=waiting")
+        self.assertContains(response, "Эркинбаев Нурболот")
+        self.assertContains(response, "Ждёт проект")
