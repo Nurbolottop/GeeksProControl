@@ -143,6 +143,77 @@ class ActivateInternMembershipTests(TestCase):
         )
 
 
+class LeaveTeamGraduatesOnProjectEndedTests(TestCase):
+    """Снятие с проекта с причиной «Проект завершён» должно превращать
+    человека в выпускника — так же, как apps.projects.services.release_team
+    делает это при смене статуса всего проекта разом. На практике ПМ/
+    тимлиды часто снимают людей по одному, не меняя статус проекта."""
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Учкун")
+
+    def test_marks_graduate_status_pending(self):
+        intern = Intern.objects.create(full_name="Стажёр", status=InternStatus.ACTIVE)
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.leave_team(member, reason=TeamMember.LeftReason.PROJECT_ENDED)
+
+        from apps.interns.models import GraduateStatus
+
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, GraduateStatus.PENDING)
+        self.assertEqual(intern.status, InternStatus.READY)
+
+    def test_other_reasons_do_not_graduate(self):
+        intern = Intern.objects.create(full_name="Стажёр")
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.leave_team(member, reason=TeamMember.LeftReason.NOT_FIT)
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, "")
+
+    def test_does_not_override_existing_graduate_status(self):
+        from apps.interns.models import GraduateStatus
+
+        intern = Intern.objects.create(
+            full_name="Уже отказался", graduate_status=GraduateStatus.DECLINED,
+        )
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.leave_team(member, reason=TeamMember.LeftReason.PROJECT_ENDED)
+        intern.refresh_from_db()
+        self.assertEqual(intern.graduate_status, GraduateStatus.DECLINED)
+
+    def test_team_lead_not_graduated(self):
+        """Тимлид — сотрудник: снятие с проекта не превращает его в
+        выпускника, даже с причиной «Проект завершён»."""
+        lead = Intern.objects.create(full_name="Тимлид", status=InternStatus.ACTIVE)
+        member = TeamMember.objects.create(
+            project=self.project, intern=lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.leave_team(member, reason=TeamMember.LeftReason.PROJECT_ENDED)
+        lead.refresh_from_db()
+        self.assertEqual(lead.graduate_status, "")
+        self.assertEqual(lead.status, InternStatus.ACTIVE)
+
+    def test_paused_intern_status_untouched(self):
+        intern = Intern.objects.create(full_name="Заморожен", status=InternStatus.PAUSED)
+        member = TeamMember.objects.create(
+            project=self.project, intern=intern, role=TeamRole.BACKEND,
+            status=TeamMember.Status.ACTIVE,
+        )
+        services.leave_team(member, reason=TeamMember.LeftReason.PROJECT_ENDED)
+        intern.refresh_from_db()
+        self.assertEqual(intern.status, InternStatus.PAUSED)
+
+
 class AddNewPersonTests(TestCase):
     """Человека, которого нет в базе, можно завести прямо из формы команды."""
 

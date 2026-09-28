@@ -61,12 +61,40 @@ def leave_team(member: TeamMember, reason: str = '') -> None:
     """Снять человека с проекта — не удаляем запись, чтобы не терять
     историю участия, просто помечаем «Вышел» (+ причина, если её
     выбрали при снятии).
+
+    Если причина — «Проект завершён», это по сути то же самое
+    завершение, что и apps.projects.services.release_team (там
+    команду освобождают всю разом, через смену статуса проекта), но
+    ПМ/тимлиды на практике часто просто снимают людей по одному, а сам
+    проект в «Завершён» не переводят. Раньше в этом случае человек не
+    попадал в «Выпускники»: снятие с проекта — не то же самое, что
+    смена статуса проекта, а graduate_status выставлялся только там.
     """
     member.status = TeamMember.Status.LEFT
     member.left_at = timezone.localdate()
     if reason in TeamMember.LeftReason.values:
         member.left_reason = reason
     member.save(update_fields=['status', 'left_at', 'left_reason', 'updated_at'])
+    if reason == TeamMember.LeftReason.PROJECT_ENDED and member.intern_id:
+        _graduate_after_leaving(member)
+
+
+def _graduate_after_leaving(member: TeamMember) -> None:
+    from apps.interns.models import GraduateStatus, InternStatus
+    from apps.teams.selectors import lead_intern_ids
+
+    intern = member.intern
+    if intern.pk in lead_intern_ids():
+        return
+    update_fields = []
+    if intern.status == InternStatus.ACTIVE:
+        intern.status = InternStatus.READY
+        update_fields.append('status')
+    if not intern.graduate_status:
+        intern.graduate_status = GraduateStatus.PENDING
+        update_fields.append('graduate_status')
+    if update_fields:
+        intern.save(update_fields=[*update_fields, 'updated_at'])
 
 
 def workload_band(total: int) -> tuple[str, str]:
