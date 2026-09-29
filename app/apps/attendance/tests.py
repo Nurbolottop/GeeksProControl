@@ -174,6 +174,43 @@ class MeetingScoreTests(TestCase):
             WorkScore.objects.filter(meeting=self.meeting, intern=self.person).exists(),
         )
 
+    def test_left_member_excluded_from_marking_and_scoring(self):
+        """Вышедший из команды — не в табеле, даже если запись о нём в
+        группе осталась (история участия не удаляется)."""
+        self.member = TeamMember.objects.get(group=self.group, intern=self.person)
+        self.member.status = TeamMember.Status.LEFT
+        self.member.save(update_fields=['status'])
+
+        detail = self.client.get(
+            reverse('attendance:meeting_detail', args=[self.meeting.pk]),
+        )
+        self.assertNotContains(detail, self.person.full_name)
+
+        mark_response = self.client.post(
+            reverse('attendance:mark_person', args=[self.meeting.pk]),
+            {'intern': self.person.pk, 'status': 'present'},
+        )
+        self.assertEqual(mark_response.status_code, 404)
+
+    def test_duplicate_membership_does_not_crash_scoring(self):
+        """Баг из продакшена: у стажёра осталась старая вышедшая запись
+        в группе плюс текущая активная — get_object_or_404() в
+        meeting_score/meeting_mark_toggle падал с MultipleObjectsReturned
+        (500), потому что attendance_eligible_members() не фильтровала
+        по TeamMember.status и находила обе."""
+        TeamMember.objects.create(
+            group=self.group, project=self.group.project, intern=self.person,
+            role=TeamRole.BACKEND, status=TeamMember.Status.LEFT,
+        )
+        response = self.client.post(
+            reverse('attendance:score_person', args=[self.meeting.pk]),
+            {'intern': self.person.pk, 'score': '7'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            WorkScore.objects.filter(meeting=self.meeting, intern=self.person, score=7).exists(),
+        )
+
 
 class MeetingCompletionTests(TestCase):
     """meeting_completion: закрыт ли табель собрания для списка людей —

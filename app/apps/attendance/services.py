@@ -8,7 +8,7 @@ from django.utils import timezone
 from apps.attendance.models import (
     Attendance, GroupMeeting, MeetingKind, WorkScore,
 )
-from apps.teams.models import TeamRole
+from apps.teams.models import TeamMember, TeamRole
 
 # Посещаемость и «Активность» ставят только стажёрам команды — ПМ и
 # тимлид не студенты, их в табеле быть не должно (ТЗ, реплика
@@ -18,10 +18,18 @@ ATTENDANCE_EXCLUDED_ROLES = (TeamRole.PROJECT_MANAGER, TeamRole.TEAM_LEAD)
 
 def attendance_eligible_members(group):
     """Участники группы, которых можно отмечать/оценивать — без ПМ,
-    тимлида и стажёров, чья стажировка сейчас заморожена."""
+    тимлида, стажёров, чья стажировка сейчас заморожена, и тех, кто уже
+    вышел из команды.
+
+    Без фильтра по status=ACTIVE сюда попадали и записи о вышедших
+    участниках — а если у человека к тому же было две записи в одной
+    группе (вышедшая + текущая, дубль), get_object_or_404() в
+    meeting_mark_toggle/meeting_score падал с MultipleObjectsReturned
+    (500) при попытке тимлида его отметить/оценить.
+    """
     from apps.interns.models import InternStatus
 
-    return group.members.exclude(
+    return group.members.filter(status=TeamMember.Status.ACTIVE).exclude(
         role__in=ATTENDANCE_EXCLUDED_ROLES,
     ).exclude(intern__status=InternStatus.PAUSED)
 
