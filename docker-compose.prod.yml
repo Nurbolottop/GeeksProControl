@@ -87,8 +87,16 @@ services:
       - DJANGO_SETTINGS_MODULE=core.settings.prod
     # host.docker.internal — для TELEGRAM_PROXY_URL, если с сервера нет
     # прямого маршрута до Telegram (см. .env.prod.example).
+    #
+    # api.telegram.org прибит к IPv4 намеренно: DNS на сервере отдаёт для
+    # этого имени только AAAA-запись, а IPv6-маршрута у контейнера нет —
+    # без этой строки каждый запрос упирается в таймаут. Из отвечающих
+    # адресов Telegram живым остаётся этот; если он перестанет работать,
+    # проверить рабочий адрес можно так:
+    #   curl --resolve api.telegram.org:443:<ip> https://api.telegram.org/
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "api.telegram.org:149.154.167.220"
     depends_on:
       db:
         condition: service_healthy
