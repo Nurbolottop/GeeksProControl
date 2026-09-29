@@ -126,6 +126,10 @@ class Intern(TimeStampedModel, ArchivableModel):
     phone_lock_until = models.DateTimeField(
         'Бот-выпускник: блокировка проверки телефона до', null=True, blank=True,
     )
+    # Правила бота человек читает один раз: дальше сразу вход в аккаунт.
+    rules_accepted_at = models.DateTimeField(
+        'Бот-выпускник: ознакомлен с правилами', null=True, blank=True,
+    )
     rating = models.DecimalField(
         'Рейтинг', max_digits=3, decimal_places=2, null=True, blank=True,
     )

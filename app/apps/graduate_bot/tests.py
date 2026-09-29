@@ -25,6 +25,32 @@ class FindGraduatesTests(TestCase):
         result = services.find_graduates("даяна")
         self.assertEqual([i.pk for i in result], [self.grad.pk])
 
+    def test_finds_by_any_word_order(self):
+        """Люди пишут «Имя Фамилия», «Фамилия Имя» или одно слово."""
+        for typed in (
+            "Сабыралиева Даяна", "Даяна Сабыралиева", "сабыралиева",
+            "  ДАЯНА   нурдиновна ", "Саб Даян",
+        ):
+            with self.subTest(typed=typed):
+                self.assertEqual(
+                    [i.pk for i in services.find_graduates(typed)], [self.grad.pk],
+                )
+
+    def test_yo_and_extra_spaces_do_not_break_search(self):
+        person = Intern.objects.create(
+            full_name="Артёмов Семён", graduate_status=GraduateStatus.PENDING,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=person, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT,
+        )
+        self.assertEqual(
+            [i.pk for i in services.find_graduates("семен  артемов")], [person.pk],
+        )
+
+    def test_word_from_another_person_does_not_match(self):
+        self.assertEqual(services.find_graduates("Даяна Иванова"), [])
+
     def test_no_match_returns_empty(self):
         self.assertEqual(services.find_graduates("Неизвестный Человек"), [])
 
@@ -82,90 +108,6 @@ class PhoneMatchesTests(TestCase):
     def test_blank_stored_phone_never_matches(self):
         intern = Intern.objects.create(full_name="Без Телефона", phone="")
         self.assertFalse(services.phone_matches(intern, "0501644171"))
-
-
-class EligibleProjectsTests(TestCase):
-    def _project(self, name, stage, team_size, status=ProjectStatus.ACTIVE):
-        project = Project.objects.create(name=name, status=status, current_stage=stage)
-        for i in range(team_size):
-            TeamMember.objects.create(
-                project=project, intern=Intern.objects.create(full_name=f"{name} чел {i}"),
-                role=TeamRole.BACKEND, status=TeamMember.Status.ACTIVE,
-            )
-        return project
-
-    def test_dev_stage_with_room_is_eligible(self):
-        project = self._project("Есть место", ProjectStageKey.BACKEND, team_size=3)
-        self.assertIn(project, services.eligible_projects())
-
-    def test_full_team_is_not_eligible(self):
-        project = self._project("Полная команда", ProjectStageKey.BACKEND, team_size=4)
-        self.assertNotIn(project, services.eligible_projects())
-
-    def test_staging_stage_is_not_eligible(self):
-        project = self._project("На тестовом", ProjectStageKey.STAGING, team_size=1)
-        self.assertNotIn(project, services.eligible_projects())
-
-    def test_paused_project_is_not_eligible(self):
-        project = self._project(
-            "На паузе", ProjectStageKey.BACKEND, team_size=1, status=ProjectStatus.PAUSED,
-        )
-        self.assertNotIn(project, services.eligible_projects())
-
-    def test_left_members_do_not_count_toward_team_size(self):
-        project = Project.objects.create(
-            name="С вышедшими", status=ProjectStatus.ACTIVE, current_stage=ProjectStageKey.BACKEND,
-        )
-        for i in range(5):
-            TeamMember.objects.create(
-                project=project, intern=Intern.objects.create(full_name=f"Вышедший {i}"),
-                role=TeamRole.BACKEND, status=TeamMember.Status.LEFT,
-            )
-        self.assertIn(project, services.eligible_projects())
-
-
-class JoinGraduateToProjectTests(TestCase):
-    def setUp(self):
-        self.spec = Specialization.objects.create(name="Backend")
-        self.project = Project.objects.create(name="Новый проект")
-        self.intern = Intern.objects.create(
-            full_name="Выпускник Тестов", specialization=self.spec,
-            status=InternStatus.READY, graduate_status=GraduateStatus.PENDING,
-        )
-
-    def test_creates_active_membership_with_role_from_specialization(self):
-        member = services.join_graduate_to_project(self.intern, self.project)
-        self.assertEqual(member.role, TeamRole.BACKEND)
-        self.assertEqual(member.status, TeamMember.Status.ACTIVE)
-        self.assertEqual(member.project, self.project)
-
-    def test_clears_graduate_status_and_activates(self):
-        services.join_graduate_to_project(self.intern, self.project)
-        self.intern.refresh_from_db()
-        self.assertEqual(self.intern.graduate_status, "")
-        self.assertEqual(self.intern.status, InternStatus.ACTIVE)
-
-    def test_logs_to_audit(self):
-        from apps.audit.models import AuditLog
-
-        services.join_graduate_to_project(self.intern, self.project)
-        entry = AuditLog.objects.get(
-            object_type="Intern", object_id=str(self.intern.pk),
-            action="Статус выпускника снят",
-        )
-        self.assertIn("Новый проект", entry.reason)
-        self.assertIn("бот-выпускник", entry.reason)
-
-    def test_creates_notification_for_head_feed(self):
-        from apps.notifications.models import Notification
-
-        services.join_graduate_to_project(self.intern, self.project)
-        notification = Notification.objects.get(
-            dedup_key=f"graduate-continued:{self.intern.pk}:{self.project.pk}",
-        )
-        self.assertIsNone(notification.intern)
-        self.assertIn("Выпускник Тестов", notification.title)
-        self.assertIn("Новый проект", notification.title)
 
 
 class CompletedProjectsTests(TestCase):
@@ -536,7 +478,7 @@ class WaitingForNextInternshipTests(TestCase):
         services.request_next_internship(self.grad, 777)
         self.grad.refresh_from_db()
         text = services.resolved_status_message(self.grad)
-        self.assertIn("ближайшую стажировку", text)
+        self.assertIn("базе ожидания", text)
 
     def test_activity_page_shows_waiting(self):
         services.request_next_internship(self.grad, 777)
@@ -600,3 +542,164 @@ class BotTimeoutsTests(TestCase):
         self.assertGreaterEqual(apihelper.CONNECT_TIMEOUT, 30)
         self.assertGreaterEqual(apihelper.READ_TIMEOUT, 60)
         self.assertTrue(apihelper.RETRY_ON_ERROR)
+
+
+class RulesAcceptanceTests(TestCase):
+    """Правила читают один раз: отметка о чате переносится в карточку
+    при входе в аккаунт."""
+
+    def setUp(self):
+        from apps.graduate_bot import services as bot_services
+
+        bot_services._rules_accepted.clear()
+
+    def test_rules_not_accepted_by_default(self):
+        self.assertFalse(services.rules_accepted(555))
+
+    def test_accept_is_remembered_for_chat(self):
+        services.accept_rules(555)
+        self.assertTrue(services.rules_accepted(555))
+
+    def test_acceptance_lands_in_card_on_login(self):
+        person = Intern.objects.create(
+            full_name="Ознакомленный", graduate_status=GraduateStatus.PENDING,
+        )
+        services.accept_rules(555)
+        services.remember_chat_id(person, 555)
+        person.refresh_from_db()
+        self.assertIsNotNone(person.rules_accepted_at)
+        self.assertEqual(person.telegram_chat_id, 555)
+
+    def test_card_mark_survives_bot_restart(self):
+        from django.utils import timezone
+
+        person = Intern.objects.create(
+            full_name="Старый знакомый", rules_accepted_at=timezone.now(),
+        )
+        # перезапуск бота — память о чатах пустая
+        from apps.graduate_bot import services as bot_services
+
+        bot_services._rules_accepted.clear()
+        self.assertTrue(services.rules_accepted(777, person))
+
+
+class OneAccountPerChatTests(TestCase):
+    """Один Telegram — один выпускник: за другого войти нельзя."""
+
+    def setUp(self):
+        self.first = Intern.objects.create(full_name="Первый Вошедший", telegram_chat_id=900)
+        self.second = Intern.objects.create(full_name="Второй Желающий")
+
+    def test_other_person_is_detected(self):
+        taken = services.chat_taken_by_other(self.second, 900)
+        self.assertEqual(taken, self.first)
+
+    def test_own_chat_is_free(self):
+        self.assertIsNone(services.chat_taken_by_other(self.first, 900))
+
+    def test_new_chat_is_free(self):
+        self.assertIsNone(services.chat_taken_by_other(self.second, 901))
+
+
+class NotifyProjectAssignedTests(TestCase):
+    """Ждавшему сообщаем, что место нашлось — это обещал бот."""
+
+    def setUp(self):
+        self.spec = Specialization.objects.create(name="Backend")
+        self.project = Project.objects.create(name="Новый проект")
+        self.person = Intern.objects.create(
+            full_name="Ждавший Места", specialization=self.spec,
+            telegram_chat_id=321, graduate_status=GraduateStatus.WAITING,
+        )
+
+    def test_message_names_project(self):
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            services.notify_project_assigned(self.person, self.project)
+        self.assertTrue(send.called)
+        chat_id, text = send.call_args[0][0], send.call_args[0][1]
+        self.assertEqual(chat_id, 321)
+        self.assertIn("Новый проект", text)
+
+    def test_lead_contact_included(self):
+        lead = Intern.objects.create(full_name="Тимлид Бэкенд", specialization=self.spec, phone="0700112233")
+        TeamMember.objects.create(
+            project=self.project, intern=lead, role=TeamRole.TEAM_LEAD,
+            status=TeamMember.Status.ACTIVE,
+        )
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            services.notify_project_assigned(self.person, self.project)
+        text = send.call_args[0][1]
+        self.assertIn("Тимлид Бэкенд", text)
+        self.assertIn("0700112233", text)
+
+    def test_person_without_chat_is_skipped(self):
+        self.person.telegram_chat_id = None
+        self.person.save(update_fields=["telegram_chat_id"])
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            services.notify_project_assigned(self.person, self.project)
+        self.assertFalse(send.called)
+
+    def test_telegram_failure_does_not_break_assignment(self):
+        with mock.patch("apps.graduate_bot.bot.bot.send_message", side_effect=Exception("boom")):
+            services.notify_project_assigned(self.person, self.project)  # не падаем
+
+
+class AssignmentFromPlatformTests(TestCase):
+    """Распределение со страницы «Ожидают проект» — с сообщением в бота."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(user)
+        self.spec = Specialization.objects.create(name="Backend")
+        self.project = Project.objects.create(name="Новый проект")
+        self.person = Intern.objects.create(
+            full_name="Ждавший Места", specialization=self.spec,
+            telegram_chat_id=321, graduate_status=GraduateStatus.WAITING,
+            status=InternStatus.READY,
+        )
+
+    def test_waiting_page_lists_person(self):
+        from django.urls import reverse
+
+        response = self.client.get(reverse("interns:waiting"))
+        self.assertContains(response, "Ждавший Места")
+        self.assertContains(response, reverse("interns:project_add", args=[self.person.pk]))
+
+    def test_assignment_notifies_and_clears_status(self):
+        from django.urls import reverse
+
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            self.client.post(
+                reverse("interns:project_add", args=[self.person.pk]),
+                {"project": self.project.pk, "workload": 100},
+            )
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.graduate_status, "")
+        self.assertTrue(send.called)
+        self.assertIn("Новый проект", send.call_args[0][1])
+
+    def test_page_empty_when_nobody_waits(self):
+        from django.urls import reverse
+
+        self.person.graduate_status = GraduateStatus.PENDING
+        self.person.save(update_fields=["graduate_status"])
+        response = self.client.get(reverse("interns:waiting"))
+        self.assertContains(response, "Сейчас никто не ждёт проект")
+
+
+class RockPaperScissorsTests(TestCase):
+    """Мини-игра для тех, кто ждёт проект."""
+
+    def test_moves_cover_all_three(self):
+        from apps.graduate_bot import bot as botmod
+
+        self.assertEqual(set(botmod.GAME_MOVES.values()), {"rock", "scissors", "paper"})
+
+    def test_every_move_beats_exactly_one(self):
+        from apps.graduate_bot import bot as botmod
+
+        self.assertEqual(botmod.GAME_BEATS["rock"], "scissors")
+        self.assertEqual(botmod.GAME_BEATS["scissors"], "paper")
+        self.assertEqual(botmod.GAME_BEATS["paper"], "rock")

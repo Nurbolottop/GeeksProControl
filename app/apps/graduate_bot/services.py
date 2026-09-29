@@ -16,20 +16,10 @@ from datetime import timedelta
 from django.utils import timezone
 
 from apps.interns.models import GraduateStatus, Intern, ResumeBankStatus
-from apps.projects.models import Project, ProjectStageKey, ProjectStatus
+from apps.projects.models import Project, ProjectStatus
 from apps.teams.models import TeamMember, TeamRole
 
 logger = logging.getLogger(__name__)
-
-# Этапы «до разработки включительно» — на этих этапах команда ещё
-# набирается или дорабатывается, есть смысл предлагать проект выпускнику.
-# Со «Тестового сервера» и дальше команда уже укомплектована для сдачи.
-ROOM_STAGES = [
-    ProjectStageKey.NEW, ProjectStageKey.DOCUMENTS, ProjectStageKey.REQUIREMENTS,
-    ProjectStageKey.TEAM_FORMING, ProjectStageKey.DESIGN,
-    ProjectStageKey.BACKEND, ProjectStageKey.FRONTEND, ProjectStageKey.MOBILE_DEV,
-]
-MAX_TEAM_SIZE_WITH_ROOM = 4
 
 # Сколько попыток подряд неверного телефона допускаем, прежде чем
 # заблокировать проверку для этого человека (защита от подбора телефона
@@ -37,18 +27,40 @@ MAX_TEAM_SIZE_WITH_ROOM = 4
 PHONE_ATTEMPTS_LIMIT = 3
 PHONE_LOCK_MINUTES = 30
 
+# Чаты, где правила прочитали, но в аккаунт ещё не вошли: связать отметку
+# не с чем, в карточку она уходит при входе. Живёт до перезапуска бота —
+# в худшем случае человек прочитает правила ещё раз.
+_rules_accepted: set[int] = set()
+
+
+def _name_words(value: str) -> list[str]:
+    """Слова имени в сравнимом виде: без регистра, без «ё» и лишних знаков."""
+    lowered = (value or '').lower().replace('ё', 'е')
+    return [word for word in re.split(r'[^0-9a-zA-Zа-я]+', lowered) if word]
+
 
 def find_graduates(name: str, limit: int = 5) -> list[Intern]:
-    """Выпускники «на проверке» или «не хочет продолжать» с похожим ФИО."""
+    """Выпускники с похожим ФИО.
+
+    Люди пишут как придётся: «Иванов Иван», «Иван Иванов», одно имя, с
+    опечаткой в регистре или через «ё». Поэтому сравниваем по словам и в
+    любом порядке: подходит тот, у кого нашлись все введённые слова —
+    целиком или как начало слова в карточке («Саид» → «Саидахмад»).
+    """
     from apps.interns.services import graduated_interns
 
-    name = name.strip()
-    if not name:
+    words = _name_words(name)
+    if not words:
         return []
-    return [
-        intern for intern in graduated_interns()
-        if name.lower() in intern.full_name.lower()
-    ][:limit]
+
+    def matches(intern: Intern) -> bool:
+        stored = _name_words(intern.full_name)
+        return all(
+            any(word == part or part.startswith(word) for part in stored)
+            for word in words
+        )
+
+    return [intern for intern in graduated_interns() if matches(intern)][:limit]
 
 
 def _digits(value: str) -> str:
@@ -110,17 +122,50 @@ def lock_phone_verification(intern: Intern) -> None:
 
 def remember_chat_id(intern: Intern, chat_id: int) -> None:
     """Запоминаем chat_id — нужен, чтобы потом писать выпускнику
-    проактивно (решение по банку резюме), а не только в ответ."""
-    if intern.telegram_chat_id == chat_id:
-        return
-    intern.telegram_chat_id = chat_id
-    intern.save(update_fields=['telegram_chat_id', 'updated_at'])
+    проактивно (решение по банку резюме, распределение на проект), а не
+    только в ответ. Заодно переносим в карточку отметку о правилах:
+    до входа в аккаунт её некуда было записать."""
+    from django.utils import timezone
+
+    fields = []
+    if intern.telegram_chat_id != chat_id:
+        intern.telegram_chat_id = chat_id
+        fields.append('telegram_chat_id')
+    if chat_id in _rules_accepted and not intern.rules_accepted_at:
+        intern.rules_accepted_at = timezone.now()
+        fields.append('rules_accepted_at')
+    if fields:
+        intern.save(update_fields=fields + ['updated_at'])
+
+
+def chat_taken_by_other(intern: Intern, chat_id: int) -> Intern | None:
+    """Не занят ли этот Telegram другим выпускником.
+
+    Один аккаунт на один чат: иначе с одного телефона можно было бы
+    «войти» за разных людей и распорядиться чужим выбором.
+    """
+    other = Intern.objects.filter(telegram_chat_id=chat_id).exclude(pk=intern.pk).first()
+    return other
 
 
 def find_by_chat_id(chat_id: int) -> Intern | None:
     """Кого уже проверяли по телефону в этом чате — чтобы повторный
     /start не переспрашивал ФИО и телефон заново."""
     return Intern.objects.filter(telegram_chat_id=chat_id).order_by('-updated_at').first()
+
+
+def accept_rules(chat_id: int) -> None:
+    """Человек нажал «Я ознакомлен». Пока он не вошёл в аккаунт, знать,
+    кто это, мы не можем — поэтому запоминаем сам чат, а в карточку
+    отметка попадёт при входе (см. remember_chat_id)."""
+    _rules_accepted.add(chat_id)
+
+
+def rules_accepted(chat_id: int, intern: Intern | None = None) -> bool:
+    """Читал ли этот человек правила — в текущем запуске бота или раньше."""
+    if chat_id in _rules_accepted:
+        return True
+    return bool(intern and intern.rules_accepted_at)
 
 
 def resolved_status_message(intern: Intern) -> str:
@@ -144,8 +189,9 @@ def resolved_status_message(intern: Intern) -> str:
         )
     if intern.graduate_status == GraduateStatus.WAITING:
         return (
-            f'Здравствуйте, {intern.full_name}! Вы записаны на ближайшую '
-            'стажировку — напишем здесь, как появится место на проекте.'
+            f'Здравствуйте, {intern.full_name}! Вы в базе ожидания '
+            'следующего проекта — как появится место, вас добавят в '
+            'команду и я напишу сюда.\n\nА пока можем сыграть 🙂'
         )
     return f'Здравствуйте, {intern.full_name}! Вы уже продолжаете стажировку в GeeksPro.'
 
@@ -200,7 +246,7 @@ def submit_to_resume_bank(intern: Intern, chat_id: int) -> bool:
     уходит руководителю на проверку (apps.interns.views.resume_bank_approve/
     resume_bank_revise).
 
-    Также снимаем ``graduate_status`` (как и join_graduate_to_project) —
+    Также снимаем ``graduate_status`` (как и распределение на проект) —
     без этого человек оставался бы в find_graduates() и мог заново пройти
     /start и повторно нажать подтверждение, откатив уже принятое решение
     руководителя обратно на «Ожидает проверки». Если резюме уже приняли
@@ -264,68 +310,33 @@ def notify_resume_bank_decision(intern: Intern, *, approved: bool, comment: str 
         logger.exception('Не удалось отправить решение по банку резюме в Telegram (intern=%s)', intern.pk)
 
 
-def eligible_projects() -> list[Project]:
-    """Проекты, где ещё есть место: этап не дальше разработки и в
-    команде меньше 4 активных участников (правило заказчика)."""
-    candidates = (
-        Project.objects.filter(
-            status=ProjectStatus.ACTIVE, current_stage__in=ROOM_STAGES,
+def notify_project_assigned(intern: Intern, project: Project) -> None:
+    """Ждавшего распределили на проект — сообщаем ему об этом в Telegram.
+
+    Обещание «как появится место, вас добавят» должно выполняться само:
+    руководитель распределяет человека в системе, сообщение уходит без
+    его участия.
+    """
+    if not intern.telegram_chat_id:
+        return
+    lead = team_lead_contact(project, intern)
+    if lead:
+        contact = lead.phone or lead.telegram or 'контакты уточните у руководителя'
+        lead_line = f'\n\nВаш тимлид — {lead.full_name} ({contact}). Напишите ему(ей), чтобы договориться о старте.'
+    else:
+        lead_line = '\n\nТимлид пока не назначен — с вами свяжется руководитель GeeksPro.'
+    text = (
+        f'🎉 {intern.full_name}, для вас нашлось место! '
+        f'Вы добавлены в проект «{project.name}».{lead_line}'
+    )
+    try:
+        from apps.graduate_bot.bot import bot
+
+        bot.send_message(intern.telegram_chat_id, text)
+    except Exception:
+        logger.exception(
+            'Не удалось сообщить о распределении в Telegram (intern=%s)', intern.pk,
         )
-        .order_by('name')
-    )
-    return [
-        project for project in candidates
-        if project.team_members.filter(status=TeamMember.Status.ACTIVE).count()
-        < MAX_TEAM_SIZE_WITH_ROOM
-    ]
-
-
-def join_graduate_to_project(intern: Intern, project: Project, *, source: str = 'бот-выпускник') -> TeamMember:
-    """Выпускник сам выбрал проект — добавляем в команду, снимаем статус
-    выпускника, оставляем след в истории (как при ручном переводе,
-    apps/interns/views.py::intern_project_add)."""
-    from django.utils import timezone
-
-    from apps.audit.services import log as audit_log
-    from apps.interns.models import InternStatus
-    from apps.teams.forms import ROLE_BY_SPECIALIZATION
-
-    spec = intern.specialization
-    member = TeamMember.objects.create(
-        project=project, intern=intern,
-        group=getattr(project, 'group', None),
-        role=ROLE_BY_SPECIALIZATION.get(spec.name if spec else '', TeamRole.OTHER),
-        status=TeamMember.Status.ACTIVE,
-        joined_at=timezone.localdate(),
-    )
-    update_fields = []
-    if intern.status != InternStatus.ACTIVE:
-        intern.status = InternStatus.ACTIVE
-        update_fields.append('status')
-    if intern.graduate_status:
-        audit_log(
-            intern, 'Статус выпускника снят',
-            old_value=intern.get_graduate_status_display(),
-            reason=f'{source}: сам выбрал(а) проект «{project.name}»',
-        )
-        intern.graduate_status = ''
-        update_fields.append('graduate_status')
-    if update_fields:
-        intern.save(update_fields=[*update_fields, 'updated_at'])
-    # intern=None — в общую ленту руководителя, как и уведомление о
-    # заявке в банк резюме: он должен узнавать о решении выпускника,
-    # не заходя специально проверять список «Выпускники».
-    from apps.notifications.models import NotificationLevel
-    from apps.notifications.services import notify
-
-    notify(
-        f'{intern.full_name} продолжает стажировку: «{project.name}»',
-        level=NotificationLevel.SUCCESS,
-        description='Выпускник сам выбрал проект через бота и уже добавлен в команду.',
-        url=intern.get_absolute_url(),
-        dedup_key=f'graduate-continued:{intern.pk}:{project.pk}',
-    )
-    return member
 
 
 def team_lead_contact(project: Project, intern: Intern) -> Intern | None:

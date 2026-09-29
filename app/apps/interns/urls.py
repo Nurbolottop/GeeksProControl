@@ -39,6 +39,7 @@ urlpatterns = [
         name='resume_bank_revise',
     ),
     path('graduates/', views.graduates_list, name='graduates'),
+    path('waiting/', views.waiting_list, name='waiting'),
     path('<int:pk>/', views.intern_detail, name='detail'),
     path('<int:pk>/edit/', views.intern_update, name='update'),
     path('<int:pk>/evaluate/', views.evaluation_add, name='evaluate'),

@@ -385,6 +385,7 @@ def intern_project_add(request, pk):
         if intern.status in (InternStatus.WAITING, InternStatus.READY):
             intern.status = InternStatus.ACTIVE
             update_fields.append('status')
+        was_waiting = intern.graduate_status == GraduateStatus.WAITING
         if intern.graduate_status:
             from apps.audit.services import log as audit_log
 
@@ -398,6 +399,11 @@ def intern_project_add(request, pk):
             update_fields.append('graduate_status')
         if update_fields:
             intern.save(update_fields=[*update_fields, 'updated_at'])
+        if was_waiting:
+            # Человек ждал места и ему это обещали в боте — сообщаем сами.
+            from apps.graduate_bot.services import notify_project_assigned
+
+            notify_project_assigned(intern, member.project)
         messages.success(
             request, f'{intern.full_name} добавлен(а) в «{member.project.name}».',
         )
@@ -703,6 +709,22 @@ def graduates_list(request):
         'ResumeBankStatus': ResumeBankStatus,
         'filter_label': _graduate_filter_label(filters, people),
         'total_count': len(people),
+    })
+
+
+@login_required
+def waiting_list(request):
+    """«Ожидают проект» — кто сам записался через бота и ждёт распределения.
+
+    Отсюда руководитель ставит человека на проект: после назначения бот
+    сам пишет ему, что место нашлось (apps.interns.views.intern_project_add).
+    """
+    people = [
+        person for person in services.graduated_interns()
+        if person.graduate_status == GraduateStatus.WAITING
+    ]
+    return render(request, 'interns/waiting_list.html', {
+        'people': people, 'title': 'Ожидают проект',
     })
 
 

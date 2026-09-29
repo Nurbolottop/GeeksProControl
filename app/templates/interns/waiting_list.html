@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} — GeeksPro Control{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ title }}</h1>
+        <div class="sub">
+            Выпускники, которые через бота выбрали «Продолжить стажировку».
+            Поставьте человека на проект — бот сам сообщит ему, что место нашлось.
+        </div>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'interns:graduates' %}" class="btn btn--secondary">Все выпускники</a>
+    </div>
+</div>
+
+<div class="panel" style="padding: 0;">
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+            <tr>
+                <th>ФИО</th>
+                <th>Направление</th>
+                <th>Последний проект</th>
+                <th>Дата выпуска</th>
+                <th>Телефон</th>
+                <th>Действия</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for person in people %}
+                <tr>
+                    <td><a href="{{ person.get_absolute_url }}"><strong>{{ person.full_name }}</strong></a></td>
+                    <td>{{ person.specialization|default:'—' }}</td>
+                    <td>{{ person.graduated_project|default:'—' }}</td>
+                    <td>{{ person.graduated_at|date:'d.m.Y'|default:'—' }}</td>
+                    <td>{{ person.phone|default:'—' }}</td>
+                    <td>
+                        <a href="{% url 'interns:project_add' person.pk %}" class="btn btn--sm">Распределить на проект</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="empty" style="text-align:center; padding: 24px;">
+                        Сейчас никто не ждёт проект.
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
