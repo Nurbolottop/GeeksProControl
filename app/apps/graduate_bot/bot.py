@@ -49,6 +49,17 @@ else:
 # трогает остальные проекты на этом сервере.
 urllib3_connection.HAS_IPV6 = False
 
+# До Telegram с этого сервера идём через прокси, и он медленный: обычный
+# ответ приходит за 5–15 секунд, иногда дольше. Стандартных таймаутов
+# библиотеки (15/30 сек) на это не хватает — сообщение выпускнику просто
+# не уходит. Даём запас и разрешаем повтор: лучше ответить с задержкой,
+# чем не ответить совсем.
+apihelper.CONNECT_TIMEOUT = 30
+apihelper.READ_TIMEOUT = 60
+apihelper.RETRY_ON_ERROR = True
+apihelper.RETRY_TIMEOUT = 3
+apihelper.MAX_RETRIES = 3
+
 bot = telebot.TeleBot(settings.TELEGRAM_BOT_TOKEN)
 
 CONTINUE_BUTTON = 'Продолжить стажировку'

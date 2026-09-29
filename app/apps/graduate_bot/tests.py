@@ -576,3 +576,27 @@ class WaitingGraduatesPageTests(TestCase):
         response = self.client.get(reverse("interns:graduates") + "?status=waiting")
         self.assertContains(response, "Эркинбаев Нурболот")
         self.assertContains(response, "Ждёт проект")
+
+
+class BotTimeoutsTests(TestCase):
+    """Через медленный прокси дорога до Telegram занимает 5–15 секунд:
+    бюджет запроса должен быть заметно больше времени удержания
+    соединения, иначе каждый опрос падает и бот выглядит молчащим."""
+
+    def test_request_budget_is_bigger_than_long_polling(self):
+        import inspect
+
+        from apps.graduate_bot.management.commands import run_graduate_bot
+
+        source = inspect.getsource(run_graduate_bot.Command.handle)
+        self.assertIn("timeout=45", source)
+        self.assertIn("long_polling_timeout=10", source)
+
+    def test_api_timeouts_have_headroom(self):
+        from telebot import apihelper
+
+        from apps.graduate_bot import bot  # noqa: F401 — настройки ставятся при импорте
+
+        self.assertGreaterEqual(apihelper.CONNECT_TIMEOUT, 30)
+        self.assertGreaterEqual(apihelper.READ_TIMEOUT, 60)
+        self.assertTrue(apihelper.RETRY_ON_ERROR)

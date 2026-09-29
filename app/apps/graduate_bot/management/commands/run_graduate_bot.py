@@ -37,7 +37,16 @@ class Command(BaseCommand):
         delay = RETRY_START_SECONDS
         while True:
             try:
-                bot.polling(non_stop=False, skip_pending=True, timeout=20, long_polling_timeout=20)
+                # timeout — наш бюджет на запрос (столько ждём ответа),
+                # long_polling_timeout — сколько Telegram держит соединение
+                # открытым. Второе должно быть заметно меньше первого:
+                # через медленный прокси дорога туда-обратно съедает
+                # 5–15 секунд, и при равных значениях каждый опрос падал
+                # по ReadTimeout, а бот выглядел молчащим.
+                bot.polling(
+                    non_stop=False, skip_pending=True,
+                    timeout=45, long_polling_timeout=10,
+                )
             except Exception as exc:  # noqa: BLE001 — бот должен пережить любой сбой связи
                 message = _hide_token(str(exc))
                 self.stderr.write(self.style.WARNING(
