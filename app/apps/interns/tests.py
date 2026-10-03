@@ -1738,3 +1738,40 @@ class PositionPromotionTests(TestCase):
         call_command("backfill_positions", apply=True, stdout=StringIO())
         self.person.refresh_from_db()
         self.assertEqual(self.person.position, "lead")
+
+
+class PastProjectsLabelTests(TestCase):
+    """«Прошлые проекты» — это проекты, где человек больше не в команде.
+    Сам проект при этом может идти дальше: заголовок не должен врать,
+    что он завершён."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project, ProjectStatus
+        from apps.teams.models import TeamMember, TeamRole
+
+        user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(user)
+        self.person = Intern.objects.create(full_name="Темирбаева Луиза")
+        self.running = Project.objects.create(name="ArtDream")
+        self.done = Project.objects.create(
+            name="Балажан", status=ProjectStatus.COMPLETED,
+        )
+        for project in (self.running, self.done):
+            TeamMember.objects.create(
+                project=project, intern=self.person, role=TeamRole.BACKEND,
+                status=TeamMember.Status.LEFT,
+            )
+
+    def test_section_is_called_past_not_completed(self):
+        response = self.client.get(self.person.get_absolute_url())
+        self.assertContains(response, "Прошлые проекты")
+        self.assertNotContains(response, "Завершённые проекты")
+
+    def test_running_project_marked_as_left_team(self):
+        response = self.client.get(self.person.get_absolute_url())
+        self.assertContains(response, "вышел(а) из команды")
+
+    def test_finished_project_marked_as_delivered(self):
+        response = self.client.get(self.person.get_absolute_url())
+        self.assertContains(response, "проект сдан")
