@@ -2,8 +2,8 @@
 from decimal import Decimal
 
 from apps.interns.models import (
-    GraduateStatus, Intern, InternEvaluation, InternStatus, ProfileFormLink,
-    ResumeBankStatus,
+    GraduateStatus, Intern, InternEvaluation, InternStatus, Position,
+    ProfileFormLink, ResumeBankStatus,
 )
 
 
@@ -375,3 +375,61 @@ def join_project_from_form(intern: Intern, link: ProfileFormLink):
             ])),
         )
     return member
+
+
+def promote_to_lead(intern: Intern, user=None) -> bool:
+    """Повысить человека до тимлида — должность, а не роль на проекте.
+
+    Тимлидом он становится сразу на всех своих текущих проектах, а на
+    будущих роль подставляется сама (apps.teams.forms). Возвращает False,
+    если он уже тимлид.
+    """
+    from apps.audit.services import log as audit_log
+    from apps.teams.models import TeamMember, TeamRole
+
+    if intern.position == Position.TEAM_LEAD:
+        return False
+    was = intern.get_position_display()
+    intern.position = Position.TEAM_LEAD
+    intern.save(update_fields=['position', 'updated_at'])
+    changed = TeamMember.objects.filter(
+        intern=intern, status=TeamMember.Status.ACTIVE,
+    ).exclude(role=TeamRole.TEAM_LEAD)
+    projects = [member.project.name for member in changed.select_related('project')]
+    # Каждого сохраняем по отдельности: на post_save висит занесение
+    # тимлида в резерв кадров (apps.reserve.signals).
+    for member in changed:
+        member.role = TeamRole.TEAM_LEAD
+        member.save(update_fields=['role', 'updated_at'])
+    audit_log(
+        intern, 'Повышен(а) до тимлида', old_value=was, new_value='Тимлид',
+        reason='на проектах: ' + (', '.join(projects) or 'пока без проектов'),
+        user=user,
+    )
+    return True
+
+
+def demote_from_lead(intern: Intern, user=None) -> bool:
+    """Снять с должности тимлида — обратно в стажёры.
+
+    На текущих проектах роль возвращается к направлению человека, иначе
+    он остался бы тимлидом там, где уже им не является.
+    """
+    from apps.audit.services import log as audit_log
+    from apps.teams.forms import ROLE_BY_SPECIALIZATION
+    from apps.teams.models import TeamMember, TeamRole
+
+    if intern.position != Position.TEAM_LEAD:
+        return False
+    intern.position = Position.INTERN
+    intern.save(update_fields=['position', 'updated_at'])
+    spec = intern.specialization
+    role = ROLE_BY_SPECIALIZATION.get(spec.name if spec else '', TeamRole.OTHER)
+    TeamMember.objects.filter(
+        intern=intern, status=TeamMember.Status.ACTIVE, role=TeamRole.TEAM_LEAD,
+    ).update(role=role)
+    audit_log(
+        intern, 'Снят(а) с должности тимлида',
+        old_value='Тимлид', new_value='Стажёр', user=user,
+    )
+    return True

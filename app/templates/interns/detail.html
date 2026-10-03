@@ -29,6 +29,23 @@
                 {% if intern.user %}Сбросить пароль{% else %}Выдать доступ тимлида{% endif %}
             </a>
         {% endif %}
+        {% if not intern.is_archived %}
+            {% if intern.position == 'lead' %}
+                <form method="post" action="{% url 'interns:demote_lead' intern.pk %}" style="margin:0"
+                      data-confirm="Снять {{ intern.full_name|escapejs }} с должности тимлида? На своих проектах он(а) вернётся к своему направлению."
+                      data-confirm-ok="Снять с тимлида">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--secondary">Снять с тимлида</button>
+                </form>
+            {% else %}
+                <form method="post" action="{% url 'interns:promote_lead' intern.pk %}" style="margin:0"
+                      data-confirm="Повысить {{ intern.full_name|escapejs }} до тимлида? Он(а) станет тимлидом на всех своих текущих проектах и на будущих тоже."
+                      data-confirm-ok="Повысить до тимлида">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn--secondary">Повысить до тимлида</button>
+                </form>
+            {% endif %}
+        {% endif %}
         <a href="{% url 'interns:update' intern.pk %}" class="btn btn--secondary">Редактировать</a>
         {% if not intern.is_archived %}
             {% if intern.status == 'paused' %}
@@ -132,15 +149,6 @@
                 — {{ member.get_role_display }}
             </div>
             <div style="display:flex; gap:8px; align-items:center">
-                {% if member.role != 'team_lead' %}
-                    <form method="post" action="{% url 'teams:lead_add' %}" style="margin:0">
-                        {% csrf_token %}
-                        <input type="hidden" name="project" value="{{ member.project_id }}">
-                        <input type="hidden" name="intern" value="{{ intern.pk }}">
-                        <input type="hidden" name="next" value="{{ intern.get_absolute_url }}">
-                        <button type="submit" class="btn btn--secondary btn--sm">Сделать тимлидом</button>
-                    </form>
-                {% endif %}
                 <form method="post" action="{% url 'interns:project_remove' intern.pk member.pk %}" style="margin:0"
                       data-confirm="Убрать {{ intern.full_name|escapejs }} с проекта «{{ member.project.name|escapejs }}»?"
                       data-confirm-reasons='[["self","Сам ушёл"],["unresponsive","Не отвечает"],["not_fit","Не подошёл"],["other","Другое"]]'>

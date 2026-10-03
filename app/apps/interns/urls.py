@@ -53,6 +53,8 @@ urlpatterns = [
         '<int:pk>/grant-lead-access/', views.grant_lead_access,
         name='grant_lead_access',
     ),
+    path('<int:pk>/promote-lead/', views.intern_promote_lead, name='promote_lead'),
+    path('<int:pk>/demote-lead/', views.intern_demote_lead, name='demote_lead'),
     path('<int:pk>/project/add/', views.intern_project_add, name='project_add'),
     path(
         '<int:pk>/project/<int:member_pk>/remove/', views.intern_project_remove,

@@ -575,8 +575,8 @@ class LeadSectionTests(TestCase):
 
 
 class InternDetailLeadPromotionTests(TestCase):
-    """Со страницы стажёра можно сразу сделать его тимлидом на проекте —
-    раньше это было можно только через отдельную страницу «Тимлиды»."""
+    """Со страницы человека его повышают до тимлида. Должность общая:
+    тимлидом он становится на всех своих проектах сразу."""
 
     def setUp(self):
         from apps.projects.services import create_project
@@ -596,19 +596,25 @@ class InternDetailLeadPromotionTests(TestCase):
             status=TeamMember.Status.ACTIVE,
         )
         response = self.client.get(self.person.get_absolute_url())
-        self.assertContains(response, "Сделать тимлидом")
+        self.assertContains(response, "Повысить до тимлида")
 
     def test_button_hidden_when_already_lead(self):
-        TeamMember.objects.create(
-            project=self.project, intern=self.person, role=TeamRole.TEAM_LEAD,
-            status=TeamMember.Status.ACTIVE,
-        )
+        self.person.position = "lead"
+        self.person.save(update_fields=["position"])
         response = self.client.get(self.person.get_absolute_url())
-        self.assertNotContains(response, "Сделать тимлидом")
+        self.assertNotContains(response, "Повысить до тимлида")
+        self.assertContains(response, "Снять с тимлида")
 
-    def test_promoting_from_intern_page_sets_lead_role_and_returns(self):
+    def test_assigning_lead_on_project_also_raises_position(self):
+        """Назначение тимлидом на проект — тоже повышение: иначе на
+        соседнем проекте человек остался бы обычным участником."""
+        second = Project.objects.create(name="Палароид")
         member = TeamMember.objects.create(
             project=self.project, intern=self.person, role=TeamRole.UXUI,
+            status=TeamMember.Status.ACTIVE,
+        )
+        other = TeamMember.objects.create(
+            project=second, intern=self.person, role=TeamRole.UXUI,
             status=TeamMember.Status.ACTIVE,
         )
         response = self.client.post(reverse("teams:lead_add"), {
@@ -617,7 +623,11 @@ class InternDetailLeadPromotionTests(TestCase):
         })
         self.assertRedirects(response, self.person.get_absolute_url())
         member.refresh_from_db()
+        other.refresh_from_db()
+        self.person.refresh_from_db()
         self.assertEqual(member.role, TeamRole.TEAM_LEAD)
+        self.assertEqual(other.role, TeamRole.TEAM_LEAD)
+        self.assertEqual(self.person.position, "lead")
 
 
 class PMSectionTests(TestCase):

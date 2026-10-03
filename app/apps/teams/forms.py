@@ -1,6 +1,7 @@
 from django import forms
 from django.utils import timezone
 
+from apps.interns.models import Position
 from apps.teams import services
 from apps.teams.models import TeamMember, TeamRole
 
@@ -87,6 +88,10 @@ class TeamMemberForm(forms.ModelForm):
             member.role = TeamRole.TEAM_LEAD
         elif role:
             member.role = role
+        elif member.intern and member.intern.position == Position.TEAM_LEAD:
+            # Должность человека сильнее направления: тимлид остаётся
+            # тимлидом и на новом проекте.
+            member.role = TeamRole.TEAM_LEAD
         else:
             spec = member.intern.specialization if member.intern else None
             member.role = ROLE_BY_SPECIALIZATION.get(

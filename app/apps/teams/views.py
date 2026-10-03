@@ -315,6 +315,11 @@ def lead_add(request):
         member.role = TeamRole.TEAM_LEAD
         member.save(update_fields=['role', 'updated_at'])
         made = True
+    # Тимлид — должность человека, а не роль в одной команде: назначили
+    # здесь — он тимлид и на остальных своих проектах.
+    from apps.interns.services import promote_to_lead
+
+    promote_to_lead(intern, user=request.user)
     if created_person:
         messages.success(request, f'{created_person} заведён(а) в базе.')
     messages.success(request, (

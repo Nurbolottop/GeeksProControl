@@ -84,14 +84,21 @@ def group_by_role(members, is_mobile: bool = False) -> list[dict]:
 def lead_intern_ids() -> set:
     """Кто из людей — тимлид. Тимлиды сотрудники, а не стажёры.
 
-    Используется везде, где считаются или показываются стажёры,
-    чтобы тимлиды в эти списки и цифры не попадали.
+    Источник истины — должность в карточке: тимлид остаётся тимлидом,
+    даже пока не назначен ни на один проект. Роль в команде смотрим
+    заодно — на случай назначений, сделанных до появления должности.
     """
-    return set(
+    from apps.interns.models import Intern, Position
+
+    by_position = set(
+        Intern.objects.filter(position=Position.TEAM_LEAD).values_list('pk', flat=True),
+    )
+    by_membership = set(
         TeamMember.objects.filter(role=TeamRole.TEAM_LEAD)
         .exclude(intern__isnull=True)
         .values_list('intern_id', flat=True),
     )
+    return by_position | by_membership
 
 
 def pm_intern_ids() -> set:

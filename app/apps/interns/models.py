@@ -38,6 +38,20 @@ class Branch(models.TextChoices):
     OSH = 'Ош', 'Ош'
 
 
+class Position(models.TextChoices):
+    """Должность человека у нас — свойство человека, а не проекта.
+
+    Повысили до тимлида — он тимлид везде: на всех своих проектах и на
+    всех будущих, пока его не снимут обратно или он не уйдёт. Раньше роль
+    жила только внутри команды, и на соседнем проекте тот же человек
+    снова оказывался обычным стажёром.
+    """
+
+    INTERN = 'intern', 'Стажёр'
+    TEAM_LEAD = 'lead', 'Тимлид'
+    PM = 'pm', 'Проект-менеджер'
+
+
 class GraduateStatus(models.TextChoices):
     """Куда делся стажёр после завершения проекта (ТЗ: разбор «Выпускников»).
 
@@ -125,6 +139,11 @@ class Intern(TimeStampedModel, ArchivableModel):
     )
     phone_lock_until = models.DateTimeField(
         'Бот-выпускник: блокировка проверки телефона до', null=True, blank=True,
+    )
+    position = models.CharField(
+        'Должность', max_length=10, choices=Position.choices,
+        default=Position.INTERN, db_index=True,
+        help_text='Тимлид остаётся тимлидом на всех проектах, пока его не снимут.',
     )
     # Правила бота человек читает один раз: дальше сразу вход в аккаунт.
     rules_accepted_at = models.DateTimeField(

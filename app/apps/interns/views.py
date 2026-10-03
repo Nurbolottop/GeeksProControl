@@ -14,6 +14,7 @@ from apps.interns.forms import (
 )
 from apps.interns.models import (
     AVAILABLE_STATUSES, GraduateStatus, Intern, InternEvaluation, InternStatus,
+    Position,
     ProfileFormLink, ProfileFormSubmission, ResumeBankStatus, TalentReserveCandidate,
 )
 from apps.teams.forms import ROLE_BY_SPECIALIZATION, InternProjectAddForm
@@ -324,11 +325,15 @@ def intern_detail(request, pk):
         m for m in memberships if m.status == TeamMember.Status.LEFT
     ]
     roles = {m.role for m in active_memberships}
-    is_lead = TeamRole.TEAM_LEAD in roles
+    # Должность — свойство человека: тимлид остаётся тимлидом, даже если
+    # сейчас не назначен ни на один проект.
+    is_lead = intern.position == Position.TEAM_LEAD or TeamRole.TEAM_LEAD in roles
     is_pm = TeamRole.PROJECT_MANAGER in roles
     was_lead = any(m.role == TeamRole.TEAM_LEAD for m in memberships)
-    if is_lead:
-        kind, kind_tone = 'Тимлид направления', 'orange'
+    if is_lead and intern.is_archived:
+        kind, kind_tone = 'Бывший тимлид', 'gray'
+    elif is_lead:
+        kind, kind_tone = 'Тимлид', 'orange'
     elif intern.is_archived and was_lead:
         kind, kind_tone = 'Бывший тимлид', 'gray'
     else:
@@ -363,6 +368,36 @@ def intern_detail(request, pk):
 
 
 @login_required
+def intern_promote_lead(request, pk):
+    """Повысить человека до тимлида — на всех его проектах сразу."""
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        if services.promote_to_lead(intern, user=request.user):
+            messages.success(
+                request,
+                f'{intern.full_name} теперь тимлид — на всех своих проектах '
+                'и на будущих тоже.',
+            )
+        else:
+            messages.info(request, f'{intern.full_name} уже тимлид.')
+    return redirect(intern.get_absolute_url())
+
+
+@login_required
+def intern_demote_lead(request, pk):
+    """Снять с должности тимлида — человек возвращается в стажёры."""
+    intern = get_object_or_404(Intern, pk=pk)
+    if request.method == 'POST':
+        if services.demote_from_lead(intern, user=request.user):
+            messages.success(
+                request, f'{intern.full_name} больше не тимлид.',
+            )
+        else:
+            messages.info(request, f'{intern.full_name} и так не тимлид.')
+    return redirect(intern.get_absolute_url())
+
+
+@login_required
 def intern_project_add(request, pk):
     """Добавить стажёра на проект прямо с его карточки."""
     intern = get_object_or_404(Intern, pk=pk)
@@ -375,10 +410,14 @@ def intern_project_add(request, pk):
     if request.method == 'POST' and form.is_valid():
         member = form.save(commit=False)
         member.group = getattr(member.project, 'group', None)
-        spec = intern.specialization
-        member.role = ROLE_BY_SPECIALIZATION.get(
-            spec.name if spec else '', TeamRole.OTHER,
-        )
+        if intern.position == Position.TEAM_LEAD:
+            # Тимлид остаётся тимлидом и на новом проекте.
+            member.role = TeamRole.TEAM_LEAD
+        else:
+            spec = intern.specialization
+            member.role = ROLE_BY_SPECIALIZATION.get(
+                spec.name if spec else '', TeamRole.OTHER,
+            )
         member.joined_at = timezone.localdate()
         member.save()
         update_fields = []

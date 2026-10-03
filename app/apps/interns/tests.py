@@ -74,7 +74,7 @@ class LeadsHiddenFromInternListTests(TestCase):
 
     def test_lead_badge_says_lead(self):
         response = self.client.get(self.lead.get_absolute_url())
-        self.assertEqual(response.context["kind"], "Тимлид направления")
+        self.assertEqual(response.context["kind"], "Тимлид")
 
 
 class PMsStayInInternListTests(TestCase):
@@ -1627,3 +1627,114 @@ class InternListAvailabilityTests(TestCase):
         self.assertEqual(labels["Выпускник"], "Выпускник")
         self.assertEqual(labels["Ожидает"], "Ожидает старта")
         self.assertContains(response, "Заморозка")
+
+
+class PositionPromotionTests(TestCase):
+    """Должность — свойство человека: повысили один раз, и он тимлид
+    на всех проектах, пока его не сняли."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.user = get_user_model().objects.create_user(username="head", password="x")
+        self.client.force_login(self.user)
+        self.frontend = Specialization.objects.create(name="Frontend")
+        self.person = Intern.objects.create(
+            full_name="Растущий Стажёр", specialization=self.frontend,
+        )
+        self.first = Project.objects.create(name="Олимпийская школа")
+        self.second = Project.objects.create(name="Палароид")
+        for project in (self.first, self.second):
+            TeamMember.objects.create(
+                project=project, intern=self.person, role=TeamRole.FRONTEND,
+                status=TeamMember.Status.ACTIVE,
+            )
+
+    def _promote(self):
+        return self.client.post(reverse("interns:promote_lead", args=[self.person.pk]))
+
+    def test_promotion_sets_position_and_all_projects(self):
+        from apps.teams.models import TeamMember, TeamRole
+
+        self._promote()
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.position, "lead")
+        roles = set(
+            TeamMember.objects.filter(intern=self.person).values_list("role", flat=True),
+        )
+        self.assertEqual(roles, {TeamRole.TEAM_LEAD})
+
+    def test_new_project_gets_lead_role_automatically(self):
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+
+        self._promote()
+        third = Project.objects.create(name="Новый проект")
+        self.client.post(
+            reverse("interns:project_add", args=[self.person.pk]),
+            {"project": third.pk, "workload": 100},
+        )
+        member = TeamMember.objects.get(intern=self.person, project=third)
+        self.assertEqual(member.role, TeamRole.TEAM_LEAD)
+
+    def test_demotion_returns_to_own_direction(self):
+        from apps.teams.models import TeamMember, TeamRole
+
+        self._promote()
+        self.client.post(reverse("interns:demote_lead", args=[self.person.pk]))
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.position, "intern")
+        roles = set(
+            TeamMember.objects.filter(intern=self.person).values_list("role", flat=True),
+        )
+        self.assertEqual(roles, {TeamRole.FRONTEND})
+
+    def test_card_shows_position_and_button(self):
+        response = self.client.get(self.person.get_absolute_url())
+        self.assertContains(response, "Повысить до тимлида")
+        self._promote()
+        response = self.client.get(self.person.get_absolute_url())
+        self.assertContains(response, "Снять с тимлида")
+        self.assertEqual(response.context["kind"], "Тимлид")
+
+    def test_lead_without_projects_is_not_counted_as_intern(self):
+        from apps.teams.selectors import staff_intern_ids
+
+        person = Intern.objects.create(full_name="Тимлид Без Проектов", position="lead")
+        self.assertIn(person.pk, staff_intern_ids())
+
+    def test_promotion_is_written_to_history(self):
+        from apps.audit.models import AuditLog
+
+        self._promote()
+        entry = AuditLog.objects.filter(
+            object_id=str(self.person.pk), action="Повышен(а) до тимлида",
+        ).first()
+        self.assertIsNotNone(entry)
+        self.assertIn("Олимпийская школа", entry.reason)
+
+    def test_second_promotion_changes_nothing(self):
+        self._promote()
+        response = self._promote()
+        self.assertEqual(response.status_code, 302)
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.position, "lead")
+
+    def test_backfill_command_sets_positions(self):
+        from io import StringIO
+
+        from django.core.management import call_command
+        from apps.teams.models import TeamMember, TeamRole
+
+        TeamMember.objects.filter(intern=self.person).update(role=TeamRole.TEAM_LEAD)
+        out = StringIO()
+        call_command("backfill_positions", stdout=out)
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.position, "intern")
+        self.assertIn("Будет изменено: 1", out.getvalue())
+        call_command("backfill_positions", apply=True, stdout=StringIO())
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.position, "lead")
