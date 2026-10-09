@@ -70,6 +70,7 @@ FINISH_BUTTON = 'Закончить стажировку'
 BANK_AGREE_BUTTON = 'Я согласен'
 BANK_SENT_BUTTON = 'Отправил заявку'
 PLAY_BUTTON = 'Играть'
+SHARE_PHONE_BUTTON = '📱 Отправить мой номер'
 
 RULES_TEXT = (
     '📋 О боте и правилах\n\n'
@@ -270,17 +271,39 @@ def handle_name_choice(message, ids):
     ask_phone(message, intern)
 
 
+def _share_phone_markup():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    markup.add(types.KeyboardButton(SHARE_PHONE_BUTTON, request_contact=True))
+    return markup
+
+
+def _own_contact_phone(message):
+    """Номер из кнопки «Отправить мой номер» — только свой собственный.
+
+    Telegram разрешает переслать и чужой контакт, поэтому сверяем, что
+    контакт принадлежит тому, кто пишет.
+    """
+    contact = getattr(message, 'contact', None)
+    if contact is None:
+        return None
+    if contact.user_id and contact.user_id != message.from_user.id:
+        return None
+    return contact.phone_number
+
+
 def ask_phone(message, intern):
     if not intern.phone:
-        # Иначе phone_matches() всегда вернёт False (сравнивать не с чем) —
-        # человек бесконечно «не проходит» проверку и получает блокировку,
-        # хотя дело не в номере, а в том, что его в базе просто нет.
+        # Телефона в базе нет — сверять не с чем. Просим поделиться
+        # контактом: Telegram отдаёт номер сам, в кнопке его не подделать.
         bot.send_message(
             message.chat.id,
-            f'{intern.full_name}, в базе не указан ваш номер телефона — '
-            'проверить личность автоматически не получится. Обратитесь к '
-            'руководителю GeeksPro, чтобы добавили номер, и начните снова: /start.',
-            reply_markup=types.ReplyKeyboardRemove(),
+            f'{intern.full_name}, вашего номера у нас в базе нет — '
+            'подтвердите личность кнопкой ниже. Telegram передаст номер '
+            'сам, вводить его руками не нужно.',
+            reply_markup=_share_phone_markup(),
+        )
+        bot.register_next_step_handler(
+            message, handle_shared_contact, intern_id=intern.pk,
         )
         return
     if services.is_phone_locked(intern):
@@ -294,11 +317,44 @@ def ask_phone(message, intern):
         return
     bot.send_message(
         message.chat.id,
-        f'{intern.full_name}, теперь введите ваш номер телефона — тот, что '
-        'указывали в анкете стажёра. Формат любой.',
-        reply_markup=types.ReplyKeyboardRemove(),
+        f'{intern.full_name}, подтвердите личность: нажмите кнопку ниже '
+        'или введите номер телефона из анкеты вручную. Формат любой.',
+        reply_markup=_share_phone_markup(),
     )
     bot.register_next_step_handler(message, handle_phone, intern_id=intern.pk, attempt=1)
+
+
+def handle_shared_contact(message, intern_id):
+    """Человек поделился своим номером — записываем его и пускаем дальше."""
+    from apps.interns.models import Intern
+
+    intern = Intern.objects.filter(pk=intern_id).first()
+    if intern is None:
+        bot.send_message(message.chat.id, 'Что-то пошло не так — начните заново: /start.')
+        return
+    phone = _own_contact_phone(message)
+    if not phone:
+        bot.send_message(
+            message.chat.id,
+            'Нажмите кнопку ниже — так Telegram передаст именно ваш номер. '
+            'Чужой контакт не подойдёт.',
+            reply_markup=_share_phone_markup(),
+        )
+        bot.register_next_step_handler(
+            message, handle_shared_contact, intern_id=intern_id,
+        )
+        return
+    taken = services.chat_taken_by_other(intern, message.chat.id)
+    if taken is not None:
+        bot.send_message(
+            message.chat.id,
+            'В этом Telegram уже входил другой выпускник — '
+            f'{taken.full_name}. Один аккаунт на один Telegram.',
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
+        return
+    services.save_phone_from_telegram(intern, phone, message.chat.id)
+    show_choice(message, intern)
 
 
 def handle_phone(message, intern_id, attempt):
@@ -308,7 +364,9 @@ def handle_phone(message, intern_id, attempt):
     if intern is None:
         bot.send_message(message.chat.id, 'Что-то пошло не так — начните заново: /start.')
         return
-    if not services.phone_matches(intern, message.text or ''):
+    shared = _own_contact_phone(message)
+    entered = shared or (message.text or '')
+    if not services.phone_matches(intern, entered):
         if attempt >= services.PHONE_ATTEMPTS_LIMIT:
             services.lock_phone_verification(intern)
             bot.send_message(

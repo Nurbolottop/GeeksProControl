@@ -91,6 +91,39 @@ def phone_matches(intern: Intern, raw_phone: str) -> bool:
     return entered[-tail:] == stored[-tail:]
 
 
+def save_phone_from_telegram(intern: Intern, phone: str, chat_id: int) -> None:
+    """Записать номер, которым человек поделился из Telegram.
+
+    У части выпускников телефона в базе нет вообще — проверить их по
+    номеру нечем. Telegram отдаёт номер сам, подделать его в кнопке
+    нельзя, поэтому такому входу мы доверяем, номер сохраняем в карточку
+    и говорим руководителю: пусть знает, кто вошёл без сверки.
+    """
+    from django.urls import reverse
+
+    from apps.audit.services import log as audit_log
+    from apps.notifications.models import NotificationLevel
+    from apps.notifications.services import notify
+
+    intern.phone = phone
+    intern.save(update_fields=['phone', 'updated_at'])
+    remember_chat_id(intern, chat_id)
+    audit_log(
+        intern, 'Телефон получен из Telegram', new_value=phone,
+        reason='бот-выпускник: в базе номера не было',
+    )
+    notify(
+        f'Вход в бота без сверки: {intern.full_name}',
+        level=NotificationLevel.WARNING,
+        description=(
+            f'Телефона в базе не было, человек поделился номером {phone} '
+            'через Telegram. Проверьте, что это действительно он(а).'
+        ),
+        url=reverse('interns:detail', args=[intern.pk]),
+        dedup_key=f'bot-login-no-phone:{intern.pk}',
+    )
+
+
 def is_phone_locked(intern: Intern) -> bool:
     """Проверку телефона для этого человека временно заблокировали —
     было слишком много неверных попыток подряд (см. lock_phone_verification)."""

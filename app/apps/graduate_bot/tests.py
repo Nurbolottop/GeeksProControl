@@ -755,3 +755,77 @@ class BotTestUserCommandTests(TestCase):
 
         with self.assertRaises(CommandError):
             self._run(name="Нет Такого")
+
+
+class PhoneFromTelegramTests(TestCase):
+    """У части выпускников телефона в базе нет — вход по контакту из
+    Telegram: номер приходит от самого Telegram и попадает в карточку."""
+
+    def setUp(self):
+        self.person = Intern.objects.create(
+            full_name="Азимова Каниет", graduate_status=GraduateStatus.PENDING,
+        )
+
+    def test_phone_saved_to_card(self):
+        services.save_phone_from_telegram(self.person, "+996700112233", 555)
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.phone, "+996700112233")
+        self.assertEqual(self.person.telegram_chat_id, 555)
+
+    def test_head_is_warned(self):
+        from apps.notifications.models import Notification
+
+        services.save_phone_from_telegram(self.person, "+996700112233", 555)
+        note = Notification.objects.get(dedup_key=f"bot-login-no-phone:{self.person.pk}")
+        self.assertIn("Азимова Каниет", note.title)
+        self.assertIn("+996700112233", note.description)
+
+    def test_written_to_history(self):
+        from apps.audit.models import AuditLog
+
+        services.save_phone_from_telegram(self.person, "+996700112233", 555)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                object_id=str(self.person.pk), action="Телефон получен из Telegram",
+            ).exists()
+        )
+
+    def test_after_saving_person_passes_normal_check(self):
+        services.save_phone_from_telegram(self.person, "+996700112233", 555)
+        self.person.refresh_from_db()
+        self.assertTrue(services.phone_matches(self.person, "0700112233"))
+
+
+class SharedContactGuardTests(TestCase):
+    """Кнопка отдаёт только свой контакт: чужой переслать нельзя."""
+
+    class _Contact:
+        def __init__(self, phone_number, user_id):
+            self.phone_number = phone_number
+            self.user_id = user_id
+
+    class _From:
+        def __init__(self, user_id):
+            self.id = user_id
+
+    class _Message:
+        def __init__(self, contact=None, from_id=1):
+            self.contact = contact
+            self.from_user = SharedContactGuardTests._From(from_id)
+
+    def test_own_contact_accepted(self):
+        from apps.graduate_bot import bot as botmod
+
+        message = self._Message(self._Contact("+996700112233", 1), from_id=1)
+        self.assertEqual(botmod._own_contact_phone(message), "+996700112233")
+
+    def test_someone_elses_contact_rejected(self):
+        from apps.graduate_bot import bot as botmod
+
+        message = self._Message(self._Contact("+996700112233", 2), from_id=1)
+        self.assertIsNone(botmod._own_contact_phone(message))
+
+    def test_plain_text_is_not_a_contact(self):
+        from apps.graduate_bot import bot as botmod
+
+        self.assertIsNone(botmod._own_contact_phone(self._Message()))
