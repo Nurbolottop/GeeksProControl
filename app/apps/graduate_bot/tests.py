@@ -885,3 +885,158 @@ class NameSearchToleranceTests(TestCase):
     def test_nobody_matches_returns_empty(self):
         self.assertEqual(self._found("Зубенко Михаил"), [])
         self.assertEqual(services.find_people("Зубенко Михаил"), [])
+
+
+class GraduateRemindersTests(TestCase):
+    """Выпускник, не сделавший выбор, и давно ждущий проект не должны
+    висеть молча: напоминаем им и показываем сводку руководителю."""
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self.project = Project.objects.create(
+            name="Балажан", status=ProjectStatus.COMPLETED,
+        )
+        self.long_ago = timezone.localdate() - timedelta(days=30)
+        self.yesterday = timezone.localdate() - timedelta(days=1)
+
+    def _graduate(self, name, left_at, status=GraduateStatus.PENDING, chat_id=None):
+        person = Intern.objects.create(
+            full_name=name, graduate_status=status, telegram_chat_id=chat_id,
+        )
+        TeamMember.objects.create(
+            project=self.project, intern=person, role=TeamRole.BACKEND,
+            status=TeamMember.Status.LEFT, left_at=left_at,
+        )
+        return person
+
+    def _run(self):
+        from apps.graduate_bot.tasks import remind_graduates
+
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            result = remind_graduates()
+        return result, send
+
+    def test_reminds_person_who_has_not_chosen(self):
+        person = self._graduate("Завис Выпускников", self.long_ago, chat_id=11)
+        result, send = self._run()
+        self.assertEqual(result["pending"], 1)
+        self.assertTrue(send.called)
+        person.refresh_from_db()
+        self.assertIsNotNone(person.bot_reminded_at)
+
+    def test_fresh_graduate_is_not_touched(self):
+        self._graduate("Только Выпустился", self.yesterday, chat_id=12)
+        result, send = self._run()
+        self.assertEqual(result["pending"], 0)
+        self.assertFalse(send.called)
+
+    def test_waiting_person_reminded_later(self):
+        self._graduate(
+            "Ждёт Давно", self.long_ago, status=GraduateStatus.WAITING, chat_id=13,
+        )
+        result, _ = self._run()
+        self.assertEqual(result["waiting"], 1)
+
+    def test_person_without_chat_counts_but_gets_no_message(self):
+        self._graduate("Без Телеграма", self.long_ago)
+        result, send = self._run()
+        self.assertEqual(result["pending"], 1)
+        self.assertEqual(result["sent"], 0)
+        self.assertFalse(send.called)
+
+    def test_second_run_does_not_spam(self):
+        self._graduate("Завис Выпускников", self.long_ago, chat_id=11)
+        self._run()
+        result, send = self._run()
+        self.assertEqual(result["sent"], 0)
+        self.assertFalse(send.called)
+
+    def test_head_gets_summary(self):
+        from apps.notifications.models import Notification
+
+        self._graduate("Завис Выпускников", self.long_ago, chat_id=11)
+        self._run()
+        self.assertTrue(
+            Notification.objects.filter(title__startswith="Выпускники без решения").exists()
+        )
+
+
+class ProjectCloseInvitesGraduatesTests(TestCase):
+    """Проект сдан — бот сам зовёт выпускников сделать выбор."""
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Балажан")
+        self.known = Intern.objects.create(full_name="Знаком Боту", telegram_chat_id=21)
+        self.stranger = Intern.objects.create(full_name="Не Писал Боту")
+        for person in (self.known, self.stranger):
+            TeamMember.objects.create(
+                project=self.project, intern=person, role=TeamRole.BACKEND,
+                status=TeamMember.Status.ACTIVE,
+            )
+
+    def test_invite_goes_only_to_those_who_used_the_bot(self):
+        sent = None
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            sent = services.invite_graduates(
+                self.project, [self.known, self.stranger],
+            )
+        self.assertEqual(sent, 1)
+        self.assertEqual(send.call_args[0][0], 21)
+        self.assertIn("Балажан", send.call_args[0][1])
+
+    def test_closing_project_invites_graduates(self):
+        from apps.projects.models import ProjectStatus
+        from apps.projects.services import release_team
+
+        self.project.status = ProjectStatus.COMPLETED
+        self.project.save(update_fields=["status"])
+        with mock.patch("apps.graduate_bot.bot.bot.send_message") as send:
+            release_team(self.project)
+        self.assertTrue(send.called)
+        self.known.refresh_from_db()
+        self.assertEqual(self.known.graduate_status, GraduateStatus.PENDING)
+
+    def test_telegram_failure_does_not_break_closing(self):
+        from apps.projects.models import ProjectStatus
+        from apps.projects.services import release_team
+
+        self.project.status = ProjectStatus.COMPLETED
+        self.project.save(update_fields=["status"])
+        with mock.patch("apps.graduate_bot.bot.bot.send_message", side_effect=Exception("boom")):
+            release_team(self.project)  # не падаем
+        self.known.refresh_from_db()
+        self.assertEqual(self.known.graduate_status, GraduateStatus.PENDING)
+
+
+class FinishedInternshipGoesToReserveTests(TestCase):
+    """«Закончить стажировку» — человек попадает в резерв кадров и
+    перестаёт числиться свободным на проект."""
+
+    def setUp(self):
+        self.person = Intern.objects.create(
+            full_name="Закончил Стажировку", graduate_status=GraduateStatus.PENDING,
+            status=InternStatus.READY,
+        )
+
+    def test_card_appears_in_reserve(self):
+        from apps.reserve.models import CandidatePool, ReserveCandidate
+
+        services.submit_to_resume_bank(self.person, 555)
+        card = ReserveCandidate.objects.get(intern=self.person)
+        self.assertEqual(card.full_name, "Закончил Стажировку")
+        self.assertEqual(card.pool, CandidatePool.INTERN)
+
+    def test_status_becomes_employable(self):
+        services.submit_to_resume_bank(self.person, 555)
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.status, InternStatus.EMPLOYABLE)
+
+    def test_second_submit_does_not_duplicate_card(self):
+        from apps.reserve.models import ReserveCandidate
+
+        services.submit_to_resume_bank(self.person, 555)
+        services.submit_to_resume_bank(self.person, 555)
+        self.assertEqual(ReserveCandidate.objects.filter(intern=self.person).count(), 1)

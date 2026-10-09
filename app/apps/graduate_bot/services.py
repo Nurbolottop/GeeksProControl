@@ -333,15 +333,21 @@ def submit_to_resume_bank(intern: Intern, chat_id: int) -> bool:
     remember_chat_id(intern, chat_id)
     if intern.resume_bank_status == ResumeBankStatus.APPROVED:
         return False
+    from apps.interns.models import InternStatus
+
     intern.in_resume_bank = True
     intern.resume_bank_status = ResumeBankStatus.PENDING
     intern.resume_bank_comment = ''
     intern.graduate_status = ''
+    # Стажировка для него закончилась: в «свободных» на проект его ждать
+    # больше не нужно, зато он доступен работодателям.
+    intern.status = InternStatus.EMPLOYABLE
     intern.save(update_fields=[
         'in_resume_bank', 'resume_bank_status', 'resume_bank_comment',
-        'graduate_status', 'updated_at',
+        'graduate_status', 'status', 'updated_at',
     ])
     audit_log(intern, 'Заявка в банк резюме отправлена', reason='бот-выпускник')
+    _put_into_reserve(intern)
     # intern=None — в общую ленту руководителя (apps.notifications), не в
     # чей-то личный портал: заявки в банк резюме проверяет только он сам.
     notify(
@@ -352,6 +358,20 @@ def submit_to_resume_bank(intern: Intern, chat_id: int) -> bool:
         dedup_key=f'resume-bank-submitted:{intern.pk}',
     )
     return True
+
+
+def _put_into_reserve(intern: Intern) -> None:
+    """Закончил стажировку — заводим карточку в резерве кадров.
+
+    Раньше человек оседал только в банке резюме, а в резерв его
+    приходилось заносить руками — и предлагать работодателям было некого.
+    """
+    from apps.reserve.models import ReserveCandidate
+    from apps.reserve.services import candidate_from_intern
+
+    if ReserveCandidate.objects.filter(intern=intern).exists():
+        return
+    candidate_from_intern(intern)
 
 
 def notify_resume_bank_decision(intern: Intern, *, approved: bool, comment: str = '') -> None:
@@ -379,6 +399,34 @@ def notify_resume_bank_decision(intern: Intern, *, approved: bool, comment: str 
         bot.send_message(intern.telegram_chat_id, text)
     except Exception:
         logger.exception('Не удалось отправить решение по банку резюме в Telegram (intern=%s)', intern.pk)
+
+
+def invite_graduates(project: Project, interns) -> int:
+    """Проект сдан — зовём выпускников в бота, не дожидаясь, пока они сами.
+
+    Пишем только тем, кто уже общался с ботом: остальным Telegram писать
+    не даёт, их зовёт руководитель ссылкой. Возвращаем, скольким ушло.
+    """
+    sent = 0
+    for intern in interns:
+        if not intern.telegram_chat_id:
+            continue
+        text = (
+            f'🎉 {intern.full_name}, проект «{project.name}» сдан — '
+            'поздравляем!\n\nТеперь выберите, что дальше: продолжить '
+            'стажировку на новом проекте или закончить её и попасть в наш '
+            'банк резюме. Нажмите /start.'
+        )
+        try:
+            from apps.graduate_bot.bot import bot
+
+            bot.send_message(intern.telegram_chat_id, text)
+            sent += 1
+        except Exception:
+            logger.exception(
+                'Не удалось позвать выпускника в бота (intern=%s)', intern.pk,
+            )
+    return sent
 
 
 def notify_project_assigned(intern: Intern, project: Project) -> None:

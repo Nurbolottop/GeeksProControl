@@ -240,6 +240,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'apps.reports.tasks.generate_monthly_kpi_snapshot',
         'schedule': crontab(hour=6, minute=0, day_of_month=1),
     },
+    # Выпускники, которые не сделали выбор, и те, кто давно ждёт проект.
+    'remind-graduates': {
+        'task': 'apps.graduate_bot.tasks.remind_graduates',
+        'schedule': crontab(hour=9, minute=0),
+    },
 }
 
 # Пороговые значения проверок (ТЗ §22)

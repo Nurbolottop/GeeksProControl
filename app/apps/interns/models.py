@@ -145,6 +145,10 @@ class Intern(TimeStampedModel, ArchivableModel):
         default=Position.INTERN, db_index=True,
         help_text='Тимлид остаётся тимлидом на всех проектах, пока его не снимут.',
     )
+    # Когда бот последний раз напоминал о себе — чтобы не писать каждый день.
+    bot_reminded_at = models.DateTimeField(
+        'Бот-выпускник: последнее напоминание', null=True, blank=True,
+    )
     # Правила бота человек читает один раз: дальше сразу вход в аккаунт.
     rules_accepted_at = models.DateTimeField(
         'Бот-выпускник: ознакомлен с правилами', null=True, blank=True,

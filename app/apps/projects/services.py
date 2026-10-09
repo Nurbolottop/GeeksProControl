@@ -94,6 +94,11 @@ def release_team(project: Project, when: datetime.date | None = None) -> None:
         Intern.objects.filter(
             pk__in=intern_ids, status=InternStatus.ACTIVE,
         ).update(status=InternStatus.READY)
+        # Зовём их в бота сами: ждать, пока каждый вспомнит про него,
+        # значит копить «выпускников на проверке», которых никто не разобрал.
+        from apps.graduate_bot.services import invite_graduates
+
+        invite_graduates(project, Intern.objects.filter(pk__in=intern_ids))
     notify_leads_project_closed(project, Intern.objects.filter(pk__in=lead_ids))
 
 

@@ -358,3 +358,34 @@ class StaffingRequestTests(TestCase):
         self.assertEqual(by_spec["Backend"], 3)
         self.assertEqual(by_spec["Frontend"], 4)
         self.assertContains(response, "всего нужно")
+
+
+class WaitingGraduatesCountAsFreeTests(TestCase):
+    """Кто сказал боту «продолжаю» и ждёт проект — тот и есть свободный:
+    его как раз надо распределять. А те, кто ещё не решил, — нет."""
+
+    def setUp(self):
+        from apps.interns.models import GraduateStatus
+        from apps.training.models import Specialization
+
+        self.spec = Specialization.objects.create(name="Backend")
+        self.waiting = Intern.objects.create(
+            full_name="Ждёт Проекта", specialization=self.spec,
+            status=InternStatus.READY, graduate_status=GraduateStatus.WAITING,
+        )
+        self.undecided = Intern.objects.create(
+            full_name="Ещё Не Решил", specialization=self.spec,
+            status=InternStatus.READY, graduate_status=GraduateStatus.PENDING,
+        )
+
+    def test_waiting_person_is_free(self):
+        totals = services.interns_total()
+        self.assertEqual(totals["free"], 1)
+
+    def test_undecided_graduate_is_not_free(self):
+        row = next(
+            r for r in services.interns_summary()
+            if r["specialization"] == self.spec
+        )
+        self.assertEqual(row["free"], 1)
+        self.assertEqual(row["graduates"], 2)

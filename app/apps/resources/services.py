@@ -43,14 +43,17 @@ def _counts(people, busy_ids) -> dict:
     «Выпускники» — те, у кого стоит статус выпускника (вышли с завершённого
     проекта и ещё не разобраны), «заморозка» — стажировка приостановлена,
     «ожидают» — ещё не начали стажировку, «свободные» — кого можно занять
-    прямо сейчас: без проекта, в рабочем статусе и не из «Выпускников».
+    прямо сейчас: без проекта, в рабочем статусе и либо не выпускник, либо
+    уже сказавший через бота, что продолжает и ждёт проект.
     """
+    from apps.interns.models import GraduateStatus
+
     busy = sum(1 for person in people if person.pk in busy_ids)
     free = sum(
         1 for p in people
         if p.pk not in busy_ids
         and p.status in AVAILABLE_STATUSES
-        and not p.graduate_status
+        and (not p.graduate_status or p.graduate_status == GraduateStatus.WAITING)
     )
     return {
         'total': len(people),
