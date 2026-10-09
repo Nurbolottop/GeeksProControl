@@ -160,7 +160,13 @@ def project_detail(request, pk):
         group = getattr(project, 'group', None)
         context['group'] = group
         if group:
-            context['meetings'] = group.meetings.select_related('host').order_by('-date')
+            # Только собрания своего направления: чужие тимлид не ведёт и
+            # отмечать по ним некого. Общие (без направления) видны всем.
+            own_role = services.lead_own_role(request.user)
+            meetings = group.meetings.select_related('host')
+            if own_role:
+                meetings = meetings.filter(direction__in=['', own_role])
+            context['meetings'] = meetings.order_by('-date')
     else:
         from apps.lead_portal.overview import lead_overview
 
@@ -229,9 +235,12 @@ def _group_or_404(project):
 
 @login_required
 def meeting_create(request, pk):
-    """Новое собрание нельзя создать, пока не закрыто предыдущее —
-    отмечать посещаемость и ставить оценки своему направлению
-    обязательно (в отличие от ПМ, у которого это только просмотр)."""
+    """Собрание своего направления: тимлид дизайна собирает дизайнеров,
+    у бэкенда в этот же день может быть своё собрание.
+
+    Новое собрание нельзя создать, пока не закрыто предыдущее — отмечать
+    посещаемость и ставить оценки своему направлению обязательно (в
+    отличие от ПМ, у которого это только просмотр)."""
     project = services.lead_project_or_404(request.user, pk)
     group = _group_or_404(project)
     if request.method == 'POST':
@@ -252,14 +261,29 @@ def meeting_create(request, pk):
         except ValueError:
             messages.error(request, 'Укажите корректную дату.')
         else:
+            own_role = services.lead_own_role(request.user)
             meeting = attendance_services.create_meeting(
                 group, kind=MeetingKind.INTERNAL, date=date,
+                direction=own_role or '',
+                host=getattr(request.user, 'intern_profile', None),
             )
             if meeting:
                 messages.success(request, f'Собрание {date:%d.%m.%Y} добавлено.')
             else:
                 messages.info(request, 'Такое собрание уже есть.')
     return redirect(f"{reverse('lead_portal:project_detail', args=[project.pk])}?tab=attendance")
+
+
+def _lead_meeting_or_404(request, group, meeting_pk):
+    """Собрание своего направления (или общее) — чужие тимлиду не открыть."""
+    meetings = GroupMeeting.objects.filter(pk=meeting_pk, group=group)
+    own_role = services.lead_own_role(request.user)
+    if own_role:
+        meetings = meetings.filter(direction__in=['', own_role])
+    meeting = meetings.first()
+    if meeting is None:
+        raise Http404('Это собрание другого направления.')
+    return meeting
 
 
 def _own_direction_eligible_members(request, group):
@@ -276,7 +300,7 @@ def _own_direction_eligible_members(request, group):
 def meeting_detail(request, pk, meeting_pk):
     project = services.lead_project_or_404(request.user, pk)
     group = _group_or_404(project)
-    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    meeting = _lead_meeting_or_404(request, group, meeting_pk)
     marks = {mark.intern_id: mark for mark in meeting.attendance.all()}
     scores = {score.intern_id: score for score in meeting.scores.all()}
     previous = attendance_services.previous_scores(meeting)
@@ -319,7 +343,7 @@ def meeting_mark_toggle(request, pk, meeting_pk):
     """AJAX: клик по бейджу переключает отметку — Был → Не был → ... → пусто."""
     project = services.lead_project_or_404(request.user, pk)
     group = _group_or_404(project)
-    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    meeting = _lead_meeting_or_404(request, group, meeting_pk)
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(
@@ -336,7 +360,7 @@ def meeting_mark_toggle(request, pk, meeting_pk):
 def meeting_mark_all(request, pk, meeting_pk):
     project = services.lead_project_or_404(request.user, pk)
     group = _group_or_404(project)
-    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    meeting = _lead_meeting_or_404(request, group, meeting_pk)
     if request.method == 'POST':
         created = attendance_services.mark_all_present(
             meeting, user=request.user, only_role=services.lead_own_role(request.user),
@@ -350,7 +374,7 @@ def meeting_score(request, pk, meeting_pk):
     """Клик по шкале «Активность» — балл (0–10) или комментарий за период."""
     project = services.lead_project_or_404(request.user, pk)
     group = _group_or_404(project)
-    meeting = get_object_or_404(GroupMeeting, pk=meeting_pk, group=group)
+    meeting = _lead_meeting_or_404(request, group, meeting_pk)
     if request.method != 'POST':
         raise Http404
     member = get_object_or_404(

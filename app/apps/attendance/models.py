@@ -23,7 +23,13 @@ WEEKDAYS = [
 
 
 class GroupMeeting(TimeStampedModel):
-    """Собрание группы: конкретная дата, по которой ведётся табель."""
+    """Собрание группы: конкретная дата, по которой ведётся табель.
+
+    Собрание принадлежит направлению: тимлид дизайна собирает дизайнеров,
+    бэкенда — бэкендеров. В одной команде в один день может быть несколько
+    собраний разных направлений, и каждый тимлид отмечает только своих.
+    Пустое ``direction`` — общее собрание команды (так заведены старые).
+    """
 
     class Status(models.TextChoices):
         PLANNED = 'planned', 'Запланировано'
@@ -37,6 +43,13 @@ class GroupMeeting(TimeStampedModel):
     kind = models.CharField(
         'Вид', max_length=20,
         choices=MeetingKind.choices, default=MeetingKind.PM_INTERNS,
+    )
+    direction = models.CharField(
+        'Направление', max_length=20, blank=True, db_index=True,
+        help_text=(
+            'Роль в команде, для которой собрание: тимлид собирает только '
+            'своё направление. Пусто — общее собрание команды.'
+        ),
     )
     date = models.DateField('Дата', db_index=True)
     host = models.ForeignKey(
@@ -54,11 +67,20 @@ class GroupMeeting(TimeStampedModel):
         verbose_name = 'Собрание группы'
         verbose_name_plural = 'Собрания групп'
         ordering = ['date']
-        unique_together = [('group', 'kind', 'date')]
+        unique_together = [('group', 'kind', 'date', 'direction')]
         indexes = [models.Index(fields=['group', 'date'])]
 
     def __str__(self) -> str:
         return f'{self.get_kind_display()} {self.date:%d.%m.%Y}'
+
+    @property
+    def direction_label(self) -> str:
+        """«Дизайн», «Backend» — для подписи собрания в табеле."""
+        from apps.teams.models import TeamRole
+
+        if not self.direction:
+            return 'Вся команда'
+        return dict(TeamRole.choices).get(self.direction, self.direction)
 
     @property
     def short_kind(self) -> str:

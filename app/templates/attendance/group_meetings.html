@@ -48,7 +48,10 @@
                         <strong>{{ meeting.date|date:'d.m.Y' }}</strong>
                         <div style="font-size:11.5px; color: var(--text-muted)">{{ meeting.date|date:'l' }}</div>
                     </td>
-                    <td>{{ meeting.get_kind_display }}</td>
+                    <td>
+                        {{ meeting.get_kind_display }}
+                        <div style="font-size:11.5px; color: var(--text-muted)">{{ meeting.direction_label }}</div>
+                    </td>
                     <td>{{ meeting.host.full_name|default:'—' }}</td>
                     <td>
                         {% if meeting.status == 'held' %}

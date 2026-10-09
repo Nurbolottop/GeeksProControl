@@ -1380,3 +1380,109 @@ class LeadFinishedProjectsTests(TestCase):
             ).status_code,
             404,
         )
+
+
+class LeadMeetingDirectionTests(TestCase):
+    """Собрание тимлида — только для его направления."""
+
+    def setUp(self):
+        from apps.attendance.models import GroupMeeting, MeetingKind
+        from apps.flows.models import Flow, Group
+        from apps.projects.models import Project
+        from apps.teams.models import TeamMember, TeamRole
+        from apps.training.models import Specialization
+
+        self.design = Specialization.objects.create(name='UX/UI')
+        self.backend = Specialization.objects.create(name='Backend')
+        self.project = Project.objects.create(name='Омур')
+        flow = Flow.objects.create(number=1)
+        self.group = Group.objects.create(flow=flow, number=1, project=self.project)
+
+        def person(name, spec, role, lead=False):
+            user = Model.objects.create_user(
+                username=f'u{name}', password='x',
+                role=User.Role.TEAM_LEAD if lead else User.Role.PROJECT_MANAGER,
+            )
+            intern = Intern.objects.create(full_name=name, specialization=spec, user=user)
+            TeamMember.objects.create(
+                project=self.project, group=self.group, intern=intern, role=role,
+                status=TeamMember.Status.ACTIVE,
+            )
+            return user, intern
+
+        self.design_lead, self.design_lead_intern = person(
+            'Тимлид Дизайна', self.design, TeamRole.TEAM_LEAD, lead=True,
+        )
+        self.backend_lead, _ = person(
+            'Тимлид Бэка', self.backend, TeamRole.TEAM_LEAD, lead=True,
+        )
+        person('Дизайнер', self.design, TeamRole.UXUI)
+        person('Бэкендер', self.backend, TeamRole.BACKEND)
+        self.MeetingKind = MeetingKind
+        self.GroupMeeting = GroupMeeting
+
+    def _create_meeting(self, user, date='2026-10-09'):
+        self.client.force_login(user)
+        return self.client.post(
+            reverse('lead_portal:meeting_create', args=[self.project.pk]),
+            {'date': date},
+        )
+
+    def test_meeting_carries_the_lead_direction(self):
+        self._create_meeting(self.design_lead)
+        meeting = self.GroupMeeting.objects.get()
+        self.assertEqual(meeting.direction, 'uxui')
+        self.assertEqual(meeting.direction_label, 'UX/UI')
+
+    def test_other_lead_does_not_see_a_foreign_meeting(self):
+        self._create_meeting(self.design_lead)
+        self.client.force_login(self.backend_lead)
+        response = self.client.get(
+            reverse('lead_portal:project_detail', args=[self.project.pk]),
+            {'tab': 'attendance'},
+        )
+        self.assertEqual(list(response.context['meetings']), [])
+
+    def test_foreign_meeting_does_not_block_creating_your_own(self):
+        self._create_meeting(self.design_lead)
+        self._create_meeting(self.backend_lead)
+        self.assertEqual(self.GroupMeeting.objects.count(), 2)
+        self.assertEqual(
+            sorted(self.GroupMeeting.objects.values_list('direction', flat=True)),
+            ['backend', 'uxui'],
+        )
+
+    def test_foreign_meeting_cannot_be_opened(self):
+        self._create_meeting(self.design_lead)
+        meeting = self.GroupMeeting.objects.get()
+        self.client.force_login(self.backend_lead)
+        response = self.client.get(
+            reverse('lead_portal:meeting_detail', args=[self.project.pk, meeting.pk]),
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_own_meeting_lists_only_your_direction(self):
+        self._create_meeting(self.design_lead)
+        meeting = self.GroupMeeting.objects.get()
+        self.client.force_login(self.design_lead)
+        response = self.client.get(
+            reverse('lead_portal:meeting_detail', args=[self.project.pk, meeting.pk]),
+        )
+        names = [
+            member.intern.full_name
+            for section in response.context['sections']
+            for member in section['members']
+        ]
+        self.assertEqual(names, ['Дизайнер'])
+
+    def test_unclosed_foreign_meeting_does_not_nag(self):
+        """Бэкенд-тимлида не должно блокировать собрание дизайна."""
+        from apps.lead_portal import services as lead_services
+
+        self._create_meeting(self.design_lead)
+        self.assertIsNone(
+            lead_services.pending_meeting(self.project, self.backend_lead),
+        )
+        self.assertIsNotNone(
+            lead_services.pending_meeting(self.project, self.design_lead),
+        )

@@ -20,6 +20,7 @@
         <h1>{{ meeting.get_kind_display }} · {{ meeting.date|date:'d.m.Y' }}</h1>
         <div class="sub" style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
             {% if group.project %}<span class="badge badge--blue">{{ group.project.name }}</span>{% endif %}
+            <span class="badge badge--gray">{{ meeting.direction_label }}</span>
             {% if meeting.host %}<span class="badge badge--gray">ведёт {{ meeting.host.full_name }}</span>{% endif %}
             {% if rate is not None %}
                 <span class="badge badge--{% if rate >= 80 %}green{% elif rate >= 60 %}yellow{% else %}red{% endif %}">

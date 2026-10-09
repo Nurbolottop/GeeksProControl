@@ -51,13 +51,18 @@ def default_host(group, kind: str):
 @transaction.atomic
 def create_meeting(
     group, kind: str, date: datetime.date, host=None, topic: str = '',
+    direction: str = '',
 ) -> GroupMeeting | None:
     """Создаёт одно собрание на дату. Ведущий подставляется по виду собрания.
+
+    `direction` — роль в команде, для которой собрание: тимлид собирает
+    своё направление, и у других направлений в этот день может быть своё
+    собрание. Пусто — общее собрание команды.
 
     Возвращает None, если такое собрание уже есть.
     """
     meeting, is_new = GroupMeeting.objects.get_or_create(
-        group=group, kind=kind, date=date,
+        group=group, kind=kind, date=date, direction=direction,
         defaults={'host': host or default_host(group, kind), 'topic': topic},
     )
     return meeting if is_new else None

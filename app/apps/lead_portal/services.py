@@ -66,10 +66,14 @@ def pending_meeting(project, user):
     group = getattr(project, 'group', None)
     if group is None:
         return None
-    meeting = group.meetings.filter(kind=MeetingKind.INTERNAL).order_by('-date').first()
+    own_role = lead_own_role(user)
+    meetings = group.meetings.filter(kind=MeetingKind.INTERNAL)
+    if own_role:
+        # Чужое собрание тимлида не касается: закрывать нужно только свои
+        meetings = meetings.filter(direction__in=['', own_role])
+    meeting = meetings.order_by('-date').first()
     if meeting is None:
         return None
-    own_role = lead_own_role(user)
     members = attendance_services.attendance_eligible_members(group).filter(
         status=TeamMember.Status.ACTIVE, intern__isnull=False,
     )
