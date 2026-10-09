@@ -156,3 +156,54 @@ class DisplayNameTests(TestCase):
             first_name="Тест", last_name="Тестов",
         )
         self.assertEqual(user.display_name, "Тест Тестов")
+
+
+class PhoneLoginFormatTests(TestCase):
+    """Номер логином записан по-разному, а человек вводит его как помнит:
+    формат не должен мешать войти."""
+
+    def setUp(self):
+        self.plus = User.objects.create_user(
+            username="+996509616181", password="Pass12345", role=User.Role.PROJECT_MANAGER,
+        )
+        self.zero = User.objects.create_user(
+            username="0555693418", password="Pass54321", role=User.Role.TEAM_LEAD,
+        )
+
+    def _login(self, username, password):
+        return self.client.post(
+            reverse("login"), {"username": username, "password": password},
+        )
+
+    def test_exact_login_still_works(self):
+        self.assertEqual(self._login("+996509616181", "Pass12345").status_code, 302)
+
+    def test_plus_user_enters_local_format(self):
+        for typed in ("0509616181", "509616181", "996509616181", "+996 509 61 61 81"):
+            with self.subTest(typed=typed):
+                self.client.logout()
+                self.assertEqual(self._login(typed, "Pass12345").status_code, 302)
+
+    def test_local_user_enters_international_format(self):
+        for typed in ("+996555693418", "996 555 693 418", "0555-693-418"):
+            with self.subTest(typed=typed):
+                self.client.logout()
+                self.assertEqual(self._login(typed, "Pass54321").status_code, 302)
+
+    def test_wrong_password_still_rejected(self):
+        response = self._login("0509616181", "неверный")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Неверный логин или пароль")
+
+    def test_unknown_number_rejected(self):
+        response = self._login("0700000000", "Pass12345")
+        self.assertEqual(response.status_code, 200)
+
+    def test_inactive_user_cannot_enter(self):
+        self.zero.is_active = False
+        self.zero.save(update_fields=["is_active"])
+        self.assertEqual(self._login("+996555693418", "Pass54321").status_code, 200)
+
+    def test_name_login_unaffected(self):
+        User.objects.create_user(username="nurbolot", password="Pass00000")
+        self.assertEqual(self._login("nurbolot", "Pass00000").status_code, 302)

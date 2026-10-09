@@ -161,6 +161,11 @@ DATABASES = {
 # =============================================================================
 
 AUTH_USER_MODEL = 'accounts.User'
+
+# Телефон логином записан по-разному (+996…, 996…, 0…), а человек вводит
+# его как помнит — PhoneBackend сверяет последние девять цифр, чтобы
+# формат не мешал войти. Обычный вход по логину он тоже умеет.
+AUTHENTICATION_BACKENDS = ['apps.accounts.backends.PhoneBackend']
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
