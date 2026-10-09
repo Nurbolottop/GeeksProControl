@@ -703,3 +703,55 @@ class RockPaperScissorsTests(TestCase):
         self.assertEqual(botmod.GAME_BEATS["rock"], "scissors")
         self.assertEqual(botmod.GAME_BEATS["scissors"], "paper")
         self.assertEqual(botmod.GAME_BEATS["paper"], "rock")
+
+
+class BotTestUserCommandTests(TestCase):
+    """Тестовый выпускник для прогонов бота: заводится и откатывается
+    в начало сценария, не трогая настоящих людей."""
+
+    def _run(self, **kwargs):
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command("bot_test_user", stdout=out, **kwargs)
+        return out.getvalue()
+
+    def test_preview_changes_nothing(self):
+        text = self._run(phone="0700112233")
+        self.assertIn("Предпросмотр", text)
+        self.assertFalse(Intern.objects.filter(phone="0700112233").exists())
+
+    def test_creates_person_with_completed_project(self):
+        self._run(phone="0700112233", apply=True)
+        person = Intern.objects.get(phone="0700112233")
+        self.assertEqual(person.graduate_status, GraduateStatus.PENDING)
+        membership = TeamMember.objects.get(intern=person)
+        self.assertEqual(membership.status, TeamMember.Status.LEFT)
+        self.assertEqual(membership.project.status, ProjectStatus.COMPLETED)
+
+    def test_person_is_found_by_the_bot(self):
+        self._run(phone="0700112233", apply=True)
+        found = services.find_graduates("Тестов Тест")
+        self.assertEqual([p.phone for p in found], ["0700112233"])
+
+    def test_reset_returns_person_to_the_start(self):
+        self._run(phone="0700112233", apply=True)
+        person = Intern.objects.get(phone="0700112233")
+        person.telegram_chat_id = 4242
+        person.graduate_status = GraduateStatus.WAITING
+        person.resume_bank_status = ResumeBankStatus.PENDING
+        person.save()
+        self._run(phone="0700112233", reset=True, apply=True)
+        person.refresh_from_db()
+        self.assertIsNone(person.telegram_chat_id)
+        self.assertIsNone(person.rules_accepted_at)
+        self.assertEqual(person.graduate_status, GraduateStatus.PENDING)
+        self.assertEqual(person.resume_bank_status, "")
+
+    def test_phone_required_for_unknown_person(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaises(CommandError):
+            self._run(name="Нет Такого")
