@@ -259,7 +259,7 @@
         </div>
     </div>
 
-    <div class="form-link {% if not brief_link %}form-link--off{% endif %}" style="margin-bottom: 16px;">
+    <div id="brief-link" class="form-link {% if not brief_link %}form-link--off{% endif %} {% if request.GET.brief == 'new' %}form-link--fresh{% endif %}" style="margin-bottom: 16px;">
         <div class="form-link__body">
             <div class="form-link__label">Ссылка на бриф</div>
             {% if brief_link %}
@@ -285,15 +285,32 @@
         </div>
     </div>
     {% if brief_link %}
+        <style>
+            .form-link--fresh { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+        </style>
         <script>
-            document.querySelector('[data-copy-link="brief-link-url"]')?.addEventListener('click', function () {
-                var button = this;
-                var url = document.getElementById('brief-link-url').href;
-                navigator.clipboard.writeText(url).then(function () {
+            (function () {
+                var button = document.querySelector('[data-copy-link="brief-link-url"]');
+                var field = document.getElementById('brief-link-url');
+                if (!button || !field) return;
+
+                function done() {
                     button.textContent = 'Скопировано';
                     setTimeout(function () { button.textContent = 'Копировать'; }, 1500);
-                });
-            });
+                }
+                function copy() {
+                    return navigator.clipboard.writeText(field.href).then(done);
+                }
+                button.addEventListener('click', copy);
+
+                {% if request.GET.brief == 'new' %}
+                // Проект только что создан: подводим к ссылке и пробуем
+                // сразу положить её в буфер. Браузер может не дать копировать
+                // без клика — тогда просто останется кнопка.
+                document.getElementById('brief-link').scrollIntoView({block: 'center'});
+                copy().catch(function () {});
+                {% endif %}
+            })();
         </script>
     {% endif %}
 

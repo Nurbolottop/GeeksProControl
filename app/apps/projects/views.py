@@ -242,7 +242,11 @@ def project_detail(request, pk):
 
 @login_required
 def project_create(request):
-    """Новый проект. Заказчика можно завести здесь же, не уходя с формы."""
+    """Новый проект. Заказчика можно завести здесь же, не уходя с формы.
+
+    После создания сразу открываем документы проекта с готовой ссылкой на
+    бриф: её нужно отправить заказчику в тот же день, а не искать потом.
+    """
     from apps.clients.models import Client
 
     form = ProjectCreateForm(request.POST or None)
@@ -266,10 +270,19 @@ def project_create(request):
         if changed:
             form = ProjectCreateForm(data)
         if form.is_valid():
+            from apps.documents import services as doc_services
+
             project = form.save(commit=False)
             services.create_project(project, user=request.user)
-            messages.success(request, f'Проект «{project.name}» создан.')
-            return redirect(f'{project.get_absolute_url()}?tab=team')
+            # Бриф нужен сразу: первое дело на новом проекте — отправить
+            # ссылку заказчику, поэтому выпускаем её вместе с проектом
+            link = doc_services.issue_brief_link(project, user=request.user)
+            url = request.build_absolute_uri(link.get_absolute_url())
+            messages.success(
+                request,
+                f'Проект «{project.name}» создан. Ссылка на бриф для заказчика: {url}',
+            )
+            return redirect(f'{project.get_absolute_url()}?tab=documents&brief=new')
     return render(
         request, 'projects/form.html',
         {'form': form, 'title': 'Новый проект'},

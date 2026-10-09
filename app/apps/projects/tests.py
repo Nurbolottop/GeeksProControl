@@ -1,6 +1,7 @@
 import datetime
 
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
 from django.test import TestCase
 from django.urls import reverse
 
@@ -240,7 +241,7 @@ class ProjectCreationFlowTests(TestCase):
         project = Project.objects.get(name="Туризм")
         self.assertEqual(project.client, client_obj)
         # После создания сразу зовём назначать команду
-        self.assertTrue(response.url.endswith("?tab=team"))
+        self.assertTrue(response.url.endswith("?tab=documents&brief=new"))
 
     def test_existing_client_not_duplicated(self):
         Client.objects.create(organization="ОсОО Омур")
@@ -1113,3 +1114,56 @@ class GraduateOnlyWhenFreeTests(TestCase):
 
         person.refresh_from_db()
         self.assertEqual(person.graduate_status, GraduateStatus.PENDING)
+
+
+class BriefLinkOnProjectCreateTests(TestCase):
+    """Создали проект — ссылка на бриф уже готова, её не надо искать."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="head-brief", password="x")
+        self.client.force_login(self.user)
+
+    def _create(self, name="Новый проект"):
+        response = self.client.post(reverse("projects:create"), {"name": name})
+        return response, Project.objects.get(name=name)
+
+    def test_link_is_issued_with_the_project(self):
+        from apps.documents.services import active_brief_link
+
+        _, project = self._create()
+        link = active_brief_link(project)
+        self.assertIsNotNone(link)
+        self.assertTrue(link.is_open)
+
+    def test_lands_on_documents_with_the_link_highlighted(self):
+        response, project = self._create()
+        self.assertRedirects(
+            response, f"{project.get_absolute_url()}?tab=documents&brief=new",
+        )
+
+    def test_message_carries_the_url(self):
+        from apps.documents.services import active_brief_link
+
+        response, project = self._create()
+        link = active_brief_link(project)
+        text = ' '.join(str(m) for m in get_messages(response.wsgi_request))
+        self.assertIn(link.get_absolute_url(), text)
+
+    def test_page_offers_to_copy_it(self):
+        from apps.documents.services import active_brief_link
+
+        _, project = self._create()
+        link = active_brief_link(project)
+        page = self.client.get(f"{project.get_absolute_url()}?tab=documents&brief=new")
+        self.assertContains(page, link.get_absolute_url())
+        self.assertContains(page, "data-copy-link=\"brief-link-url\"")
+        self.assertContains(page, "form-link--fresh")
+
+    def test_second_project_gets_its_own_link(self):
+        from apps.documents.services import active_brief_link
+
+        _, first = self._create("Первый")
+        _, second = self._create("Второй")
+        self.assertNotEqual(
+            active_brief_link(first).token, active_brief_link(second).token,
+        )
