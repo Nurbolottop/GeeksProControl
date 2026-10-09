@@ -12,12 +12,16 @@ callback_query, поэтому весь выбор разбирается чер
 register_next_step_handler (как ФИО/телефон), а не через
 callback_query_handler.
 """
+import logging
+
 import telebot
 import urllib3.util.connection as urllib3_connection
 from django.conf import settings
 from telebot import apihelper, types
 
 from apps.graduate_bot import services
+
+logger = logging.getLogger(__name__)
 
 # С этого сервера до конкретного IP api.telegram.org (149.154.166.110)
 # стабильно нет маршрута — похоже на проблему пиринга дата-центра, не
@@ -231,17 +235,38 @@ def handle_login_request(message):
 
 
 def handle_name(message):
-    candidates = services.find_graduates(message.text or '')
+    typed = (message.text or '').strip()
+    candidates = services.find_graduates(typed)
     if not candidates:
+        # Записываем, что именно ввели: иначе «бот меня не находит»
+        # нечем проверить — в логах видно только молчание.
+        others = services.find_people(typed)
+        logger.warning(
+            'Бот-выпускник: не нашли выпускника по «%s» (chat=%s); '
+            'среди всех стажёров похожие: %s',
+            typed, message.chat.id, [p.full_name for p in others] or 'нет',
+        )
+        if others:
+            names = '\n'.join(f'— {p.full_name}' for p in others)
+            bot.send_message(
+                message.chat.id,
+                f'Нашёл вас в базе:\n{names}\n\n'
+                'Но бот открывается только после того, как ваш проект сдан '
+                'и вас отметили выпускником. Если проект уже закончился — '
+                'напишите руководителю GeeksPro, он отметит, и возвращайтесь: /start.',
+            )
+            return
         bot.send_message(
             message.chat.id,
-            'Такого выпускника не нашли — либо стажировка ещё не '
-            'завершена, либо имя написано иначе. Попробуйте написать '
-            'по-другому (например, только фамилию) или обратитесь к '
+            'Не нашёл такого человека. Попробуйте написать иначе — '
+            'например, только фамилию. Если не получится, напишите '
             'руководителю GeeksPro.',
         )
         bot.register_next_step_handler(message, handle_name)
         return
+    logger.info(
+        'Бот-выпускник: по «%s» нашли %s', typed, [p.full_name for p in candidates],
+    )
     if len(candidates) > 1:
         # Просить «введите полностью, как в анкете» бесполезно: человек не
         # знает, как он записан у нас. Показываем кнопками — пусть выберет.

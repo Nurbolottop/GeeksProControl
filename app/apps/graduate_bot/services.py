@@ -33,10 +33,21 @@ PHONE_LOCK_MINUTES = 30
 _rules_accepted: set[int] = set()
 
 
+# Буквы, которые люди пишут и так и эдак: кыргызские ү/ө/ң набирают как
+# у/о/н, «ё» — как «е», а латинские a/e/o/p/c/x/y часто проскакивают
+# вместо кириллических в именах, набранных в спешке.
+LETTER_FIXES = str.maketrans({
+    'ё': 'е', 'ү': 'у', 'ө': 'о', 'ң': 'н', 'і': 'и', 'ъ': '', 'ь': '',
+    'a': 'а', 'e': 'е', 'o': 'о', 'p': 'р', 'c': 'с', 'x': 'х', 'y': 'у',
+    'k': 'к', 'm': 'м', 't': 'т', 'h': 'н', 'b': 'в',
+})
+
+
 def _name_words(value: str) -> list[str]:
-    """Слова имени в сравнимом виде: без регистра, без «ё» и лишних знаков."""
-    lowered = (value or '').lower().replace('ё', 'е')
-    return [word for word in re.split(r'[^0-9a-zA-Zа-я]+', lowered) if word]
+    """Слова имени в сравнимом виде: без регистра, без лишних знаков и
+    с приведением букв, которые пишут по-разному."""
+    lowered = (value or '').lower().translate(LETTER_FIXES)
+    return [word for word in re.split(r'[^0-9a-zа-я]+', lowered) if word]
 
 
 def find_graduates(name: str, limit: int = 5) -> list[Intern]:
@@ -49,18 +60,45 @@ def find_graduates(name: str, limit: int = 5) -> list[Intern]:
     """
     from apps.interns.services import graduated_interns
 
+    return _search(graduated_interns(), name, limit)
+
+
+def _search(people, name: str, limit: int) -> list[Intern]:
+    """Поиск человека по тому, как его назвали.
+
+    Сначала ищем строго: все введённые слова должны найтись. Если никого
+    — ищем по любому слову: человек мог перепутать отчество или написать
+    фамилию с ошибкой, и лучше показать ему похожих, чем тупик.
+    """
     words = _name_words(name)
     if not words:
         return []
 
-    def matches(intern: Intern) -> bool:
+    def hits(intern: Intern) -> int:
         stored = _name_words(intern.full_name)
-        return all(
-            any(word == part or part.startswith(word) for part in stored)
-            for word in words
+        return sum(
+            1 for word in words
+            if any(word == part or part.startswith(word) or word.startswith(part)
+                   for part in stored)
         )
 
-    return [intern for intern in graduated_interns() if matches(intern)][:limit]
+    scored = [(hits(person), person) for person in people]
+    strict = [person for score, person in scored if score == len(words)]
+    if strict:
+        return strict[:limit]
+    loose = sorted(
+        (item for item in scored if item[0]), key=lambda item: -item[0],
+    )
+    return [person for _, person in loose][:limit]
+
+
+def find_people(name: str, limit: int = 5) -> list[Intern]:
+    """Поиск среди всех стажёров — чтобы отличить «такого нет» от
+    «есть, но стажировка ещё идёт»."""
+    people = list(
+        Intern.objects.filter(is_archived=False).select_related('specialization'),
+    )
+    return _search(people, name, limit)
 
 
 def _digits(value: str) -> str:

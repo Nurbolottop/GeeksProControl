@@ -48,8 +48,14 @@ class FindGraduatesTests(TestCase):
             [i.pk for i in services.find_graduates("семен  артемов")], [person.pk],
         )
 
-    def test_word_from_another_person_does_not_match(self):
-        self.assertEqual(services.find_graduates("Даяна Иванова"), [])
+    def test_partly_wrong_name_shows_candidates(self):
+        """Фамилию написали неверно — показываем похожих, а не тупик:
+        дальше человек выбирает себя кнопкой."""
+        found = services.find_graduates("Даяна Иванова")
+        self.assertEqual([p.pk for p in found], [self.grad.pk])
+
+    def test_completely_other_name_finds_nobody(self):
+        self.assertEqual(services.find_graduates("Зубенко Михаил"), [])
 
     def test_no_match_returns_empty(self):
         self.assertEqual(services.find_graduates("Неизвестный Человек"), [])
@@ -829,3 +835,53 @@ class SharedContactGuardTests(TestCase):
         from apps.graduate_bot import bot as botmod
 
         self.assertIsNone(botmod._own_contact_phone(self._Message()))
+
+
+class NameSearchToleranceTests(TestCase):
+    """Имя пишут как придётся: кыргызские буквы заменяют русскими,
+    путают отчество, печатают латиницей по инерции."""
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Балажан", status=ProjectStatus.COMPLETED)
+        self.people = {}
+        for name in ("Асилбекова Айчүрөк", "Салиев Яхьё", "Азимова Каниет Медеровна"):
+            person = Intern.objects.create(
+                full_name=name, graduate_status=GraduateStatus.PENDING,
+            )
+            TeamMember.objects.create(
+                project=self.project, intern=person, role=TeamRole.BACKEND,
+                status=TeamMember.Status.LEFT,
+            )
+            self.people[name] = person
+
+    def _found(self, typed):
+        return [p.full_name for p in services.find_graduates(typed)]
+
+    def test_kyrgyz_letters_typed_as_russian(self):
+        self.assertIn("Асилбекова Айчүрөк", self._found("Асилбекова Айчурок"))
+        self.assertIn("Асилбекова Айчүрөк", self._found("айчурок"))
+
+    def test_yo_typed_as_ye(self):
+        self.assertIn("Салиев Яхьё", self._found("Салиев Яхье"))
+
+    def test_wrong_patronymic_still_finds(self):
+        """Строгое совпадение не вышло — показываем похожих, а не тупик."""
+        self.assertIn(
+            "Азимова Каниет Медеровна", self._found("Азимова Каниет Медеровна"),
+        )
+        self.assertIn("Азимова Каниет Медеровна", self._found("Азимова Канает"))
+
+    def test_latin_lookalike_letters(self):
+        """Латинские a/o/e/к часто проскакивают вместо кириллических."""
+        self.assertIn("Азимова Каниет Медеровна", self._found("Aзимoвa"))
+
+    def test_active_intern_found_among_all_people(self):
+        active = Intern.objects.create(full_name="Активный Стажёров")
+        self.assertEqual(services.find_graduates("Активный"), [])
+        self.assertEqual(
+            [p.pk for p in services.find_people("Активный")], [active.pk],
+        )
+
+    def test_nobody_matches_returns_empty(self):
+        self.assertEqual(self._found("Зубенко Михаил"), [])
+        self.assertEqual(services.find_people("Зубенко Михаил"), [])
