@@ -64,6 +64,13 @@
                     Заказчики
                 </span>
             </a>
+            <a href="{% url 'documents:brief_requests' %}"
+               class="nav-item {% if request.resolver_match.url_name == 'brief_requests' %}is-active{% endif %}">
+                <span class="nav-item__label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"/><path d="M12 3v10"/><path d="m8 7 4-4 4 4"/></svg>
+                    Заявки с брифа
+                </span>
+            </a>
             <a href="{% url 'documents:list' %}"
                class="nav-item {% if request.resolver_match.namespace == 'documents' %}is-active{% endif %}">
                 <span class="nav-item__label">

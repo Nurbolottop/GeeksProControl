@@ -261,3 +261,102 @@ class ProjectBriefTests(TestCase):
             f"{self.project.get_absolute_url()}?tab=documents",
         )
         self.assertContains(response, "Продаём цветы")
+
+
+class NewProjectBriefTests(TestCase):
+    """Бриф на новый проект: заказчик заполняет общую форму, проекта
+    ещё нет — заявка превращается в проект одной кнопкой."""
+
+    FILLED = {
+        'project_name': 'Магазин запчастей',
+        'organization': 'ОсОО Автодеталь',
+        'contact_name': 'Иванов Иван',
+        'phone': '0700112233',
+        'email': 'ivan@example.com',
+        'about_business': 'Продаём запчасти',
+        'goal': 'Запустить интернет-магазин',
+        'target_audience': 'Автовладельцы',
+        'required_features': 'Каталог, корзина, оплата',
+        'references': 'ozon.ru',
+        'deadline_wish': 'до Нового года',
+        'existing_site_url': 'нет',
+        'domain': 'avtodetal.kg',
+        'integrations': '1С',
+        'languages': 'русский',
+        'content_owner': 'мы сами',
+        'social_links': 'instagram.com/avtodetal',
+    }
+
+    def test_public_form_opens_without_login(self):
+        response = self.client.get(reverse('new_project_brief'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Бриф проекта')
+
+    def test_submission_creates_request_without_project(self):
+        from apps.documents.models import ProjectBrief
+
+        response = self.client.post(reverse('new_project_brief'), self.FILLED)
+        self.assertEqual(response.status_code, 200)
+        brief = ProjectBrief.objects.get(project_name='Магазин запчастей')
+        self.assertIsNone(brief.project_id)
+        self.assertEqual(brief.organization, 'ОсОО Автодеталь')
+        self.assertIsNotNone(brief.submitted_at)
+
+    def test_head_is_notified(self):
+        from apps.notifications.models import Notification
+
+        self.client.post(reverse('new_project_brief'), self.FILLED)
+        self.assertTrue(
+            Notification.objects.filter(title__startswith='Заявка с брифа').exists()
+        )
+
+    def test_requests_page_lists_it(self):
+        from django.contrib.auth import get_user_model
+
+        self.client.post(reverse('new_project_brief'), self.FILLED)
+        user = get_user_model().objects.create_user(username='head', password='x')
+        self.client.force_login(user)
+        response = self.client.get(reverse('documents:brief_requests'))
+        self.assertContains(response, 'Магазин запчастей')
+        self.assertContains(response, 'ОсОО Автодеталь')
+
+    def test_accepting_request_creates_project_and_client(self):
+        from django.contrib.auth import get_user_model
+
+        from apps.clients.models import Client as Company
+        from apps.documents.models import ProjectBrief
+        from apps.projects.models import Project
+
+        self.client.post(reverse('new_project_brief'), self.FILLED)
+        brief = ProjectBrief.objects.get(project_name='Магазин запчастей')
+        user = get_user_model().objects.create_user(username='head', password='x')
+        self.client.force_login(user)
+        self.client.post(reverse('documents:brief_request_accept', args=[brief.pk]))
+        project = Project.objects.get(name='Магазин запчастей')
+        brief.refresh_from_db()
+        self.assertEqual(brief.project, project)
+        self.assertEqual(project.client, Company.objects.get(organization='ОсОО Автодеталь'))
+
+    def test_accepting_twice_does_not_duplicate(self):
+        from django.contrib.auth import get_user_model
+
+        from apps.documents.models import ProjectBrief
+        from apps.projects.models import Project
+
+        self.client.post(reverse('new_project_brief'), self.FILLED)
+        brief = ProjectBrief.objects.get(project_name='Магазин запчастей')
+        user = get_user_model().objects.create_user(username='head', password='x')
+        self.client.force_login(user)
+        for _ in range(2):
+            self.client.post(reverse('documents:brief_request_accept', args=[brief.pk]))
+        self.assertEqual(Project.objects.filter(name='Магазин запчастей').count(), 1)
+
+    def test_old_link_brief_still_works(self):
+        """Бриф по ссылке проекта не сломался — он по-прежнему про проект."""
+        from apps.documents.models import ProjectBriefLink
+        from apps.projects.models import Project
+
+        project = Project.objects.create(name='Балажан')
+        link = ProjectBriefLink.objects.create(project=project)
+        response = self.client.get(link.get_absolute_url())
+        self.assertContains(response, 'Балажан')

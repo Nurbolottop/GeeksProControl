@@ -103,6 +103,60 @@ def active_brief_link(project: Project) -> ProjectBriefLink | None:
     return link
 
 
+def accept_new_project_brief(form) -> ProjectBrief:
+    """Бриф на новый проект — заказчик заполнил общую форму.
+
+    Проекта у нас ещё нет, поэтому это заявка: сохраняем ответы вместе с
+    контактами и зовём руководителя — он заведёт проект из заявки.
+    """
+    from django.urls import reverse
+    from django.utils import timezone
+
+    from apps.notifications.models import NotificationLevel
+    from apps.notifications.services import notify
+
+    brief = form.save(commit=False)
+    brief.project = None
+    brief.submitted_at = timezone.now()
+    brief.save()
+    notify(
+        f'Заявка с брифа: {brief.project_name}',
+        level=NotificationLevel.INFO,
+        description=(
+            f'{brief.organization} ({brief.contact_name}, {brief.phone}) '
+            'заполнил бриф на новый проект.'
+        ),
+        url=reverse('documents:brief_requests'),
+        dedup_key=f'brief-request:{brief.pk}',
+    )
+    return brief
+
+
+def project_from_brief(brief: ProjectBrief, user=None):
+    """Завести проект из заявки: клиент, проект и сам бриф привязываются.
+
+    Повторный вызов ничего не плодит — если проект уже заведён, просто
+    возвращаем его.
+    """
+    from apps.clients.models import Client
+    from apps.projects.models import Project
+    from apps.projects.services import create_project
+
+    if brief.project_id:
+        return brief.project
+
+    client = Client.objects.filter(organization=brief.organization).first()
+    if client is None:
+        client = Client.objects.create(
+            organization=brief.organization, contact_name=brief.contact_name,
+            phone=brief.phone, email=brief.email,
+        )
+    project = create_project(Project(name=brief.project_name, client=client))
+    brief.project = project
+    brief.save(update_fields=['project', 'updated_at'])
+    return project
+
+
 def accept_brief_submission(link: ProjectBriefLink, form) -> ProjectBrief:
     """Заказчик отправил бриф по ссылке.
 

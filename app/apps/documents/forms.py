@@ -113,3 +113,19 @@ class ProjectBriefApplyForm(forms.ModelForm):
 
     def clean_requirements_file(self):
         return validate_upload_file(self.cleaned_data.get('requirements_file'))
+
+
+class NewProjectBriefForm(ProjectBriefApplyForm):
+    """Бриф на новый проект — по общей ссылке, без привязки к проекту.
+
+    Проекта у нас ещё нет, поэтому контакты и название сохраняем прямо в
+    брифе: это заявка, из которой руководитель заводит проект.
+    """
+
+    project_name = forms.CharField(label='Название проекта', max_length=255)
+
+    class Meta(ProjectBriefApplyForm.Meta):
+        fields = [
+            'project_name', 'organization', 'contact_name', 'phone', 'email',
+            *ProjectBriefApplyForm.Meta.fields,
+        ]

@@ -8,7 +8,7 @@ from apps.interns.views import (
     profile_apply, profile_link_expired, resume_bank_apply,
     talent_reserve_apply,
 )
-from apps.documents.views import brief_apply
+from apps.documents.views import brief_apply, new_project_brief
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,6 +29,7 @@ urlpatterns = [
     path('candidate/<str:token>/', reserve_share, name='reserve_share'),
     # Бриф проекта — ссылка выпускается под конкретный проект, заказчик
     # заполняет без входа, ответы попадают в Документы этого проекта.
+    path('brief/', new_project_brief, name='new_project_brief'),
     path('brief/<str:token>/', brief_apply, name='project_brief_apply'),
     path('', include('apps.accounts.urls')),
     path('', include('apps.dashboard.urls')),

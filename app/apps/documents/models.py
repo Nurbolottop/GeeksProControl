@@ -178,10 +178,20 @@ class ProjectBrief(TimeStampedModel):
     в карточку клиента проекта (Client), не дублируются здесь.
     """
 
+    # Проект может появиться позже: бриф на новый проект заказчик
+    # заполняет по общей ссылке, когда проекта у нас ещё нет. Пока
+    # проект не заведён, это заявка — её видно в «Заявках с брифа».
     project = models.OneToOneField(
         Project, on_delete=models.CASCADE, related_name='brief',
-        verbose_name='Проект',
+        verbose_name='Проект', null=True, blank=True,
     )
+    # Контакты заполняются только у заявок: у брифа по ссылке проекта
+    # они уходят в карточку клиента, дублировать их здесь незачем.
+    project_name = models.CharField('Название проекта', max_length=255, blank=True)
+    organization = models.CharField('Компания', max_length=255, blank=True)
+    contact_name = models.CharField('Контактное лицо', max_length=255, blank=True)
+    phone = models.CharField('Телефон', max_length=32, blank=True)
+    email = models.EmailField('Email', blank=True)
     about_business = models.TextField('О бизнесе', blank=True)
     goal = models.TextField('Цель проекта', blank=True)
     target_audience = models.TextField('Целевая аудитория', blank=True)
@@ -231,7 +241,12 @@ class ProjectBrief(TimeStampedModel):
         verbose_name_plural = 'Брифы проектов'
 
     def __str__(self) -> str:
-        return f'Бриф «{self.project}»'
+        return f'Бриф «{self.project or self.project_name or self.organization}»'
+
+    @property
+    def is_request(self) -> bool:
+        """Заявка на новый проект: бриф есть, а проекта ещё нет."""
+        return self.project_id is None
 
     @property
     def display_rows(self):

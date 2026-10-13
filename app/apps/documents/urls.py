@@ -9,6 +9,11 @@ urlpatterns = [
     path('create/', views.document_create, name='create'),
     path('<int:pk>/edit/', views.document_update, name='update'),
     path('<int:pk>/approve/', views.document_approve, name='approve'),
+    path('brief-requests/', views.brief_requests, name='brief_requests'),
+    path(
+        'brief-requests/<int:pk>/accept/', views.brief_request_accept,
+        name='brief_request_accept',
+    ),
     path('templates/', views.template_list, name='templates'),
     path('templates/create/', views.template_create, name='template_create'),
     path(

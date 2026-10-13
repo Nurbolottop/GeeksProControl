@@ -6,10 +6,11 @@ from django.utils import timezone
 
 from apps.documents import services
 from apps.documents.forms import (
-    DocumentForm, DocumentTemplateForm, ProjectBriefApplyForm,
+    DocumentForm, DocumentTemplateForm, NewProjectBriefForm, ProjectBriefApplyForm,
 )
 from apps.documents.models import (
-    Document, DocumentStatus, DocumentTemplate, DocumentType, ProjectBriefLink,
+    Document, DocumentStatus, DocumentTemplate, DocumentType, ProjectBrief,
+    ProjectBriefLink,
 )
 from apps.projects.models import Project, ProjectStatusHistory
 
@@ -130,6 +131,48 @@ def brief_apply(request, token):
     return render(request, 'documents/brief_apply.html', {
         'form': form, 'project': project,
     })
+
+
+def new_project_brief(request):
+    """Бриф на новый проект — постоянная ссылка без токена.
+
+    Заказчика, которого у нас ещё нет в базе, незачем заводить заранее:
+    он сам называет проект и оставляет контакты, а проект заводится из
+    заявки одной кнопкой.
+    """
+    form = NewProjectBriefForm(request.POST or None, request.FILES or None)
+    if request.method == 'POST' and form.is_valid():
+        brief = services.accept_new_project_brief(form)
+        return render(request, 'documents/brief_apply_done.html', {
+            'project': None, 'brief': brief,
+        })
+    return render(request, 'documents/brief_apply.html', {
+        'form': form, 'project': None,
+    })
+
+
+@login_required
+def brief_requests(request):
+    """Заявки с брифа: заказчик заполнил, проекта ещё нет."""
+    requests_ = (
+        ProjectBrief.objects.filter(project__isnull=True).order_by('-submitted_at')
+    )
+    return render(request, 'documents/brief_requests.html', {
+        'requests': requests_, 'title': 'Заявки с брифа',
+    })
+
+
+@login_required
+def brief_request_accept(request, pk):
+    """Завести проект из заявки — вместе с карточкой клиента."""
+    brief = get_object_or_404(ProjectBrief, pk=pk)
+    if request.method == 'POST':
+        project = services.project_from_brief(brief, user=request.user)
+        messages.success(
+            request, f'Проект «{project.name}» заведён из заявки — бриф уже внутри.',
+        )
+        return redirect(project.get_absolute_url())
+    return redirect('documents:brief_requests')
 
 
 @login_required
